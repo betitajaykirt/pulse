@@ -1,0 +1,762 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% load static %}
+{% block page_title %}Submit Case Report{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+{% endblock %}
+
+{% block content %}
+<div class="pulse-page">
+
+  <header class="pulse-page-header">
+    <div class="pulse-page-header__text">
+      <span class="pulse-eyebrow">Data Entry</span>
+      <h2>Submit Case Report</h2>
+      <p>Batch syndromic entry — capture raw symptom indicators only; disease classification is handled later by ML</p>
+    </div>
+  </header>
+
+  <div class="pulse-panel report-form-shell">
+    <div class="form-section">
+      <div class="form-section-title">Global Session Info</div>
+      <div class="session-info-grid">
+        <div>
+          <span class="session-info-label">Reporter</span>
+          <span class="session-info-value">{{ session_full_name }}</span>
+        </div>
+        <div>
+          <span class="session-info-label">Role</span>
+          <span class="session-info-value">{{ session_role|title }}</span>
+        </div>
+        {% if assigned_barangay %}
+        <div>
+          <span class="session-info-label">Assigned Barangay</span>
+          <span class="session-info-value">{{ assigned_barangay }}</span>
+        </div>
+        {% endif %}
+        <div>
+          <span class="session-info-label">Report Date</span>
+          <span class="session-info-value">{% now "M d, Y" %}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">Patient Cases</div>
+      <p style="font-size:.84rem;color:var(--muted);margin:0 0 .75rem;">Each block captures demographics, onset date, syndromic indicators, and location. Click a patient header to activate the map pin for that case.</p>
+      <div id="patient-list" class="patient-list"></div>
+      <button type="button" id="btn-add-patient" class="nc-btn nc-btn--outline" style="margin-top:.75rem;">+ Add Another Patient</button>
+    </div>
+
+    <div class="form-section">
+      <div class="form-section-title">Location Pin (Shared Map)</div>
+      <div id="map-active-label" class="map-active-label">Active: Patient #1</div>
+      <small style="color:var(--muted);display:block;margin-bottom:.5rem;">One map updates the active patient only. Click the map to drop a pin for the focused patient block.</small>
+      <div id="pin-map" class="pulse-map"></div>
+      <div id="pin-info" class="pin-hint pin-info-row" style="display:none;">
+        <i data-lucide="map-pin" class="lucide-icon lucide-icon--xs"></i>
+        <span id="pin-coords"></span>
+        <button type="button" id="clear-pin" style="margin-left:.5rem;background:none;border:none;color:var(--danger);cursor:pointer;font-size:.82rem;font-weight:600;">Clear pin</button>
+      </div>
+    </div>
+
+    <div class="report-form-actions">
+      <a href="{% url 'my_reports' %}" class="nc-btn nc-btn--outline">Cancel</a>
+      <button type="button" id="btn-submit-batch" class="nc-btn nc-btn--primary">Submit Batch Report</button>
+    </div>
+    <div id="submit-status"></div>
+  </div>
+
+</div>
+
+<input type="hidden" id="csrf-token" value="{{ csrf_token }}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+const BARANGAY_OPTIONS = {{ barangay_options_json|safe }};
+const BARANGAY_LOCKED = {{ barangay_locked|yesno:"true,false" }};
+const DEFAULT_BARANGAY_ID = '{{ default_barangay_id }}';
+const SUBMIT_URL = '{% url "submit_report" %}';
+
+const SYMPTOM_GROUPS = {{ symptom_groups_json|safe }};
+
+const ALL_SYMPTOM_KEYS = SYMPTOM_GROUPS.flatMap(g => g.items.map(i => i.key));
+const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Divorced', 'Annulled'];
+
+let patientSeq = 0;
+let activePatientId = null;
+let patients = [];
+
+function createPatient() {
+  patientSeq += 1;
+  const id = 'p' + patientSeq;
+  const symptoms = {};
+  ALL_SYMPTOM_KEYS.forEach(key => { symptoms[key] = false; });
+  return {
+    id,
+    patient_name: '',
+    civil_status: '',
+    date_of_birth: '',
+    is_student: false,
+    grade_year_section: '',
+    school_name: '',
+    purok_street: '',
+    barangay_id: DEFAULT_BARANGAY_ID || (BARANGAY_OPTIONS[0] ? String(BARANGAY_OPTIONS[0].id) : ''),
+    latitude: null,
+    longitude: null,
+    date_of_onset: '',
+    age: '',
+    sex: '',
+    symptoms,
+    other_symptoms: '',
+    open: true,
+  };
+}
+
+function escapeTextarea(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function barangaySelectHtml(p) {
+  if (BARANGAY_LOCKED && BARANGAY_OPTIONS.length === 1) {
+    const b = BARANGAY_OPTIONS[0];
+    return `<input type="text" value="${b.name}" disabled class="input-soft input-soft--plain readonly-field">`;
+  }
+  let opts = '<option value="">-- Select Barangay --</option>';
+  BARANGAY_OPTIONS.forEach(b => {
+    const sel = String(p.barangay_id) === String(b.id) ? 'selected' : '';
+    opts += `<option value="${b.id}" ${sel}>${b.name}</option>`;
+  });
+  return `<select id="barangay_${p.id}" class="field-barangay input-soft input-soft--plain" data-pid="${p.id}">${opts}</select>`;
+}
+
+function symptomGroupsHtml(p) {
+  return `
+    <div class="symptom-section" data-pid="${p.id}">
+      <div class="symptom-search-wrap">
+        <i data-lucide="search" class="lucide-icon lucide-icon--xs symptom-search-icon"></i>
+        <input type="text"
+          class="symptom-search-input input-soft input-soft--plain"
+          placeholder="Search symptoms..."
+          data-pid="${p.id}"
+          autocomplete="off">
+      </div>
+      <div class="symptom-groups-container">
+        ${SYMPTOM_GROUPS.map(group => `
+          <div class="symptom-group" data-group="${group.id}">
+            <h5 class="symptom-group-title">Group ${group.id}: ${group.title}</h5>
+            <div class="symptom-grid">
+              ${group.items.map(s => `
+                <label class="symptom-item" data-label="${s.label.toLowerCase()}">
+                  <input type="checkbox" class="field-symptom" data-pid="${p.id}" data-key="${s.key}"
+                    ${p.symptoms[s.key] ? 'checked' : ''}>
+                  <span>${s.label}</span>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function filterSymptomsForPatient(pid, query) {
+  const section = document.querySelector(`.symptom-section[data-pid="${pid}"]`);
+  if (!section) return;
+  const q = query.trim().toLowerCase();
+  section.querySelectorAll('.symptom-item').forEach(label => {
+    const text = label.dataset.label || label.querySelector('span').textContent.toLowerCase();
+    label.classList.toggle('symptom-item--hidden', q.length > 0 && !text.includes(q));
+  });
+  section.querySelectorAll('.symptom-group').forEach(group => {
+    const visible = group.querySelectorAll('.symptom-item:not(.symptom-item--hidden)');
+    group.classList.toggle('symptom-group--empty', visible.length === 0);
+  });
+}
+
+function otherSymptomsSectionHtml(p) {
+  return `
+    <div class="other-symptoms-panel">
+      <div class="other-symptoms-header">
+        <i data-lucide="file-text" class="lucide-icon lucide-icon--sm other-symptoms-icon" stroke-width="1.8"></i>
+        <h5 class="other-symptoms-title">Other Clinical Observations</h5>
+      </div>
+      <p class="other-symptoms-hint">Describe any additional signs, symptoms, or patient complications that cannot be identified in the checkboxes above.</p>
+      <textarea
+        name="other_symptoms"
+        class="field-other-symptoms other-symptoms-textarea"
+        data-pid="${p.id}"
+        rows="4"
+        placeholder="Optional — e.g. atypical rash pattern, post-operative complications, or other unlisted findings">${escapeTextarea(p.other_symptoms)}</textarea>
+    </div>
+  `;
+}
+
+function demographicsSectionHtml(p) {
+  const studentDisplay = p.is_student ? 'block' : 'none';
+  return `
+    <div class="demographic-section">
+      <h4 class="demographic-section__title">A. Demographic Data</h4>
+      <div class="demographic-grid demographic-grid--two-col">
+        <div class="form-group demographic-grid__full">
+          <label for="patient_name_${p.id}">Full Name <span class="text-danger">*</span></label>
+          <input type="text"
+            id="patient_name_${p.id}"
+            name="patient_name"
+            class="field-name input-soft input-soft--plain"
+            data-pid="${p.id}"
+            value="${escapeTextarea(p.patient_name)}"
+            placeholder="e.g. Juan Dela Cruz"
+            autocomplete="name">
+        </div>
+        <div class="form-group">
+          <label for="date_of_birth_${p.id}">Date of Birth <span class="text-danger">*</span></label>
+          <input type="date"
+            id="date_of_birth_${p.id}"
+            name="date_of_birth"
+            class="form-control field-dob input-soft input-soft--plain"
+            data-pid="${p.id}"
+            value="${p.date_of_birth}"
+            max="{% now 'Y-m-d' %}"
+            required>
+        </div>
+        <div class="form-group">
+          <label for="age_${p.id}">Age <span class="text-danger">*</span></label>
+          <input type="number"
+            id="age_${p.id}"
+            name="age"
+            class="field-age input-soft input-soft--plain age-readonly"
+            data-pid="${p.id}"
+            value="${p.age}"
+            min="0"
+            max="120"
+            readonly
+            tabindex="-1"
+            placeholder="Auto-calculated">
+          <small class="field-hint">Calculated automatically from date of birth</small>
+        </div>
+        <div class="form-group">
+          <label for="gender_${p.id}">Gender <span class="text-danger">*</span></label>
+          <select id="gender_${p.id}" name="gender" class="field-gender input-soft input-soft--plain" data-pid="${p.id}">
+            <option value="">-- Select Gender --</option>
+            <option value="Male" ${p.sex === 'Male' ? 'selected' : ''}>Male</option>
+            <option value="Female" ${p.sex === 'Female' ? 'selected' : ''}>Female</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="civil_status_${p.id}">Civil Status</label>
+          <select id="civil_status_${p.id}" name="civil_status" class="field-civil-status input-soft input-soft--plain" data-pid="${p.id}">
+            <option value="">-- Select Civil Status --</option>
+            ${CIVIL_STATUS_OPTIONS.map(status => `<option value="${status}" ${p.civil_status === status ? 'selected' : ''}>${status}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="onset_date_${p.id}">Date of Onset of Initial Signs &amp; Symptoms <span class="text-danger">*</span></label>
+          <input type="date"
+            id="onset_date_${p.id}"
+            name="onset_date"
+            class="form-control field-onset input-soft input-soft--plain"
+            data-pid="${p.id}"
+            value="${p.date_of_onset}"
+            max="{% now 'Y-m-d' %}"
+            required>
+        </div>
+      </div>
+      <label class="student-switch" for="is_student_${p.id}">
+        <input type="checkbox"
+          id="is_student_${p.id}"
+          class="field-is-student"
+          data-pid="${p.id}"
+          ${p.is_student ? 'checked' : ''}>
+        <span>Is the patient currently a student?</span>
+      </label>
+      <div id="student-fields-${p.id}" class="student-fields" data-pid="${p.id}" style="display: ${studentDisplay};">
+        <div class="demographic-grid demographic-grid--two-col">
+          <div class="form-group">
+            <label for="grade_year_section_${p.id}">Grade / Year &amp; Section</label>
+            <input type="text"
+              id="grade_year_section_${p.id}"
+              name="grade_year_section"
+              class="field-grade input-soft input-soft--plain"
+              data-pid="${p.id}"
+              value="${escapeTextarea(p.grade_year_section)}"
+              placeholder="e.g. Grade 5 — Section A">
+          </div>
+          <div class="form-group">
+            <label for="school_name_${p.id}">Name of School</label>
+            <input type="text"
+              id="school_name_${p.id}"
+              name="school_name"
+              class="field-school input-soft input-soft--plain"
+              data-pid="${p.id}"
+              value="${escapeTextarea(p.school_name)}"
+              placeholder="e.g. Bago Central Elementary School">
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function patientSummary(p) {
+  const parts = [];
+  const name = (p.patient_name || '').trim();
+  if (name) parts.push(name);
+  if (p.age !== '' && p.age != null) parts.push('Age ' + p.age);
+  if (p.sex) parts.push(p.sex);
+  if (p.purok_street) parts.push(p.purok_street);
+  const symptomCount = getSymptomArray(p).length;
+  if (symptomCount) parts.push(symptomCount + ' indicator' + (symptomCount === 1 ? '' : 's'));
+  return parts.length ? ' — ' + parts.join(', ') : '';
+}
+
+function updatePatientHeader(p) {
+  const hdr = document.querySelector(`.patient-card[data-pid="${p.id}"] .patient-card-header h4`);
+  const idx = patients.findIndex(x => x.id === p.id);
+  if (hdr) hdr.textContent = 'Patient #' + (idx + 1) + patientSummary(p);
+}
+
+function getSymptomArray(p) {
+  return ALL_SYMPTOM_KEYS.filter(key => p.symptoms[key]);
+}
+
+function renderPatientList() {
+  const list = document.getElementById('patient-list');
+  list.innerHTML = patients.map((p, idx) => `
+    <div class="patient-card ${p.open ? 'open' : ''} ${p.id === activePatientId ? 'active' : ''}" data-pid="${p.id}">
+      <div class="patient-card-header" data-action="toggle" data-pid="${p.id}">
+        <h4>Patient #${idx + 1}${patientSummary(p)}</h4>
+        <div class="patient-card-actions">
+          ${patients.length > 1 ? `<button type="button" class="nc-btn nc-btn--danger nc-btn--sm" data-action="remove" data-pid="${p.id}">Remove</button>` : ''}
+          <span class="patient-chevron"><i data-lucide="${p.open ? 'chevron-up' : 'chevron-down'}" class="lucide-icon lucide-icon--xs"></i></span>
+        </div>
+      </div>
+      <div class="patient-card-body">
+        ${demographicsSectionHtml(p)}
+        <div class="form-section-title" style="margin-top:.25rem;">B. Syndromic Indicators</div>
+        <p style="font-size:.8rem;color:var(--muted);margin:0 0 .75rem;">Check all signs, symptoms, and exposures present. No disease name is recorded at entry — only raw indicators for objective ML classification.</p>
+        ${symptomGroupsHtml(p)}
+        ${otherSymptomsSectionHtml(p)}
+        <div class="form-section-title" style="margin-top:1rem;">C. Location Details</div>
+        <div class="location-section">
+          <div class="form-group">
+            <label for="purok_street_${p.id}">Purok / Street / Landmark <span class="text-danger">*</span></label>
+            <input type="text"
+              id="purok_street_${p.id}"
+              name="purok_street"
+              class="field-purok input-soft input-soft--plain"
+              data-pid="${p.id}"
+              value="${escapeTextarea(p.purok_street)}"
+              placeholder="e.g. Purok 3, Sitio Mabini"
+              autocomplete="street-address">
+          </div>
+          <div class="form-group">
+            <label for="barangay_${p.id}">Barangay <span class="text-danger">*</span></label>
+            ${barangaySelectHtml(p)}
+          </div>
+          <div class="pin-hint">
+            Coordinates: ${p.latitude != null ? p.latitude + ', ' + p.longitude : 'No pin yet — activate this patient and click the map below'}
+          </div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  bindPatientEvents();
+  bindAgeCalculation();
+  patients.forEach(p => {
+    if (p.date_of_birth) applyAgeFromBirthdate(p.id, p.date_of_birth, false);
+  });
+  updateMapForActivePatient();
+  if (window.lucide) lucide.createIcons();
+}
+
+function bindPatientEvents() {
+  document.querySelectorAll('[data-action="toggle"]').forEach(el => {
+    el.onclick = (e) => {
+      if (e.target.closest('[data-action="remove"]')) return;
+      const pid = el.dataset.pid;
+      const p = patients.find(x => x.id === pid);
+      if (p) { p.open = !p.open; renderPatientList(); setActivePatient(pid); }
+    };
+  });
+  document.querySelectorAll('[data-action="remove"]').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const pid = btn.dataset.pid;
+      patients = patients.filter(x => x.id !== pid);
+      if (activePatientId === pid) activePatientId = patients[0]?.id || null;
+      renderPatientList();
+    };
+  });
+  document.querySelectorAll('.field-purok').forEach(inp => {
+    inp.oninput = () => { const p = patients.find(x => x.id === inp.dataset.pid); if (p) p.purok_street = inp.value; };
+  });
+  document.querySelectorAll('.field-name').forEach(inp => {
+    inp.oninput = () => {
+      const p = patients.find(x => x.id === inp.dataset.pid);
+      if (!p) return;
+      p.patient_name = inp.value;
+      updatePatientHeader(p);
+    };
+  });
+  document.querySelectorAll('.field-civil-status').forEach(sel => {
+    sel.onchange = () => { const p = patients.find(x => x.id === sel.dataset.pid); if (p) p.civil_status = sel.value; };
+  });
+  document.querySelectorAll('.field-grade').forEach(inp => {
+    inp.oninput = () => { const p = patients.find(x => x.id === inp.dataset.pid); if (p) p.grade_year_section = inp.value; };
+  });
+  document.querySelectorAll('.field-school').forEach(inp => {
+    inp.oninput = () => { const p = patients.find(x => x.id === inp.dataset.pid); if (p) p.school_name = inp.value; };
+  });
+  document.querySelectorAll('.field-is-student').forEach(cb => {
+    cb.onchange = () => {
+      const p = patients.find(x => x.id === cb.dataset.pid);
+      if (!p) return;
+      p.is_student = cb.checked;
+      toggleStudentFields(p.id, p.is_student);
+      if (!p.is_student) {
+        p.grade_year_section = '';
+        p.school_name = '';
+        const grade = document.querySelector(`.field-grade[data-pid="${p.id}"]`);
+        const school = document.querySelector(`.field-school[data-pid="${p.id}"]`);
+        if (grade) grade.value = '';
+        if (school) school.value = '';
+      }
+    };
+  });
+  document.querySelectorAll('.field-onset').forEach(inp => {
+    inp.onchange = () => {
+      const p = patients.find(x => x.id === inp.dataset.pid);
+      if (p) p.date_of_onset = inp.value;
+    };
+  });
+  document.querySelectorAll('.field-gender').forEach(sel => {
+    sel.onchange = () => {
+      const p = patients.find(x => x.id === sel.dataset.pid);
+      if (!p) return;
+      p.sex = sel.value;
+      updatePatientHeader(p);
+    };
+  });
+  document.querySelectorAll('.field-barangay').forEach(sel => {
+    sel.onchange = () => { const p = patients.find(x => x.id === sel.dataset.pid); if (p) p.barangay_id = sel.value; };
+  });
+  document.querySelectorAll('.field-symptom').forEach(cb => {
+    cb.onchange = () => {
+      const p = patients.find(x => x.id === cb.dataset.pid);
+      if (!p) return;
+      p.symptoms[cb.dataset.key] = cb.checked;
+      const hdr = document.querySelector(`.patient-card[data-pid="${p.id}"] .patient-card-header h4`);
+      const idx = patients.findIndex(x => x.id === p.id);
+      if (hdr) hdr.textContent = 'Patient #' + (idx + 1) + patientSummary(p);
+    };
+  });
+  document.querySelectorAll('.field-other-symptoms').forEach(ta => {
+    ta.oninput = () => {
+      const p = patients.find(x => x.id === ta.dataset.pid);
+      if (p) p.other_symptoms = ta.value;
+    };
+  });
+  document.querySelectorAll('.symptom-search-input').forEach(inp => {
+    inp.oninput = () => filterSymptomsForPatient(inp.dataset.pid, inp.value);
+  });
+  document.querySelectorAll('.patient-card-header').forEach(hdr => {
+    hdr.addEventListener('click', () => setActivePatient(hdr.dataset.pid));
+  });
+}
+
+function setActivePatient(pid) {
+  activePatientId = pid;
+  document.querySelectorAll('.patient-card').forEach(c => {
+    c.classList.toggle('active', c.dataset.pid === pid);
+  });
+  const idx = patients.findIndex(x => x.id === pid);
+  document.getElementById('map-active-label').textContent = 'Active: Patient #' + (idx + 1);
+  updateMapForActivePatient();
+}
+
+function addPatient() {
+  const p = createPatient();
+  patients.push(p);
+  activePatientId = p.id;
+  renderPatientList();
+}
+
+document.getElementById('btn-add-patient').addEventListener('click', addPatient);
+
+const pinMap = L.map('pin-map').setView([10.5389, 122.8366], 14);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
+}).addTo(pinMap);
+let pinMarker = null;
+
+function updateMapForActivePatient() {
+  const p = patients.find(x => x.id === activePatientId);
+  if (!p) return;
+  if (pinMarker) { pinMap.removeLayer(pinMarker); pinMarker = null; }
+  if (p.latitude != null && p.longitude != null) {
+    pinMarker = L.marker([p.latitude, p.longitude], {
+      icon: L.divIcon({
+        className: '',
+        html: '<div style="width:18px;height:18px;background:#DC2626;border:3px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.35);"></div>',
+        iconSize: [18, 18], iconAnchor: [9, 9]
+      })
+    }).addTo(pinMap);
+    pinMap.setView([p.latitude, p.longitude], 15);
+    document.getElementById('pin-coords').textContent = p.latitude + ', ' + p.longitude;
+    document.getElementById('pin-info').style.display = 'block';
+  } else {
+    document.getElementById('pin-info').style.display = 'none';
+  }
+}
+
+pinMap.on('click', function(e) {
+  const p = patients.find(x => x.id === activePatientId);
+  if (!p) return;
+  p.latitude = parseFloat(e.latlng.lat.toFixed(7));
+  p.longitude = parseFloat(e.latlng.lng.toFixed(7));
+  updateMapForActivePatient();
+  renderPatientList();
+  setActivePatient(p.id);
+});
+
+document.getElementById('clear-pin').addEventListener('click', () => {
+  const p = patients.find(x => x.id === activePatientId);
+  if (!p) return;
+  p.latitude = null;
+  p.longitude = null;
+  updateMapForActivePatient();
+  renderPatientList();
+  setActivePatient(p.id);
+});
+
+function syncPatientsFromDom() {
+  patients.forEach(p => {
+    const name = document.querySelector(`.field-name[data-pid="${p.id}"]`);
+    const purok = document.querySelector(`.field-purok[data-pid="${p.id}"]`);
+    const onset = document.querySelector(`.field-onset[data-pid="${p.id}"]`);
+    const dob = document.querySelector(`.field-dob[data-pid="${p.id}"]`);
+    const age = document.querySelector(`.field-age[data-pid="${p.id}"]`);
+    const brgy = document.querySelector(`.field-barangay[data-pid="${p.id}"]`);
+    const civil = document.querySelector(`.field-civil-status[data-pid="${p.id}"]`);
+    const gender = document.querySelector(`.field-gender[data-pid="${p.id}"]`);
+    const isStudent = document.querySelector(`.field-is-student[data-pid="${p.id}"]`);
+    const grade = document.querySelector(`.field-grade[data-pid="${p.id}"]`);
+    const school = document.querySelector(`.field-school[data-pid="${p.id}"]`);
+    if (name) p.patient_name = name.value;
+    if (purok) p.purok_street = purok.value;
+    if (onset) p.date_of_onset = onset.value;
+    if (dob) p.date_of_birth = dob.value;
+    if (age) p.age = age.value;
+    if (gender) p.sex = gender.value;
+    if (brgy) p.barangay_id = brgy.value;
+    if (civil) p.civil_status = civil.value;
+    if (isStudent) p.is_student = isStudent.checked;
+    if (grade) p.grade_year_section = grade.value;
+    if (school) p.school_name = school.value;
+    document.querySelectorAll(`.field-symptom[data-pid="${p.id}"]`).forEach(cb => {
+      p.symptoms[cb.dataset.key] = cb.checked;
+    });
+    const otherSymptoms = document.querySelector(`.field-other-symptoms[data-pid="${p.id}"]`);
+    if (otherSymptoms) p.other_symptoms = otherSymptoms.value;
+  });
+}
+
+function validatePatients() {
+  syncPatientsFromDom();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  for (let i = 0; i < patients.length; i++) {
+    const p = patients[i];
+    const n = i + 1;
+    if (!(p.patient_name || '').trim()) return `Patient #${n}: full name is required.`;
+    if (!p.date_of_birth) return `Patient #${n}: date of birth is required.`;
+    if (!p.date_of_onset) return `Patient #${n}: date of onset is required.`;
+    const dobDate = parseIsoDate(p.date_of_birth);
+    const onsetDate = parseIsoDate(p.date_of_onset);
+    if (!dobDate) return `Patient #${n}: enter a valid date of birth.`;
+    if (!onsetDate) return `Patient #${n}: enter a valid date of onset.`;
+    if (dobDate > today) return `Patient #${n}: date of birth cannot be in the future.`;
+    if (onsetDate > today) return `Patient #${n}: date of onset cannot be in the future.`;
+    if (p.age === '' || p.age == null) return `Patient #${n}: age could not be calculated — select a valid date of birth.`;
+    const ageNum = parseInt(p.age, 10);
+    if (isNaN(ageNum) || ageNum < 0 || ageNum > 120) return `Patient #${n}: calculated age must be between 0 and 120.`;
+    if (!p.sex) return `Patient #${n}: gender is required.`;
+    if (!p.purok_street.trim()) return `Patient #${n}: purok / street / landmark is required.`;
+    if (!p.barangay_id) return `Patient #${n}: barangay is required.`;
+    if (!getSymptomArray(p).length) return `Patient #${n}: at least one syndromic indicator is required.`;
+    if (p.is_student) {
+      if (!(p.grade_year_section || '').trim()) return `Patient #${n}: grade/year & section is required for students.`;
+      if (!(p.school_name || '').trim()) return `Patient #${n}: school name is required for students.`;
+    }
+  }
+  return null;
+}
+
+function buildPayload() {
+  return {
+    cases: patients.map(p => {
+      const address = p.purok_street.trim();
+      return {
+      patient_name: (p.patient_name || '').trim(),
+      civil_status: (p.civil_status || '').trim() || null,
+      date_of_birth: p.date_of_birth || null,
+      detailed_address: address,
+      is_student: !!p.is_student,
+      grade_year_section: p.is_student ? (p.grade_year_section || '').trim() : '',
+      school_name: p.is_student ? (p.school_name || '').trim() : '',
+      purok_street: address,
+      barangay: p.barangay_id,
+      latitude: p.latitude,
+      longitude: p.longitude,
+      date_of_onset: p.date_of_onset,
+      onset_date: p.date_of_onset,
+      age: parseInt(p.age, 10),
+      sex: p.sex,
+      symptoms: getSymptomArray(p),
+      other_symptoms: (p.other_symptoms || '').trim(),
+    };
+    }),
+  };
+}
+
+document.getElementById('btn-submit-batch').addEventListener('click', async () => {
+  const statusEl = document.getElementById('submit-status');
+  statusEl.className = '';
+  statusEl.textContent = 'Submitting...';
+
+  const validationError = validatePatients();
+  if (validationError) {
+    statusEl.className = 'error';
+    statusEl.textContent = validationError;
+    return;
+  }
+
+  syncPatientsFromDom();
+  const payload = buildPayload();
+  const btn = document.getElementById('btn-submit-batch');
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(SUBMIT_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-CSRFToken': document.getElementById('csrf-token').value,
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify(payload),
+    });
+    let data;
+    try {
+      data = await res.json();
+    } catch (parseErr) {
+      statusEl.className = 'error';
+      statusEl.textContent = 'Server returned an invalid response (HTTP ' + res.status + ').';
+      btn.disabled = false;
+      return;
+    }
+    if (!res.ok || !data.ok) {
+      statusEl.className = 'error';
+      statusEl.textContent = data.error || 'Submission failed.';
+      btn.disabled = false;
+      return;
+    }
+    statusEl.className = 'success';
+    statusEl.textContent = data.message;
+    setTimeout(() => { window.location.href = data.redirect || '/reports/my/'; }, 800);
+  } catch (err) {
+    statusEl.className = 'error';
+    statusEl.textContent = 'Network error. Please try again.';
+    btn.disabled = false;
+    console.error('Batch submit failed:', err);
+  }
+});
+
+/* ── Automatic age calculation from native date of birth ── */
+function parseIsoDate(str) {
+  if (!str || !/^\d{4}-\d{2}-\d{2}$/.test(str)) return null;
+  const [year, month, day] = str.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+    return null;
+  }
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function calculateAgeFromBirthdate(isoStr) {
+  const birthDate = parseIsoDate(isoStr);
+  if (!birthDate) return '';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age -= 1;
+  }
+  return age >= 0 && age <= 120 ? age : '';
+}
+
+function applyAgeFromBirthdate(pid, birthdateStr, animate = true) {
+  const ageInput = document.querySelector(`.field-age[data-pid="${pid}"]`);
+  const patient = patients.find(x => x.id === pid);
+  if (!ageInput || !patient) return;
+  const calculatedAge = calculateAgeFromBirthdate(birthdateStr);
+  ageInput.value = calculatedAge;
+  patient.age = calculatedAge;
+  if (animate && calculatedAge !== '') {
+    ageInput.classList.remove('age-updated');
+    void ageInput.offsetWidth;
+    ageInput.classList.add('age-updated');
+  }
+  updatePatientHeader(patient);
+}
+
+function bindAgeCalculation() {
+  document.querySelectorAll('.field-dob').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const pid = inp.dataset.pid;
+      const patient = patients.find(x => x.id === pid);
+      if (patient) patient.date_of_birth = inp.value;
+      applyAgeFromBirthdate(pid, inp.value);
+    });
+  });
+}
+
+function toggleStudentFields(pid, show) {
+  const panel = document.getElementById('student-fields-' + pid);
+  if (!panel) return;
+  if (show) {
+    panel.style.display = 'block';
+    panel.style.opacity = '0';
+    panel.style.maxHeight = '0';
+    panel.classList.add('is-visible');
+    requestAnimationFrame(() => {
+      panel.style.transition = 'opacity 0.28s ease, max-height 0.35s ease';
+      panel.style.maxHeight = panel.scrollHeight + 'px';
+      panel.style.opacity = '1';
+    });
+  } else {
+    panel.style.maxHeight = '0';
+    panel.style.opacity = '0';
+    panel.classList.remove('is-visible');
+    setTimeout(() => {
+      panel.style.display = 'none';
+    }, 320);
+  }
+}
+
+addPatient();
+setTimeout(() => pinMap.invalidateSize(), 400);
+</script>
+{% endblock %}

@@ -1,0 +1,92 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block page_title %}My Profile{% endblock %}
+{% block content %}
+<div class="pulse-page">
+
+  <header class="pulse-page-header">
+    <div class="pulse-page-header__text">
+      <span class="pulse-eyebrow">Account</span>
+      <h2>My Profile</h2>
+      <p>View identity details and update your contact information</p>
+    </div>
+  </header>
+
+  <div class="profile-grid">
+    <div class="profile-card">
+      <div class="profile-card__head">
+        <form method="POST" action="{% url 'profile_photo' %}" enctype="multipart/form-data" id="avatar-form">
+          {% csrf_token %}
+          <input type="file" name="profile_photo" id="avatar-input" accept="image/jpeg,image/png,image/webp"
+                 style="display:none;" onchange="document.getElementById('avatar-form').submit();">
+          <label for="avatar-input" class="avatar-upload-wrap" title="Click to change photo">
+            {% if user.profile_image %}
+              <img src="{% url 'serve_avatar' user.profile_image %}" class="profile-avatar" alt="Profile photo">
+            {% else %}
+              <div class="profile-avatar">{{ user.first_name|slice:":1"|upper }}</div>
+            {% endif %}
+            <div class="avatar-overlay">Change photo</div>
+          </label>
+        </form>
+        <div class="profile-name">
+          {{ user.first_name }} {{ user.middle_name|default:"" }} {{ user.last_name }} {{ user.suffix|default:"" }}
+        </div>
+        <div class="profile-role">{{ user.role|default:session_role|title }}</div>
+        <p class="profile-hint">Click photo to change &bull; Max 2 MB</p>
+      </div>
+
+      <div class="profile-divider">
+        <p class="profile-section-title">Identity (read-only)</p>
+        <div class="form-group">
+          <label for="profile-first-name">First Name</label>
+          <input type="text" id="profile-first-name" class="input-soft input-soft--plain readonly-field" value="{{ user.first_name }}" readonly>
+        </div>
+        <div class="form-group">
+          <label for="profile-last-name">Last Name</label>
+          <input type="text" id="profile-last-name" class="input-soft input-soft--plain readonly-field" value="{{ user.last_name }}" readonly>
+        </div>
+        {% if user.middle_name %}
+        <div class="form-group">
+          <label for="profile-middle">Middle Name</label>
+          <input type="text" id="profile-middle" class="input-soft input-soft--plain readonly-field" value="{{ user.middle_name }}" readonly>
+        </div>
+        {% endif %}
+        {% if user.birthdate %}
+        <div class="form-group">
+          <label for="profile-birthdate">Date of Birth</label>
+          <input type="text" id="profile-birthdate" class="input-soft input-soft--plain readonly-field" value="{{ user.birthdate }}" readonly>
+        </div>
+        {% endif %}
+        <p class="profile-hint">Name and birthdate are locked. Contact your administrator to request changes.</p>
+      </div>
+    </div>
+
+    <div class="profile-card">
+      <div class="pulse-panel__head" style="margin-bottom:1rem;padding-bottom:.85rem;border-bottom:1px solid var(--border-light);">
+        <div class="pulse-panel__head-icon">
+          <i data-lucide="mail" class="lucide-icon"></i>
+        </div>
+        <div>
+          <h3>Edit Contact Details</h3>
+          <p>Update your email and phone number</p>
+        </div>
+      </div>
+      <form method="POST" action="{% url 'profile_update' %}">
+        {% csrf_token %}
+        <div class="form-group">
+          <label for="email">Email Address <span class="text-danger">*</span></label>
+          <input type="email" id="email" name="email" class="input-soft input-soft--plain" required value="{{ user.email }}">
+        </div>
+        <div class="form-group">
+          <label for="contact_number">Contact Number</label>
+          <input type="tel" id="contact_number" name="contact_number" class="input-soft input-soft--plain"
+                 value="{{ user.contact_number|default:'' }}" placeholder="09XXXXXXXXX">
+        </div>
+        <div class="profile-form-actions">
+          <button type="submit" class="nc-btn nc-btn--primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

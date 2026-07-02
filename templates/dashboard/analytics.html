@@ -1,0 +1,251 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block page_title %}Surveillance Analytics{% endblock %}
+{% block content %}
+<div class="pulse-page dash-home">
+
+  <header class="dash-hero">
+    <div class="dash-hero__text">
+      <span class="pulse-eyebrow">Analysis</span>
+      <h2>Surveillance Analytics</h2>
+      <p>Epidemic curves and demographic breakdowns from batch-reported patient cases</p>
+    </div>
+    <span class="dash-hero__date pill-badge badge-info" id="total-cases-badge">
+      <i data-lucide="activity" class="lucide-icon lucide-icon--xs"></i>
+      Total cases: —
+    </span>
+  </header>
+
+  <div class="pulse-panel" style="padding:1.5rem 1.75rem;margin-bottom:1.25rem;">
+    <div class="analytics-filters">
+      <span class="analytics-filters__label">Filters</span>
+      <select id="filter-syndrome" class="input-soft input-soft--plain" aria-label="Syndrome category" style="max-width:240px;">
+        {% for value, label in symptom_category_choices %}
+        <option value="{{ value }}">{% if not value %}All Syndromes{% else %}{{ label }}{% endif %}</option>
+        {% endfor %}
+      </select>
+      <select id="filter-barangay" class="input-soft input-soft--plain" aria-label="Barangay" style="max-width:220px;">
+        <option value="">All Barangays (City-wide)</option>
+        {% for b in barangays %}
+        <option value="{{ b.id }}">{{ b.barangay_name }}</option>
+        {% endfor %}
+      </select>
+      <select id="filter-time" class="input-soft input-soft--plain" aria-label="Time range" style="max-width:200px;">
+        <option value="current_year">Current Year</option>
+        <option value="last_6_months">Last 6 Months</option>
+        <option value="last_3_months">Last 3 Months (Weekly)</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-md-8">
+      <div class="chart-box">
+        <div class="chart-box__head">
+          <div class="chart-box__head-main">
+            <span class="chart-box__icon"><i data-lucide="bar-chart-3" class="lucide-icon lucide-icon--sm"></i></span>
+            <h3>Epidemic Curve (Epi-Curve)</h3>
+          </div>
+          <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
+        </div>
+        <p>Cases over time by case status — Unclassified through Confirmed.</p>
+        <div class="chart-height-main">
+          <canvas id="epi-chart"></canvas>
+        </div>
+        <p id="epi-empty-msg" class="text-muted text-center mt-2" style="display:none;font-size:.82rem;">No case data for the selected filters.</p>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="chart-box">
+        <div class="chart-box__head">
+          <div class="chart-box__head-main">
+            <span class="chart-box__icon"><i data-lucide="users" class="lucide-icon lucide-icon--sm"></i></span>
+            <h3>Age–Sex Demographics</h3>
+          </div>
+          <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
+        </div>
+        <p>Case counts grouped by age bracket, split by Male and Female.</p>
+        <div class="chart-height-side">
+          <canvas id="demo-chart"></canvas>
+        </div>
+        <p id="demo-empty-msg" class="text-muted text-center mt-2" style="display:none;font-size:.82rem;">No demographic data available.</p>
+      </div>
+
+      <div class="dash-summary-panel">
+        <h4 class="dash-summary-panel__title">Quick Summary</h4>
+        <div class="summary-stat">
+          <span class="summary-stat__label">Total Cases</span>
+          <span class="summary-stat__value" id="stat-total">—</span>
+        </div>
+        <div class="summary-stat">
+          <span class="summary-stat__label">Leading Syndrome</span>
+          <span class="summary-stat__value" id="stat-syndrome">—</span>
+        </div>
+        <div class="summary-stat">
+          <span class="summary-stat__label">Top Demographic</span>
+          <span class="summary-stat__value" id="stat-demo">—</span>
+        </div>
+        <div class="summary-stat">
+          <span class="summary-stat__label">Leading Status</span>
+          <span class="summary-stat__value" id="stat-status">—</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+const API_URL = '{% url "api_analytics" %}';
+const CHART_PRIMARY = '#0F4C81';
+const CHART_SECONDARY = '#00A6A6';
+const CHART_GRID = 'rgba(241, 245, 249, 0.9)';
+let epiChart = null;
+let demoChart = null;
+
+function hasChartData(payload) {
+  if (!payload || !Array.isArray(payload.labels) || !Array.isArray(payload.datasets)) return false;
+  if (!payload.labels.length) return false;
+  return payload.datasets.some(function(ds) {
+    return Array.isArray(ds.data) && ds.data.some(function(v) { return Number(v) > 0; });
+  });
+}
+
+function emptyChartData() {
+  return {
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+    datasets: [{
+      label: 'No data',
+      data: [0, 0, 0, 0, 0, 0],
+      backgroundColor: 'rgba(15, 76, 129, 0.08)',
+      borderRadius: 6,
+    }],
+  };
+}
+
+function buildStackedBarChart(ctx, payload, emptyMsgId) {
+  const isEmpty = !hasChartData(payload);
+  const el = document.getElementById(emptyMsgId);
+  if (el) el.style.display = isEmpty ? 'block' : 'none';
+
+  return new Chart(ctx, {
+    type: 'bar',
+    data: isEmpty ? emptyChartData() : { labels: payload.labels, datasets: payload.datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: !isEmpty, position: 'top', labels: { font: { family: 'Inter', size: 11 }, usePointStyle: true } },
+        tooltip: { enabled: !isEmpty, mode: 'index', intersect: false },
+      },
+      scales: {
+        x: { stacked: !isEmpty, grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B' } },
+        y: {
+          stacked: !isEmpty,
+          beginAtZero: true,
+          ticks: { precision: 0, font: { family: 'Inter', size: 11 }, color: '#64748B' },
+          grid: { color: CHART_GRID, drawBorder: false },
+          border: { display: false },
+        },
+      },
+    },
+  });
+}
+
+function buildGroupedBarChart(ctx, payload, emptyMsgId) {
+  const isEmpty = !hasChartData(payload);
+  const el = document.getElementById(emptyMsgId);
+  if (el) el.style.display = isEmpty ? 'block' : 'none';
+
+  var datasets = isEmpty ? emptyChartData().datasets : payload.datasets;
+  if (!isEmpty && datasets.length >= 2) {
+    datasets[0].backgroundColor = CHART_PRIMARY;
+    datasets[0].borderRadius = 6;
+    datasets[1].backgroundColor = CHART_SECONDARY;
+    datasets[1].borderRadius = 6;
+  }
+
+  return new Chart(ctx, {
+    type: 'bar',
+    data: isEmpty ? emptyChartData() : { labels: payload.labels, datasets: datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: !isEmpty, position: 'top', labels: { font: { family: 'Inter', size: 11 }, usePointStyle: true } },
+        tooltip: { enabled: !isEmpty, mode: 'index', intersect: false },
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B' } },
+        y: {
+          beginAtZero: true,
+          ticks: { precision: 0, font: { family: 'Inter', size: 11 }, color: '#64748B' },
+          grid: { color: CHART_GRID, drawBorder: false },
+          border: { display: false },
+        },
+      },
+    },
+  });
+}
+
+function updateSummary(data) {
+  document.getElementById('stat-total').textContent = data.total_cases ?? '—';
+  document.getElementById('total-cases-badge').innerHTML =
+    '<i data-lucide="activity" class="lucide-icon lucide-icon--xs"></i> Total cases: ' + (data.total_cases ?? '—');
+  const s = data.summary || {};
+  document.getElementById('stat-syndrome').textContent = s.dominant_syndrome_category || '—';
+  document.getElementById('stat-demo').textContent = s.top_demographic || '—';
+  document.getElementById('stat-status').textContent = s.top_status || '—';
+  if (window.lucide) lucide.createIcons();
+}
+
+async function loadAnalytics() {
+  const params = new URLSearchParams({
+    symptom_category: document.getElementById('filter-syndrome').value,
+    barangay: document.getElementById('filter-barangay').value,
+    time_range: document.getElementById('filter-time').value,
+  });
+
+  try {
+    const res = await fetch(API_URL + '?' + params.toString());
+    const data = await res.json();
+    if (!data.ok) {
+      updateSummary({ total_cases: 'Error' });
+      return;
+    }
+
+    updateSummary(data);
+
+    if (epiChart) epiChart.destroy();
+    if (demoChart) demoChart.destroy();
+
+    const epiCanvas = document.getElementById('epi-chart');
+    const demoCanvas = document.getElementById('demo-chart');
+    if (!epiCanvas || !demoCanvas || typeof Chart === 'undefined') return;
+
+    epiChart = buildStackedBarChart(
+      epiCanvas.getContext('2d'),
+      data.epi_curve || {},
+      'epi-empty-msg'
+    );
+    demoChart = buildGroupedBarChart(
+      demoCanvas.getContext('2d'),
+      data.demographics || {},
+      'demo-empty-msg'
+    );
+  } catch (err) {
+    updateSummary({ total_cases: 'Error' });
+    console.error('Analytics load failed:', err);
+  }
+}
+
+['filter-syndrome', 'filter-barangay', 'filter-time'].forEach(function(id) {
+  document.getElementById(id).addEventListener('change', loadAnalytics);
+});
+
+document.addEventListener('DOMContentLoaded', loadAnalytics);
+</script>
+{% endblock %}

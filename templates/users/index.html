@@ -1,0 +1,251 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block page_title %}User Management{% endblock %}
+{% block content %}
+<div class="pulse-page um-page">
+
+  <header class="um-page-header">
+    <div class="um-page-header__text">
+      <span class="um-eyebrow">Administration</span>
+      <h2>User Management</h2>
+      <p>Manage all PULSE user accounts, roles, and access status</p>
+    </div>
+    <button type="button" id="btn-create-user" class="nc-btn nc-btn--primary">
+      <i data-lucide="user-plus" class="lucide-icon lucide-icon--sm"></i>
+      Create User
+    </button>
+  </header>
+
+  <div id="create-user-form" class="um-panel um-create-panel" style="display:none;">
+    <div class="um-panel__head">
+      <div class="um-panel__head-icon">
+        <i data-lucide="user-plus" class="lucide-icon"></i>
+      </div>
+      <div>
+        <h3>Create New User</h3>
+        <p>Provision a staff account with role and credentials</p>
+      </div>
+    </div>
+    <form method="POST" action="{% url 'users_create' %}" class="um-form">
+      {% csrf_token %}
+      <div class="um-form-grid">
+        <div class="form-group">
+          <label for="create-first-name">First Name *</label>
+          <input type="text" id="create-first-name" name="first_name" class="input-soft" required>
+        </div>
+        <div class="form-group">
+          <label for="create-last-name">Last Name *</label>
+          <input type="text" id="create-last-name" name="last_name" class="input-soft" required>
+        </div>
+        <div class="form-group">
+          <label for="create-middle">Middle Initial</label>
+          <input type="text" id="create-middle" name="middle_initial" class="input-soft" maxlength="10">
+        </div>
+        <div class="form-group">
+          <label for="create-suffix">Suffix</label>
+          <select id="create-suffix" name="suffix" class="input-soft">
+            <option value="">— None —</option>
+            <option>Jr.</option>
+            <option>Sr.</option>
+            <option>II</option>
+            <option>III</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="create-birthdate">Date of Birth</label>
+          <input type="date" id="create-birthdate" name="birthdate" class="input-soft" placeholder="mm/dd/yyyy">
+        </div>
+        <div class="form-group">
+          <label for="create-email">Email *</label>
+          <input type="email" id="create-email" name="email" class="input-soft" required>
+        </div>
+        <div class="form-group">
+          <label for="create-role">Role *</label>
+          <select name="role" id="create-role" class="input-soft" required>
+            <option value="">Select Role</option>
+            <option value="encoder">Encoder</option>
+            <option value="health_officer">Health Officer</option>
+            <option value="surveillance_officer">Surveillance Officer</option>
+            <option value="barangay_health_worker">Barangay Health Worker</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="create-password">Temporary Password *</label>
+          <input type="password" id="create-password" name="password" class="input-soft" required placeholder="Min. 8 characters">
+        </div>
+        <div class="form-group" id="barangay-field" style="display:none;">
+          <label for="create-barangay">Assigned Barangay *</label>
+          <select id="create-barangay" name="barangay_text" class="input-soft">
+            <option value="">— Select Barangay —</option>
+            {% for b in barangays %}
+            <option value="{{ b.barangay_name }}">{{ b.barangay_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="create-contact">Contact Number</label>
+          <input type="text" id="create-contact" name="contact_number" class="input-soft" placeholder="e.g. 09171234567">
+        </div>
+      </div>
+      <div class="um-form-actions">
+        <button type="submit" class="nc-btn nc-btn--primary">Create Account</button>
+        <button type="button" class="nc-btn nc-btn--outline" id="btn-cancel-create">Cancel</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="um-panel um-search-panel">
+    <form method="GET" action="{% url 'users_index' %}" class="um-search-bar">
+      <span class="um-search-bar__icon" aria-hidden="true">
+        <i data-lucide="search" class="lucide-icon lucide-icon--sm"></i>
+      </span>
+      <input type="text" name="search" class="input-soft um-search-input"
+             placeholder="Search by name, email, role, or status..." value="{{ search }}">
+      <button type="submit" class="nc-btn nc-btn--primary">Search</button>
+      {% if search %}
+        <a href="{% url 'users_index' %}" class="nc-btn nc-btn--outline">Clear</a>
+      {% endif %}
+    </form>
+  </div>
+
+  <div class="um-panel um-table-panel">
+    <div class="um-table-panel__head">
+      <h3>All Users</h3>
+      <span class="um-count-badge">{{ users|length }} record{{ users|length|pluralize }}</span>
+    </div>
+
+    <div class="um-table-wrap table-wrapper">
+      <table class="um-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Full Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Barangay</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% if not users %}
+          <tr>
+            <td colspan="8">
+              <div class="um-empty">
+                <i data-lucide="users" class="lucide-icon"></i>
+                <p>No users found.</p>
+              </div>
+            </td>
+          </tr>
+        {% else %}
+          {% for u in users %}
+          <tr class="um-table__row">
+            <td data-label="#"><span class="um-id">{{ u.id }}</span></td>
+            <td data-label="Full Name">
+              <div class="um-user-cell">
+                {% if u.profile_image %}
+                  <img src="{% url 'serve_avatar' u.profile_image %}" class="um-avatar um-avatar--img" alt="">
+                {% else %}
+                  <span class="um-avatar">{{ u.first_name|slice:":1"|upper }}</span>
+                {% endif %}
+                <span class="um-user-name">{{ u.first_name }} {{ u.last_name }}</span>
+              </div>
+            </td>
+            <td data-label="Email"><span class="um-email">{{ u.email }}</span></td>
+            <td data-label="Role">
+              <span class="um-pill um-pill--role">{{ u.role|title }}</span>
+            </td>
+            <td data-label="Barangay">
+              {% if u.barangay_text %}
+                <span class="um-barangay">
+                  <i data-lucide="map-pin" class="lucide-icon lucide-icon--xs"></i>
+                  {{ u.barangay_text }}
+                </span>
+              {% else %}
+                <span class="um-muted">—</span>
+              {% endif %}
+            </td>
+            <td data-label="Status">
+              <span class="um-pill um-pill--{{ u.status }}">{{ u.status|title }}</span>
+            </td>
+            <td data-label="Created"><span class="um-date">{{ u.created_at|date:"M d, Y" }}</span></td>
+            <td data-label="Actions">
+              <div class="um-actions">
+                <button type="button" class="nc-btn nc-btn--outline nc-btn--sm btn-edit-toggle" data-id="{{ u.id }}">
+                  <i data-lucide="pencil" class="lucide-icon lucide-icon--xs"></i>
+                  Edit Role
+                </button>
+                {% if u.status == 'active' %}
+                  <form method="POST" action="{% url 'users_deactivate' u.id %}" class="um-inline-form"
+                        onsubmit="return confirm('Deactivate this account?');">
+                    {% csrf_token %}
+                    <button type="submit" class="nc-btn nc-btn--danger nc-btn--sm">
+                      <i data-lucide="user-x" class="lucide-icon lucide-icon--xs"></i>
+                      Deactivate
+                    </button>
+                  </form>
+                {% else %}
+                  <form method="POST" action="{% url 'users_reactivate' u.id %}" class="um-inline-form"
+                        onsubmit="return confirm('Reactivate this account?');">
+                    {% csrf_token %}
+                    <button type="submit" class="nc-btn nc-btn--success nc-btn--sm">
+                      <i data-lucide="user-check" class="lucide-icon lucide-icon--xs"></i>
+                      Reactivate
+                    </button>
+                  </form>
+                {% endif %}
+              </div>
+              <div id="edit-form-{{ u.id }}" class="um-edit-panel" style="display:none;">
+                <form method="POST" action="{% url 'users_update' u.id %}" class="um-edit-form">
+                  {% csrf_token %}
+                  <select name="role" class="input-soft" required>
+                    <option value="encoder" {% if u.role == 'encoder' %}selected{% endif %}>Encoder</option>
+                    <option value="health_officer" {% if u.role == 'health_officer' %}selected{% endif %}>Health Officer</option>
+                    <option value="surveillance_officer" {% if u.role == 'surveillance_officer' %}selected{% endif %}>Surveillance Officer</option>
+                    <option value="barangay_health_worker" {% if u.role == 'barangay_health_worker' %}selected{% endif %}>Barangay Health Worker</option>
+                  </select>
+                  <button type="submit" class="nc-btn nc-btn--primary nc-btn--sm">Save</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+  var createForm = document.getElementById('create-user-form');
+  document.getElementById('btn-create-user').addEventListener('click', function () {
+    createForm.style.display = createForm.style.display === 'none' ? 'block' : 'none';
+  });
+  document.getElementById('btn-cancel-create').addEventListener('click', function () {
+    createForm.style.display = 'none';
+  });
+
+  var roleSelect = document.getElementById('create-role');
+  var barangayRoles = ['barangay_health_worker', 'encoder', 'surveillance_officer', 'health_officer'];
+  roleSelect.addEventListener('change', function () {
+    var bf = document.getElementById('barangay-field');
+    var needsBarangay = barangayRoles.indexOf(this.value) !== -1;
+    bf.style.display = needsBarangay ? 'block' : 'none';
+    bf.querySelector('select').required = needsBarangay;
+  });
+
+  document.querySelectorAll('.btn-edit-toggle').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var f = document.getElementById('edit-form-' + btn.dataset.id);
+      f.style.display = f.style.display === 'none' ? 'block' : 'none';
+    });
+  });
+});
+</script>
+{% endblock %}

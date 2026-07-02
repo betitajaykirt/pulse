@@ -1,0 +1,375 @@
+{% extends "base.html" %}
+{% block title %}Sign In{% endblock %}
+{% block body_class %}login-page{% endblock %}
+{% block body %}
+{% include "layout/navbar.html" %}
+
+<main class="nc-main">
+
+  <!-- Dedicated Login Page — split image + form -->
+  <section class="nc-login-page" id="sign-in">
+    <div class="nc-login-page__visual">
+      <img
+        src="https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=1200&q=85&auto=format&fit=crop"
+        alt=""
+        class="nc-login-page__img"
+        loading="eager"
+        width="800"
+        height="1000">
+      <div class="nc-login-page__visual-overlay"></div>
+      <div class="nc-login-page__visual-caption">
+        <span class="nc-pill nc-pill--light">Bago City Health Office</span>
+        <h2>AI Assisted Disease Surveillance System</h2>
+        <p>Secure staff access to real-time syndromic monitoring and outbreak detection.</p>
+      </div>
+    </div>
+
+    <div class="nc-login-page__form-wrap">
+      <div class="nc-panel nc-login-page__panel">
+        <div class="nc-login-page__panel-head">
+          <span class="nc-icon-frame nc-icon-frame--primary">
+            <i data-lucide="lock-keyhole" class="lucide-icon"></i>
+          </span>
+          <div>
+            <h1>Sign in to PULSE</h1>
+            <p>Authorized personnel only</p>
+          </div>
+        </div>
+
+        {% if messages %}
+          {% for msg in messages %}
+            <div class="alert alert-{{ msg.tags }}">{{ msg }}</div>
+          {% endfor %}
+        {% endif %}
+
+        <form method="POST" action="{% url 'login' %}" class="auth-form" autocomplete="on">
+          {% csrf_token %}
+          <div class="form-group">
+            <label for="email">Email Address</label>
+            <div class="input-icon-wrap">
+              <span class="input-icon" aria-hidden="true">
+                <i data-lucide="mail" class="lucide-icon lucide-icon--sm"></i>
+              </span>
+              <input type="email" id="email" name="email" required
+                     class="input-soft" placeholder="you@example.com" autocomplete="email">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="password">Password</label>
+            <div class="input-icon-wrap">
+              <span class="input-icon" aria-hidden="true">
+                <i data-lucide="lock" class="lucide-icon lucide-icon--sm"></i>
+              </span>
+              <input type="password" id="password" name="password" required
+                     class="input-soft input-with-toggle"
+                     placeholder="Enter your password" autocomplete="current-password">
+              <button type="button" id="pw-toggle" class="pw-eye-btn" aria-label="Toggle password visibility">
+                <i data-lucide="eye" class="lucide-icon lucide-icon--sm pw-eye-icon"></i>
+              </button>
+            </div>
+          </div>
+          <button type="submit" class="nc-btn nc-btn--primary nc-btn--block nc-btn--lg">
+            Sign In
+            <i data-lucide="arrow-right" class="lucide-icon lucide-icon--sm"></i>
+          </button>
+        </form>
+
+        <p class="nc-login-page__note">
+          <i data-lucide="shield-check" class="lucide-icon lucide-icon--xs"></i>
+          Accounts are created by administrators. <a href="#access">Request access</a>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Marketing Hero — layered mockups (no app badges) -->
+  <section class="nc-hero" id="hero">
+    <div class="nc-hero__mesh" aria-hidden="true"></div>
+    <div class="nc-container nc-hero__copy">
+      <span class="nc-pill">Why Choose Health Care</span>
+      <h2 class="nc-hero__title">Your Health, Our Priority</h2>
+      <p class="nc-hero__lead">
+        PULSE delivers real-time syndromic surveillance, geospatial risk mapping, and automated
+        early-warning alerts for Bago City Health Office teams.
+      </p>
+    </div>
+
+    <div class="nc-hero__stage" aria-hidden="true">
+      <div class="nc-float-card nc-float-card--calendar">
+        <div class="nc-float-card__head">
+          <span>February 2026</span>
+          <i data-lucide="chevron-left" class="lucide-icon lucide-icon--xs"></i>
+          <i data-lucide="chevron-right" class="lucide-icon lucide-icon--xs"></i>
+        </div>
+        <div class="nc-mini-cal">
+          <span class="nc-mini-cal__day nc-mini-cal__day--muted">S</span>
+          <span class="nc-mini-cal__day nc-mini-cal__day--muted">M</span>
+          <span class="nc-mini-cal__day nc-mini-cal__day--muted">T</span>
+          <span class="nc-mini-cal__day nc-mini-cal__day--muted">W</span>
+          <span class="nc-mini-cal__day nc-mini-cal__day--muted">T</span>
+          <span class="nc-mini-cal__day nc-mini-cal__day--muted">F</span>
+          <span class="nc-mini-cal__day nc-mini-cal__day--muted">S</span>
+          <span class="nc-mini-cal__day">1</span><span class="nc-mini-cal__day">2</span>
+          <span class="nc-mini-cal__day nc-mini-cal__day--active">3</span>
+          <span class="nc-mini-cal__day">4</span><span class="nc-mini-cal__day">5</span>
+          <span class="nc-mini-cal__day">6</span><span class="nc-mini-cal__day">7</span>
+          <span class="nc-mini-cal__day">8</span><span class="nc-mini-cal__day">9</span>
+          <span class="nc-mini-cal__day">10</span><span class="nc-mini-cal__day">11</span>
+          <span class="nc-mini-cal__day">12</span><span class="nc-mini-cal__day">13</span>
+          <span class="nc-mini-cal__day">14</span>
+        </div>
+      </div>
+
+      <div class="nc-phone">
+        <div class="nc-phone__notch"></div>
+        <div class="nc-phone__screen">
+          <div class="nc-phone__status"><span>9:41</span><span class="nc-phone__signal"></span></div>
+          <p class="nc-phone__greet">Good morning,</p>
+          <h3 class="nc-phone__name">Surveillance Dashboard</h3>
+          <div class="nc-phone__metric">
+            <span class="nc-phone__metric-val">142</span>
+            <span class="nc-phone__metric-lbl">Active cases today</span>
+          </div>
+          <div class="nc-phone__bars">
+            <span style="height:45%"></span><span style="height:70%"></span>
+            <span style="height:55%"></span><span style="height:85%"></span>
+            <span style="height:60%"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="nc-float-card nc-float-card--doctors">
+        <p class="nc-float-card__label">Available Officers</p>
+        <div class="nc-avatar-stack">
+          <span class="nc-avatar" style="background:#0F4C81">DR</span>
+          <span class="nc-avatar" style="background:#00A6A6">HO</span>
+          <span class="nc-avatar" style="background:#16A34A">SO</span>
+          <span class="nc-avatar" style="background:#64748B">EN</span>
+          <span class="nc-avatar nc-avatar--more">+10</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stats -->
+  <section class="nc-stats">
+    <div class="nc-container nc-stats__grid">
+      <div class="nc-stat">
+        <span class="nc-stat__value">10,000+</span>
+        <span class="nc-stat__label">Cases Monitored<br>Across Barangays</span>
+      </div>
+      <div class="nc-stat">
+        <span class="nc-stat__value">300+</span>
+        <span class="nc-stat__label">Health Workers<br>&amp; Staff Active</span>
+      </div>
+      <div class="nc-stat">
+        <span class="nc-stat__value">95%</span>
+        <span class="nc-stat__label">Report Accuracy<br>&amp; Data Integrity</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- How It Works -->
+  <section class="nc-works" id="features">
+    <div class="nc-container">
+      <div class="nc-section-head">
+        <span class="nc-pill">How PULSE Works</span>
+        <h2>Everything you need for public health surveillance</h2>
+      </div>
+      <div class="nc-works__grid">
+        <article class="nc-works-card nc-works-card--yellow">
+          <div class="nc-icon-frame nc-icon-frame--primary">
+            <i data-lucide="clipboard-list" class="lucide-icon"></i>
+          </div>
+          <h3>Record &amp; Encode</h3>
+          <p>Capture syndromic case data from barangay health workers with validated, structured entry forms.</p>
+          <a href="#sign-in" class="nc-learn-more">Learn more <i data-lucide="arrow-right" class="lucide-icon lucide-icon--xs"></i></a>
+        </article>
+        <article class="nc-works-card nc-works-card--blue">
+          <div class="nc-icon-frame nc-icon-frame--teal">
+            <i data-lucide="map-pin" class="lucide-icon"></i>
+          </div>
+          <h3>Map &amp; Analyze</h3>
+          <p>Visualize outbreak hotspots on interactive geospatial maps with filterable risk layers.</p>
+          <a href="#sign-in" class="nc-learn-more">Learn more <i data-lucide="arrow-right" class="lucide-icon lucide-icon--xs"></i></a>
+        </article>
+        <article class="nc-works-card nc-works-card--green">
+          <div class="nc-icon-frame nc-icon-frame--accent">
+            <i data-lucide="bell-ring" class="lucide-icon"></i>
+          </div>
+          <h3>Alert &amp; Respond</h3>
+          <p>Receive APTAS early warnings when thresholds are exceeded and coordinate rapid response.</p>
+          <a href="#sign-in" class="nc-learn-more">Learn more <i data-lucide="arrow-right" class="lucide-icon lucide-icon--xs"></i></a>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- Split features -->
+  <section class="nc-split" id="about">
+    <div class="nc-container nc-split__grid">
+      <div class="nc-split__visual">
+        <div class="nc-device-frame">
+          <div class="nc-device-frame__screen">
+            <div class="nc-video-call">
+              <div class="nc-icon-frame nc-icon-frame--teal">
+                <i data-lucide="user-round" class="lucide-icon"></i>
+              </div>
+              <p>Expert Advice Anytime</p>
+              <span class="nc-badge nc-badge--accent">Live Consult</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="nc-split__content">
+        <div class="nc-panel nc-feature-block">
+          <h3>Expert Advice Anytime</h3>
+          <p>Connect surveillance officers with health administrators for real-time guidance on emerging outbreaks.</p>
+        </div>
+        <div class="nc-panel nc-feature-block">
+          <h3>Insightful Health Summaries</h3>
+          <p>Automated weekly and monthly morbidity reports with exportable PDF and Excel formats.</p>
+        </div>
+        <div class="nc-panel nc-chart-card">
+          <div class="nc-chart-card__head">
+            <h4>Summary</h4>
+            <span class="nc-badge nc-badge--primary">Trend</span>
+          </div>
+          <div class="nc-line-chart" aria-hidden="true">
+            <svg viewBox="0 0 300 80" preserveAspectRatio="none">
+              <polyline points="0,60 50,45 100,55 150,30 200,40 250,20 300,35"
+                fill="none" stroke="#0F4C81" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <polyline points="0,60 50,45 100,55 150,30 200,40 250,20 300,35 300,80 0,80"
+                fill="url(#chartGrad)" opacity="0.12"/>
+              <defs>
+                <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#0F4C81"/>
+                  <stop offset="100%" stop-color="#0F4C81" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+            </svg>
+            <div class="nc-line-chart__labels">
+              <span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span><span>Oct</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Testimonials -->
+  <section class="nc-testimonials" id="testimonials">
+    <div class="nc-container">
+      <span class="nc-pill nc-pill--center">Testimonials</span>
+      <blockquote class="nc-quote" id="nc-quote">
+        "PULSE has transformed our outbreak response. Real-time barangay data and APTAS alerts let us act before situations escalate."
+      </blockquote>
+      <div class="nc-quote-author">
+        <span class="nc-quote-avatar">MW</span>
+        <div>
+          <strong id="nc-quote-name">Maria Williams</strong>
+          <span id="nc-quote-role">Surveillance Officer, Bago CHO</span>
+        </div>
+      </div>
+      <div class="nc-dots" role="tablist" aria-label="Testimonials">
+        <button type="button" class="nc-dot nc-dot--active" data-index="0" aria-label="Testimonial 1"></button>
+        <button type="button" class="nc-dot" data-index="1" aria-label="Testimonial 2"></button>
+        <button type="button" class="nc-dot" data-index="2" aria-label="Testimonial 3"></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Access -->
+  <section class="nc-access" id="access">
+    <div class="nc-container">
+      <div class="nc-panel nc-access__card">
+        <div class="nc-icon-frame nc-icon-frame--teal">
+          <i data-lucide="shield-check" class="lucide-icon"></i>
+        </div>
+        <h3>Staff-Only Secure Access</h3>
+        <p>Accounts are provisioned exclusively by administrators. Contact your CHO system admin to request credentials.</p>
+        <a href="#sign-in" class="nc-btn nc-btn--primary">Go to Sign In</a>
+      </div>
+    </div>
+  </section>
+
+  <footer class="nc-footer">
+    <div class="nc-container">
+      <strong>PULSE</strong>
+      <span>Bago City Health Office &middot; Negros Occidental, Philippines</span>
+      <p>&copy; {% now "Y" %} PULSE Health Surveillance System</p>
+    </div>
+  </footer>
+</main>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  if (window.lucide) lucide.createIcons();
+
+  var navToggle = document.getElementById('navbar-toggle');
+  var navMenu   = document.getElementById('navbar-menu');
+  var backdrop  = document.getElementById('navbar-backdrop');
+  if (navToggle && navMenu) {
+    function closeNav() {
+      navMenu.classList.remove('is-open');
+      navToggle.classList.remove('is-open');
+      navToggle.setAttribute('aria-expanded', 'false');
+      if (backdrop) backdrop.classList.remove('is-active');
+      document.body.style.overflow = '';
+    }
+    navToggle.addEventListener('click', function () {
+      var isOpen = navMenu.classList.toggle('is-open');
+      navToggle.classList.toggle('is-open', isOpen);
+      navToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      if (backdrop) backdrop.classList.toggle('is-active', isOpen);
+      document.body.style.overflow = isOpen ? 'hidden' : '';
+    });
+    if (backdrop) backdrop.addEventListener('click', closeNav);
+    navMenu.querySelectorAll('a').forEach(function (link) {
+      link.addEventListener('click', function () {
+        if (window.innerWidth <= 900) closeNav();
+      });
+    });
+  }
+
+  var toggle = document.getElementById('pw-toggle');
+  var input  = document.getElementById('password');
+  if (toggle && input) {
+    toggle.addEventListener('click', function () {
+      var show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      var icon = toggle.querySelector('.pw-eye-icon');
+      if (icon) {
+        icon.setAttribute('data-lucide', show ? 'eye-off' : 'eye');
+        lucide.createIcons();
+      }
+      toggle.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+    });
+  }
+
+  var quotes = [
+    { text: '"PULSE has transformed our outbreak response. Real-time barangay data and APTAS alerts let us act before situations escalate."', name: 'Maria Williams', role: 'Surveillance Officer, Bago CHO', initials: 'MW' },
+    { text: '"The geospatial maps are a game-changer. We can pinpoint high-risk barangays instantly and allocate resources where they matter most."', name: 'Dr. James Reyes', role: 'Health Officer, Bago CHO', initials: 'JR' },
+    { text: '"Encoding case reports is fast and reliable. PULSE keeps our records accurate and our weekly morbidity exports are always ready on time."', name: 'Ana Santos', role: 'Data Encoder, Bago CHO', initials: 'AS' }
+  ];
+  var quoteEl = document.getElementById('nc-quote');
+  var nameEl  = document.getElementById('nc-quote-name');
+  var roleEl  = document.getElementById('nc-quote-role');
+  var avatar  = document.querySelector('.nc-quote-avatar');
+  document.querySelectorAll('.nc-dot').forEach(function (dot) {
+    dot.addEventListener('click', function () {
+      var i = parseInt(this.getAttribute('data-index'), 10);
+      document.querySelectorAll('.nc-dot').forEach(function (d) { d.classList.remove('nc-dot--active'); });
+      this.classList.add('nc-dot--active');
+      quoteEl.textContent = quotes[i].text;
+      nameEl.textContent = quotes[i].name;
+      roleEl.textContent = quotes[i].role;
+      if (avatar) avatar.textContent = quotes[i].initials;
+    });
+  });
+});
+</script>
+{% endblock %}

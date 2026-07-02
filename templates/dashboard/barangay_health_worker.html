@@ -1,0 +1,125 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block page_title %}BHW Dashboard{% endblock %}
+{% block content %}
+<div class="pulse-page dash-home">
+
+  <header class="dash-hero">
+    <div class="dash-hero__text">
+      <span class="pulse-eyebrow">Overview</span>
+      <h2>Welcome, {{ session_full_name|truncatewords:1 }}</h2>
+      <p>Barangay Health Worker — {{ barangay_name }}</p>
+    </div>
+    <span class="dash-hero__date pill-badge badge-info">
+      <i data-lucide="calendar" class="lucide-icon lucide-icon--xs"></i>
+      {% now "l, F d, Y" %}
+    </span>
+  </header>
+
+  {% include "dashboard/partials/aptas_alerts_panel.html" %}
+
+  <div class="dash-metrics">
+    <article class="dash-metric-card">
+      <div class="dash-metric-card__head">
+        <div class="dash-metric-card__icon dash-metric-card__icon--primary"><i data-lucide="file-text" class="lucide-icon lucide-icon--sm"></i></div>
+        <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
+      </div>
+      <div class="dash-metric-card__value">{{ total_reports|default:0 }}</div>
+      <div class="dash-metric-card__label">Barangay Reports</div>
+    </article>
+    <article class="dash-metric-card">
+      <div class="dash-metric-card__head">
+        <div class="dash-metric-card__icon dash-metric-card__icon--warning"><i data-lucide="clock" class="lucide-icon lucide-icon--sm"></i></div>
+        <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
+      </div>
+      <div class="dash-metric-card__value">{{ pending_reports|default:0 }}</div>
+      <div class="dash-metric-card__label">Pending Validation</div>
+    </article>
+    <article class="dash-metric-card">
+      <div class="dash-metric-card__head">
+        <div class="dash-metric-card__icon dash-metric-card__icon--teal"><i data-lucide="search" class="lucide-icon lucide-icon--sm"></i></div>
+        <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
+      </div>
+      <div class="dash-metric-card__value">{{ suspected_count|default:0 }}</div>
+      <div class="dash-metric-card__label">Suspected Cases</div>
+    </article>
+    <article class="dash-metric-card">
+      <div class="dash-metric-card__head">
+        <div class="dash-metric-card__icon dash-metric-card__icon--danger"><i data-lucide="alert-triangle" class="lucide-icon lucide-icon--sm"></i></div>
+        <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
+      </div>
+      <div class="dash-metric-card__value">{{ confirmed_count|default:0 }}</div>
+      <div class="dash-metric-card__label">Confirmed Cases</div>
+    </article>
+  </div>
+
+  <section class="dash-section">
+    <h3 class="dash-section__title">Quick Actions</h3>
+    <div class="dash-widget-grid">
+      <a href="{% url 'submit_report' %}" class="dash-widget-card">
+        <div class="dash-widget-card__head">
+          <div class="dash-widget-card__icon dash-widget-card__icon--primary"><i data-lucide="file-plus" class="lucide-icon lucide-icon--sm"></i></div>
+          <span class="dash-widget-menu" aria-hidden="true"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></span>
+        </div>
+        <h4>Submit Case Report</h4>
+        <p>Record a new syndromic case for {{ barangay_name }}</p>
+        <span class="dash-widget-card__link">Open <i data-lucide="arrow-right" class="lucide-icon lucide-icon--xs"></i></span>
+      </a>
+      <a href="{% url 'my_reports' %}" class="dash-widget-card">
+        <div class="dash-widget-card__head">
+          <div class="dash-widget-card__icon dash-widget-card__icon--warning"><i data-lucide="files" class="lucide-icon lucide-icon--sm"></i></div>
+          <span class="dash-widget-menu" aria-hidden="true"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></span>
+        </div>
+        <h4>My Reports</h4>
+        <p>View and track your submitted reports{% if pending_reports %} — <strong>{{ pending_reports }} pending</strong>{% endif %}</p>
+        <span class="dash-widget-card__link">Open <i data-lucide="arrow-right" class="lucide-icon lucide-icon--xs"></i></span>
+      </a>
+      <a href="{% url 'case_records' %}" class="dash-widget-card">
+        <div class="dash-widget-card__head">
+          <div class="dash-widget-card__icon dash-widget-card__icon--teal"><i data-lucide="clipboard-list" class="lucide-icon lucide-icon--sm"></i></div>
+          <span class="dash-widget-menu" aria-hidden="true"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></span>
+        </div>
+        <h4>Case Records</h4>
+        <p>View all surveillance records for {{ barangay_name }}</p>
+        <span class="dash-widget-card__link">Open <i data-lucide="arrow-right" class="lucide-icon lucide-icon--xs"></i></span>
+      </a>
+      <a href="{% url 'map_view' %}{{ scoped_map_query }}" class="dash-widget-card">
+        <div class="dash-widget-card__head">
+          <div class="dash-widget-card__icon dash-widget-card__icon--danger"><i data-lucide="map" class="lucide-icon lucide-icon--sm"></i></div>
+          <span class="dash-widget-menu" aria-hidden="true"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></span>
+        </div>
+        <h4>Alerts &amp; Map</h4>
+        <p>View case activity and hotspots in {{ barangay_name }}</p>
+        <span class="dash-widget-card__link">Open <i data-lucide="arrow-right" class="lucide-icon lucide-icon--xs"></i></span>
+      </a>
+    </div>
+  </section>
+
+  {% if recent_reports %}
+  <section class="dash-section">
+    <h3 class="dash-section__title">Recent Submissions</h3>
+    <div class="pulse-panel pulse-table-panel">
+      <div class="pulse-table-wrap table-wrapper">
+        <table class="pulse-table">
+          <thead>
+            <tr><th>Syndrome</th><th>Cases</th><th>Status</th><th>Date</th></tr>
+          </thead>
+          <tbody>
+            {% for r in recent_reports %}
+            <tr class="pulse-table__row">
+              <td data-label="Syndrome">{{ r.syndrome_type }}</td>
+              <td data-label="Cases">{{ r.case_count }}</td>
+              <td data-label="Status">
+                <span class="pill-badge badge-{% if r.status == 'Suspected' %}suspected{% elif r.status == 'Confirmed' %}confirmed{% else %}muted{% endif %}">{{ r.status }}</span>
+              </td>
+              <td data-label="Date"><span class="um-date">{{ r.report_date|date:"M d, Y" }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+</div>
+{% endblock %}

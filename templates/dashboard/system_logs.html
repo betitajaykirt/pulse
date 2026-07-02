@@ -1,0 +1,105 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block page_title %}System Logs{% endblock %}
+{% block content %}
+<div class="pulse-page dash-home">
+
+  <header class="dash-hero">
+    <div class="dash-hero__text">
+      <span class="pulse-eyebrow">Audit</span>
+      <h2>System Logs</h2>
+      <p>Read-only audit trail of system activity and administrative actions</p>
+    </div>
+  </header>
+
+  <section class="dash-section">
+    <h3 class="dash-section__title">Activity Logs</h3>
+    <div class="pulse-panel pulse-table-panel">
+      <div class="pulse-table-panel__head">
+        <h3>System Activity</h3>
+        <span class="pulse-count-badge">{{ system_logs|length }} record{{ system_logs|length|pluralize }}</span>
+      </div>
+      <div class="pulse-table-wrap table-wrapper">
+        <table class="pulse-table">
+          <thead>
+            <tr>
+              <th>Timestamp</th><th>Level</th><th>Activity</th><th>Module</th><th>User</th><th>IP</th><th>Message</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in system_logs %}
+            <tr class="pulse-table__row">
+              <td data-label="Timestamp"><span class="um-date">{{ log.created_at|date:"M d, Y H:i" }}</span></td>
+              <td data-label="Level"><span class="pill-badge badge-{{ log.log_level }}">{{ log.log_level|title }}</span></td>
+              <td data-label="Activity">{{ log.activity_type }}</td>
+              <td data-label="Module">{{ log.module|default:"—" }}</td>
+              <td data-label="User">
+                <strong>{{ log.display_user }}</strong>
+                {% if log.user_role and log.display_user != log.user_role|title %}
+                <div class="um-muted">{{ log.user_role|title }}</div>
+                {% endif %}
+              </td>
+              <td data-label="IP">{{ log.ip_address|default:"—" }}</td>
+              <td data-label="Message">{{ log.log_message|truncatechars:80 }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="7">
+                <div class="pulse-empty">
+                  <i data-lucide="scroll-text" class="lucide-icon"></i>
+                  <p>No system log entries yet.</p>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="dash-section">
+    <h3 class="dash-section__title">Audit Logs</h3>
+    <div class="pulse-panel pulse-table-panel">
+      <div class="pulse-table-panel__head">
+        <h3>Administrative Audit</h3>
+        <span class="pulse-count-badge">{{ audit_logs|length }} record{{ audit_logs|length|pluralize }}</span>
+      </div>
+      <div class="pulse-table-wrap table-wrapper">
+        <table class="pulse-table">
+          <thead>
+            <tr>
+              <th>Timestamp</th><th>Action</th><th>Actor</th><th>Target ID</th><th>Details</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in audit_logs %}
+            <tr class="pulse-table__row">
+              <td data-label="Timestamp"><span class="um-date">{{ log.created_at|date:"M d, Y H:i" }}</span></td>
+              <td data-label="Action">{{ log.action }}</td>
+              <td data-label="Actor">
+                <strong>{{ log.display_actor }}</strong>
+                {% if log.actor_type %}
+                <div class="um-muted">{{ log.actor_type|title }}</div>
+                {% endif %}
+              </td>
+              <td data-label="Target ID">{{ log.target_id|default:"—" }}</td>
+              <td data-label="Details">{{ log.details|default:"—"|truncatechars:80 }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="5">
+                <div class="pulse-empty">
+                  <i data-lucide="shield-check" class="lucide-icon"></i>
+                  <p>No audit log entries yet.</p>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+</div>
+{% endblock %}

@@ -1,0 +1,111 @@
+{% load static %}
+<aside class="sidebar">
+
+  <div class="sidebar-brand">
+    <a href="{% url 'dashboard' %}" class="brand-logo">
+      <div class="brand-icon">
+        <i data-lucide="activity" class="lucide-icon lucide-icon--sm"></i>
+      </div>
+      <div class="brand-text">
+        <strong>PULSE</strong>
+        <span>Health Surveillance</span>
+      </div>
+    </a>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Main</div>
+    <a href="{% url 'dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+      <span class="nav-icon"><i data-lucide="layout-dashboard" class="lucide-icon lucide-icon--sm"></i></span>
+      <span>Dashboard</span>
+    </a>
+
+    {% if session_role == 'super_admin' or session_role == 'admin' %}
+    <div class="nav-section-label">Administration</div>
+    {% if session_role == 'super_admin' %}
+    <a href="{% url 'users_index' %}" class="nav-item {% if 'users' in request.path %}active{% endif %}">
+      <span class="nav-icon"><i data-lucide="shield" class="lucide-icon lucide-icon--sm"></i></span>
+      <span>Admin Management</span>
+    </a>
+    {% endif %}
+    <a href="{% url 'users_index' %}" class="nav-item {% if 'users' in request.path %}active{% endif %}">
+      <span class="nav-icon"><i data-lucide="users" class="lucide-icon lucide-icon--sm"></i></span>
+      <span>Users</span>
+    </a>
+    {% if session_role == 'super_admin' %}
+    <a href="{% url 'system_logs' %}" class="nav-item {% if 'logs' in request.path %}active{% endif %}">
+      <span class="nav-icon"><i data-lucide="settings" class="lucide-icon lucide-icon--sm"></i></span>
+      <span>System Settings</span>
+    </a>
+    {% endif %}
+    <a href="{% url 'admin_confirmation_panel' %}" class="nav-item {% if request.resolver_match.url_name == 'admin_confirmation_panel' %}active{% endif %}">
+      <span class="nav-icon"><i data-lucide="microscope" class="lucide-icon lucide-icon--sm"></i></span>
+      <span>Case Confirmation</span>
+    </a>
+    {% endif %}
+
+    <div class="nav-section-label">Surveillance</div>
+    <a href="{% url 'case_records' %}" class="nav-item {% if 'records' in request.path %}active{% endif %}">
+      <span class="nav-icon"><i data-lucide="clipboard-list" class="lucide-icon lucide-icon--sm"></i></span>
+      <span>Case Monitoring</span>
+    </a>
+    <a href="{% url 'map_view' %}{{ scoped_map_query }}" class="nav-item {% if 'map' in request.path %}active{% endif %}">
+      <span class="nav-icon"><i data-lucide="map" class="lucide-icon lucide-icon--sm"></i></span>
+      <span>Geospatial Map</span>
+    </a>
+    <a href="{% url 'alerts_inbox' %}" class="nav-item {% if 'alerts' in request.path %}active{% endif %}">
+      <span class="nav-icon"><i data-lucide="bell-ring" class="lucide-icon lucide-icon--sm"></i></span>
+      <span>Alerts</span>
+    </a>
+
+    {% if session_role == 'surveillance_officer' or session_role == 'admin' or session_role == 'super_admin' %}
+    <div class="nav-section-label">Analysis</div>
+    <a href="{% url 'analytics' %}" class="nav-item {% if 'analytics' in request.path %}active{% endif %}">
+      <span class="nav-icon"><i data-lucide="line-chart" class="lucide-icon lucide-icon--sm"></i></span>
+      <span>Analytics</span>
+    </a>
+    {% if session_role == 'surveillance_officer' %}
+    <a href="{% url 'incident_reports' %}" class="nav-item {% if 'incidents' in request.path %}active{% endif %}">
+      <span class="nav-icon"><i data-lucide="file-search" class="lucide-icon lucide-icon--sm"></i></span>
+      <span>Incident Reports</span>
+    </a>
+    {% endif %}
+    {% endif %}
+
+    {% if session_role == 'health_officer' or session_role == 'encoder' or session_role == 'barangay_health_worker' %}
+    <div class="nav-section-label">Data Entry</div>
+    <a href="{% url 'submit_report' %}" class="nav-item {% if 'submit' in request.path %}active{% endif %}">
+      <span class="nav-icon"><i data-lucide="file-plus" class="lucide-icon lucide-icon--sm"></i></span>
+      <span>Submit Report</span>
+    </a>
+    <a href="{% url 'my_reports' %}" class="nav-item {% if 'my' in request.path %}active{% endif %}">
+      <span class="nav-icon"><i data-lucide="files" class="lucide-icon lucide-icon--sm"></i></span>
+      <span>My Reports</span>
+    </a>
+    {% endif %}
+
+    {% if session_role == 'admin' or session_role == 'super_admin' %}
+    <div class="nav-section-label">Reports</div>
+    <a href="{% url 'incident_reports' %}" class="nav-item {% if 'incidents' in request.path %}active{% endif %}">
+      <span class="nav-icon"><i data-lucide="file-text" class="lucide-icon lucide-icon--sm"></i></span>
+      <span>Incident Reports</span>
+    </a>
+    <a href="{% url 'system_logs' %}" class="nav-item {% if 'logs' in request.path %}active{% endif %}">
+      <span class="nav-icon"><i data-lucide="scroll-text" class="lucide-icon lucide-icon--sm"></i></span>
+      <span>System Logs</span>
+    </a>
+    {% endif %}
+  </nav>
+
+  <div class="sidebar-footer">
+    <a href="{% url 'profile' %}" class="nav-item {% if 'profile' in request.path %}active{% endif %}">
+      <span class="nav-icon"><i data-lucide="user" class="lucide-icon lucide-icon--sm"></i></span>
+      <span>My Profile</span>
+    </a>
+    <a href="{% url 'logout' %}" class="nav-item nav-item--logout">
+      <span class="nav-icon"><i data-lucide="log-out" class="lucide-icon lucide-icon--sm"></i></span>
+      <span>Log Out</span>
+    </a>
+  </div>
+
+</aside>

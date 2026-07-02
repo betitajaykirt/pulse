@@ -1,0 +1,50 @@
+{% if weather %}
+<section class="dash-weather-widget" aria-label="Bago City environmental conditions">
+  <div class="dash-weather-widget__head">
+    <div>
+      <span class="pulse-eyebrow">Environmental Intelligence</span>
+      <h3 class="dash-weather-widget__title">{{ weather.location }}</h3>
+    </div>
+    <span class="pill-badge {% if weather.ok %}badge-active{% else %}badge-muted{% endif %}">
+      <i data-lucide="cloud" class="lucide-icon lucide-icon--xs"></i>
+      {% if weather.ok %}Live{% else %}Estimated{% endif %}
+    </span>
+  </div>
+
+  <div class="dash-weather-widget__grid">
+    <div class="dash-weather-stat">
+      <div class="dash-weather-stat__icon dash-weather-stat__icon--temp">
+        <i data-lucide="thermometer" class="lucide-icon lucide-icon--sm"></i>
+      </div>
+      <div>
+        <div class="dash-weather-stat__value">{{ weather.temperature_c }}°C</div>
+        <div class="dash-weather-stat__label">Temperature</div>
+      </div>
+    </div>
+    <div class="dash-weather-stat">
+      <div class="dash-weather-stat__icon dash-weather-stat__icon--humidity">
+        <i data-lucide="droplets" class="lucide-icon lucide-icon--sm"></i>
+      </div>
+      <div>
+        <div class="dash-weather-stat__value">{{ weather.humidity_pct }}%</div>
+        <div class="dash-weather-stat__label">Humidity</div>
+      </div>
+    </div>
+    <div class="dash-weather-stat">
+      <div class="dash-weather-stat__icon dash-weather-stat__icon--rain">
+        <i data-lucide="cloud-rain" class="lucide-icon lucide-icon--sm"></i>
+      </div>
+      <div>
+        <div class="dash-weather-stat__value">{{ weather.precipitation_mm }} mm</div>
+        <div class="dash-weather-stat__label">Rainfall</div>
+      </div>
+    </div>
+  </div>
+
+  {% if weather.vector_breeding_risk %}
+  <div class="dash-weather-widget__alert">
+    ⚠️ Active Vector-Breeding Risk Environment
+  </div>
+  {% endif %}
+</section>
+{% endif %}

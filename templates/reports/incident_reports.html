@@ -1,0 +1,161 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block page_title %}Health Incident Reports{% endblock %}
+{% block content %}
+<div class="pulse-page">
+
+  <header class="pulse-page-header">
+    <div class="pulse-page-header__text">
+      <span class="pulse-eyebrow">Analytics</span>
+      <h2>Health Incident Reports</h2>
+      <p>Structured reports generated from validated surveillance data</p>
+    </div>
+    <button type="button" onclick="window.print()" class="nc-btn nc-btn--outline">
+      <i data-lucide="printer" class="lucide-icon lucide-icon--sm"></i>
+      Print Report
+    </button>
+  </header>
+
+  <div class="pulse-panel">
+    <form method="GET" action="{% url 'incident_reports' %}">
+      <div class="pulse-form-grid" style="grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); align-items:end;">
+        <div class="form-group" style="margin:0;">
+          <label for="date-from">Date From</label>
+          <input type="date" id="date-from" name="date_from" class="input-soft input-soft--plain" value="{{ date_from }}" placeholder="mm/dd/yyyy">
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label for="date-to">Date To</label>
+          <input type="date" id="date-to" name="date_to" class="input-soft input-soft--plain" value="{{ date_to }}" placeholder="mm/dd/yyyy">
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label for="filter-syndrome">Disease</label>
+          <select id="filter-syndrome" name="syndrome" class="input-soft input-soft--plain">
+            <option value="">All Diseases</option>
+            {% for s in syndrome_types %}<option value="{{ s }}" {% if syndrome == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label for="filter-barangay">Barangay</label>
+          <select id="filter-barangay" name="barangay" class="input-soft input-soft--plain">
+            <option value="">All Barangays</option>
+            {% for b in barangays %}<option value="{{ b.id }}" {% if barangay == b.id|stringformat:"s" %}selected{% endif %}>{{ b.barangay_name }}</option>{% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="nc-btn nc-btn--primary">Generate</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="pulse-stat-grid">
+    <div class="pulse-stat-card">
+      <div class="pulse-stat-card__icon pulse-stat-card__icon--primary">
+        <i data-lucide="clipboard-list" class="lucide-icon lucide-icon--sm"></i>
+      </div>
+      <div>
+        <div class="pulse-stat-card__value">{{ reports|length }}</div>
+        <div class="pulse-stat-card__label">Total Reports</div>
+      </div>
+    </div>
+    <div class="pulse-stat-card">
+      <div class="pulse-stat-card__icon pulse-stat-card__icon--warning">
+        <i data-lucide="users" class="lucide-icon lucide-icon--sm"></i>
+      </div>
+      <div>
+        <div class="pulse-stat-card__value">{{ total_cases }}</div>
+        <div class="pulse-stat-card__label">Total Cases</div>
+      </div>
+    </div>
+    <div class="pulse-stat-card">
+      <div class="pulse-stat-card__icon pulse-stat-card__icon--danger">
+        <i data-lucide="alert-triangle" class="lucide-icon lucide-icon--sm"></i>
+      </div>
+      <div>
+        <div class="pulse-stat-card__value">{{ by_classif.confirmed }}</div>
+        <div class="pulse-stat-card__label">Confirmed</div>
+      </div>
+    </div>
+    <div class="pulse-stat-card">
+      <div class="pulse-stat-card__icon pulse-stat-card__icon--teal">
+        <i data-lucide="bar-chart-3" class="lucide-icon lucide-icon--sm"></i>
+      </div>
+      <div>
+        <div class="pulse-stat-card__value">{{ by_disease|length }}</div>
+        <div class="pulse-stat-card__label">Diseases Reported</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pulse-breakdown-grid">
+    <div class="pulse-breakdown-card">
+      <div class="pulse-breakdown-card__head">Cases by Disease</div>
+      <div class="pulse-breakdown-card__body">
+        {% for name, count in by_disease %}
+        <div class="pulse-breakdown-row">
+          <span>{{ name }}</span>
+          <span class="pill-badge badge-warning">{{ count }}</span>
+        </div>
+        {% empty %}<p class="text-muted" style="font-size:.84rem;padding:.5rem 0;">No data</p>{% endfor %}
+      </div>
+    </div>
+    <div class="pulse-breakdown-card">
+      <div class="pulse-breakdown-card__head">Cases by Barangay</div>
+      <div class="pulse-breakdown-card__body">
+        {% for name, count in by_barangay %}
+        <div class="pulse-breakdown-row">
+          <span>{{ name }}</span>
+          <span class="pill-badge badge-info">{{ count }}</span>
+        </div>
+        {% empty %}<p class="text-muted" style="font-size:.84rem;padding:.5rem 0;">No data</p>{% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="pulse-panel pulse-table-panel">
+    <div class="pulse-table-panel__head">
+      <h3>Detailed Incident Records</h3>
+      <span class="pulse-count-badge">{{ reports|length }} record{{ reports|length|pluralize }}</span>
+    </div>
+    <div class="pulse-table-wrap table-wrapper">
+      <table class="pulse-table">
+        <thead>
+          <tr><th>Barangay</th><th>Disease</th><th>Cases</th><th>Classification</th><th>Onset</th><th>Risk</th><th>Reporter</th><th>Date</th></tr>
+        </thead>
+        <tbody>
+        {% if not reports %}
+          <tr>
+            <td colspan="8">
+              <div class="pulse-empty">
+                <i data-lucide="inbox" class="lucide-icon"></i>
+                <p>No validated reports match the selected filters.</p>
+              </div>
+            </td>
+          </tr>
+        {% else %}
+          {% for r in reports %}
+          <tr class="pulse-table__row">
+            <td data-label="Barangay">{{ r.barangay_name|default:"—" }}</td>
+            <td data-label="Disease">
+              {{ r.syndrome_type }}
+              {% if r.remarks %}
+                <br><small class="um-muted">{{ r.remarks|truncatechars:80 }}</small>
+              {% endif %}
+            </td>
+            <td data-label="Cases"><strong>{{ r.case_count }}</strong></td>
+            <td data-label="Classification">
+              <span class="pill-badge {% if r.case_classification == 'confirmed' %}badge-danger{% elif r.case_classification == 'probable' %}badge-probable{% else %}badge-info{% endif %}">{{ r.case_classification|title }}</span>
+            </td>
+            <td data-label="Onset">{{ r.date_of_onset|default:"—" }}</td>
+            <td data-label="Risk">
+              <span class="pill-badge {% if r.risk_status == 'critical' %}badge-danger{% elif r.risk_status == 'high' %}badge-warning{% elif r.risk_status == 'moderate' %}badge-info{% else %}badge-muted{% endif %}">{{ r.risk_status|title }}</span>
+            </td>
+            <td data-label="Reporter">{{ r.reporter|default:"—" }}</td>
+            <td data-label="Date"><span class="um-date">{{ r.report_date|date:"M d, Y" }}</span></td>
+          </tr>
+          {% endfor %}
+        {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

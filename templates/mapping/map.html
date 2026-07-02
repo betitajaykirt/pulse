@@ -1,0 +1,755 @@
+{% extends "dashboard/base_dashboard.html" %}
+
+{% load static %}
+
+{% block page_title %}Geospatial Hotspot Map{% endblock %}
+
+{% block extra_css %}
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+
+{% endblock %}
+
+{% block content %}
+
+<div class="pulse-page">
+
+
+
+  <header class="pulse-page-header">
+
+    <div class="pulse-page-header__text">
+
+      <span class="pulse-eyebrow">Surveillance</span>
+
+      <h2>Geospatial Hotspot Map</h2>
+
+      <p>Barangay APTAS risk boundaries with purok-level case pinpoints — Bago City</p>
+
+    </div>
+
+    <button type="button" class="nc-btn nc-btn--primary" onclick="loadMapData()">
+
+      <i data-lucide="refresh-cw" class="lucide-icon lucide-icon--sm"></i>
+
+      Refresh
+
+    </button>
+
+  </header>
+
+
+
+  <div class="pulse-stat-grid map-page-stats">
+
+    <div class="pulse-stat-card">
+
+      <div class="pulse-stat-card__icon pulse-stat-card__icon--warning">
+
+        <i data-lucide="alert-circle" class="lucide-icon lucide-icon--sm"></i>
+
+      </div>
+
+      <div>
+
+        <div class="pulse-stat-card__value" id="stat-suspected">0</div>
+
+        <div class="pulse-stat-card__label">Suspected</div>
+
+      </div>
+
+    </div>
+
+    <div class="pulse-stat-card">
+
+      <div class="pulse-stat-card__icon pulse-stat-card__icon--danger">
+
+        <i data-lucide="alert-triangle" class="lucide-icon lucide-icon--sm"></i>
+
+      </div>
+
+      <div>
+
+        <div class="pulse-stat-card__value" id="stat-probable">0</div>
+
+        <div class="pulse-stat-card__label">Probable</div>
+
+      </div>
+
+    </div>
+
+    <div class="pulse-stat-card">
+
+      <div class="pulse-stat-card__icon pulse-stat-card__icon--primary">
+
+        <i data-lucide="shield-alert" class="lucide-icon lucide-icon--sm"></i>
+
+      </div>
+
+      <div>
+
+        <div class="pulse-stat-card__value" id="stat-confirmed">0</div>
+
+        <div class="pulse-stat-card__label">Confirmed</div>
+
+      </div>
+
+    </div>
+
+    <div class="pulse-stat-card">
+
+      <div class="pulse-stat-card__icon pulse-stat-card__icon--teal">
+
+        <i data-lucide="map-pin" class="lucide-icon lucide-icon--sm"></i>
+
+      </div>
+
+      <div>
+
+        <div class="pulse-stat-card__value" id="stat-total">0</div>
+
+        <div class="pulse-stat-card__label">Total Cases</div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+
+  <div class="pulse-panel map-controls-panel">
+
+    <div class="map-controls">
+
+      <select id="filter-time" class="input-soft input-soft--plain">
+
+        <option value="7">Last 7 days</option>
+
+        <option value="30" selected>Last 30 days</option>
+
+        <option value="90">Last 90 days</option>
+
+      </select>
+
+      {% if user_role == 'admin' or user_role == 'super_admin' or user_role == 'surveillance_officer' %}
+
+      <select id="filter-barangay" class="input-soft input-soft--plain" onchange="onBarangayFilterChange()">
+
+        <option value="">All Barangays</option>
+
+        {% for b in barangays %}<option value="{{ b.barangay_name }}">{{ b.barangay_name }}</option>{% endfor %}
+
+      </select>
+
+      <select id="filter-syndrome" class="input-soft input-soft--plain" onchange="loadMapData()">
+
+        {% for value, label in symptom_category_choices %}
+
+        <option value="{{ value }}">{% if not value %}All Syndromes{% else %}{{ label }}{% endif %}</option>
+
+        {% endfor %}
+
+      </select>
+
+      <select id="filter-classif" class="input-soft input-soft--plain" onchange="loadMapData()">
+
+        <option value="">All Classifications</option>
+
+        <option value="suspected">Suspected</option>
+
+        <option value="probable">Probable</option>
+
+        <option value="confirmed">Confirmed</option>
+
+      </select>
+
+      {% elif barangay_scoped and user_barangay %}
+
+      <select id="filter-barangay" class="input-soft input-soft--plain" disabled aria-label="Assigned barangay (locked)">
+
+        <option value="{{ user_barangay }}" selected>{{ user_barangay }}</option>
+
+      </select>
+
+      {% endif %}
+
+      <div class="map-layer-group">
+
+        <button type="button" class="map-layer-btn active" id="btn-boundaries" onclick="toggleLayer('boundaries')">
+
+          <i data-lucide="layers" class="lucide-icon lucide-icon--xs"></i>
+
+          Barangay Zones
+
+        </button>
+
+        <button type="button" class="map-layer-btn active" id="btn-cases" onclick="toggleLayer('cases')">
+
+          <i data-lucide="map-pin" class="lucide-icon lucide-icon--xs"></i>
+
+          Case Pins
+
+        </button>
+
+        <button type="button" class="map-layer-btn active" id="btn-heat" onclick="toggleLayer('heat')">
+
+          <i data-lucide="flame" class="lucide-icon lucide-icon--xs"></i>
+
+          Heatmap
+
+        </button>
+
+      </div>
+
+      <div class="map-legend">
+
+        <div class="legend-item"><div class="legend-dot" style="background:#F59E0B;"></div>Suspected</div>
+
+        <div class="legend-item"><div class="legend-dot" style="background:#EF4444;"></div>Probable</div>
+
+        <div class="legend-item"><div class="legend-dot" style="background:#7C3AED;"></div>Confirmed</div>
+
+      </div>
+
+      <div class="map-legend map-legend--boundaries">
+
+        <span class="map-legend__label">APTAS Risk</span>
+
+        <div class="legend-item"><div class="legend-swatch" style="background:#16A34A;opacity:.55;"></div>Low</div>
+
+        <div class="legend-item"><div class="legend-swatch" style="background:#F59E0B;opacity:.6;"></div>Moderate</div>
+
+        <div class="legend-item"><div class="legend-swatch" style="background:#DC2626;opacity:.65;"></div>High</div>
+
+        <div class="legend-item"><div class="legend-swatch" style="background:#7C3AED;opacity:.7;"></div>Critical</div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+
+  <div class="pulse-panel map-frame-panel">
+
+    <div class="map-canvas-wrap">
+
+      <div id="map" class="pulse-map" aria-label="Geospatial hotspot map"></div>
+
+    </div>
+
+  </div>
+
+
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+<script src="{% static 'js/pulse_map_boundaries.js' %}"></script>
+
+<script>
+
+document.addEventListener('DOMContentLoaded', function () {
+
+  if (window.lucide) lucide.createIcons();
+
+
+
+  var map = L.map('map', { preferCanvas: false }).setView([10.5389, 122.8366], 13);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+
+    maxZoom: 19
+
+  }).addTo(map);
+
+
+
+  function refreshMapSize() {
+
+    map.invalidateSize({ animate: false });
+
+  }
+
+  refreshMapSize();
+
+  window.addEventListener('resize', refreshMapSize);
+
+  setTimeout(refreshMapSize, 150);
+
+  setTimeout(refreshMapSize, 500);
+
+
+
+  let casePinsLayer = L.layerGroup().addTo(map);
+
+  let heatLayer = null;
+
+  let boundaryLayer = null;
+
+  let cityBoundaryLayer = null;
+
+  let barangayGeoCache = null;
+
+  let boundaryApi = null;
+
+  let selectedBarangayName = null;
+
+  const layerState = { boundaries: true, cases: true, heat: true };
+
+
+
+  const MAP_CONFIG = {
+
+    barangayGeoUrl: "{% static 'ph-json/bago_barangay_boundaries.geojson' %}",
+
+    cityGeoUrl: "{% static 'ph-json/bago_city_boundary.geojson' %}",
+
+    riskUrl: "{% url 'get_barangay_risk_map_data' %}",
+
+  };
+
+
+
+  function toggleLayer(n) {
+
+    layerState[n] = !layerState[n];
+
+    document.getElementById('btn-' + n).classList.toggle('active', layerState[n]);
+
+    if (n === 'cases') {
+
+      layerState[n] ? map.addLayer(casePinsLayer) : map.removeLayer(casePinsLayer);
+
+    }
+
+    if (n === 'heat' && heatLayer) {
+
+      layerState[n] ? map.addLayer(heatLayer) : map.removeLayer(heatLayer);
+
+    }
+
+    if (n === 'boundaries') {
+
+      if (boundaryLayer) {
+
+        layerState[n] ? map.addLayer(boundaryLayer) : map.removeLayer(boundaryLayer);
+
+      }
+
+      if (cityBoundaryLayer) {
+
+        layerState[n] ? map.addLayer(cityBoundaryLayer) : map.removeLayer(cityBoundaryLayer);
+
+      }
+
+    }
+
+  }
+
+  window.toggleLayer = toggleLayer;
+
+
+
+  function applyUrlBarangayFocus() {
+
+    var params = new URLSearchParams(window.location.search);
+
+    var barangayParam = params.get('barangay');
+
+    if (!barangayParam || !boundaryApi) return;
+
+
+
+    var filterSelect = document.getElementById('filter-barangay');
+
+    if (filterSelect) {
+
+      for (var i = 0; i < filterSelect.options.length; i++) {
+
+        if (filterSelect.options[i].value.toLowerCase() === barangayParam.toLowerCase()) {
+
+          filterSelect.value = filterSelect.options[i].value;
+
+          selectedBarangayName = filterSelect.options[i].value;
+
+          break;
+
+        }
+
+      }
+
+    }
+
+
+
+    boundaryApi.selectBarangay(barangayParam, { silent: true });
+
+  }
+
+
+
+  function onBarangayFilterChange() {
+
+    var filterSelect = document.getElementById('filter-barangay');
+
+    var value = filterSelect ? filterSelect.value : '';
+
+    selectedBarangayName = value || null;
+
+    if (boundaryApi) {
+
+      if (value) {
+
+        boundaryApi.selectBarangay(value, { silent: true });
+
+      } else {
+
+        boundaryApi.selectBarangay(null, { silent: true });
+
+      }
+
+    }
+
+    loadMapData(false);
+
+  }
+
+  window.onBarangayFilterChange = onBarangayFilterChange;
+
+
+
+  function loadBarangayBoundaries() {
+
+    if (boundaryLayer) {
+
+      map.removeLayer(boundaryLayer);
+
+      boundaryLayer = null;
+
+    }
+
+    if (cityBoundaryLayer) {
+
+      map.removeLayer(cityBoundaryLayer);
+
+      cityBoundaryLayer = null;
+
+    }
+
+    return PulseMapBoundaries.load(map, {
+
+      barangayGeoUrl: MAP_CONFIG.barangayGeoUrl,
+
+      cityGeoUrl: MAP_CONFIG.cityGeoUrl,
+
+      riskUrl: MAP_CONFIG.riskUrl,
+
+      casePinsLayer: casePinsLayer,
+
+      onBarangaySelect: function (name) {
+
+        selectedBarangayName = name;
+
+        var filterSelect = document.getElementById('filter-barangay');
+
+        if (filterSelect && filterSelect.value !== name) {
+
+          filterSelect.value = name;
+
+          loadMapData(false);
+
+        }
+
+      },
+
+      onReady: function (payload) {
+
+        boundaryApi = payload;
+
+        boundaryLayer = payload.boundaryLayer;
+
+        cityBoundaryLayer = payload.cityLayer;
+
+        barangayGeoCache = payload.barangayGeo;
+
+        if (!layerState.boundaries) {
+
+          if (boundaryLayer) map.removeLayer(boundaryLayer);
+
+          if (cityBoundaryLayer) map.removeLayer(cityBoundaryLayer);
+
+        }
+
+        if (selectedBarangayName) {
+
+          boundaryApi.selectBarangay(selectedBarangayName, { silent: true, openPopup: false });
+
+        } else {
+
+          applyUrlBarangayFocus();
+
+        }
+
+      },
+
+    }).catch(function (e) {
+
+      console.error('Boundary layer error:', e);
+
+    });
+
+  }
+
+
+
+  function buildMitigationBanner(mitigation) {
+
+    if (!mitigation || !mitigation.steps || !mitigation.steps.length) return '';
+
+
+
+    var isEarly = mitigation.banner_type === 'early_warning';
+
+    var cls = isEarly ? 'map-mitigation-banner map-mitigation-banner--warning' : 'map-mitigation-banner map-mitigation-banner--critical';
+
+    var header = isEarly
+
+      ? '⚠️ Early Preventive Containment Tasks (ML Predicted Pattern)'
+
+      : '🚨 Critical Outbreak Suppression Actions (Admin Confirmed Threshold)';
+
+
+
+    var html = '<div class="' + cls + '">';
+
+    html += '<div class="map-mitigation-banner__header">' + header + '</div>';
+
+    html += '<div class="map-mitigation-banner__disease">' + (mitigation.disease_label || '') + '</div>';
+
+    html += '<ol class="map-mitigation-banner__steps">';
+
+    mitigation.steps.forEach(function (step) {
+
+      html += '<li><span class="map-mitigation-banner__cat">' + step.action_category.replace('_', ' ') + '</span> ' + step.action_text + '</li>';
+
+    });
+
+    html += '</ol></div>';
+
+    return html;
+
+  }
+
+
+
+  function buildCasePopup(c) {
+
+    var isPending = c.validation_status === 'pending';
+
+    var html = '<div class="map-case-popup">';
+
+    html += '<div class="map-case-popup__title"><b>' + (c.status || 'Unclassified') + '</b>';
+
+    if (isPending) html += ' <span class="map-case-popup__pending">(pending)</span>';
+
+    html += '</div>';
+
+    html += '<div class="map-case-popup__meta">';
+
+    html += '<div><strong>Disease:</strong> ' + (c.syndrome_type || '—') + '</div>';
+
+    html += '<div><strong>Barangay:</strong> ' + c.barangay_name + '</div>';
+
+    html += '<div><strong>Cases:</strong> ' + c.case_count + '</div>';
+
+    html += '<div><strong>Date:</strong> ' + c.report_date + '</div>';
+
+    if (c.epidemic_threshold_status) {
+
+      html += '<div><strong>Threshold:</strong> ' + c.epidemic_threshold_status.replace(/_/g, ' ') + '</div>';
+
+    }
+
+    html += '</div>';
+
+    html += buildMitigationBanner(c.mitigation_suggestions);
+
+    html += '</div>';
+
+    return html;
+
+  }
+
+
+
+  function loadMapData(reloadBoundaries) {
+
+    const time = document.getElementById('filter-time').value;
+
+    const barangayF = document.getElementById('filter-barangay') ? document.getElementById('filter-barangay').value : '';
+
+    const syndromeF = document.getElementById('filter-syndrome') ? document.getElementById('filter-syndrome').value : '';
+
+    const classifF = document.getElementById('filter-classif') ? document.getElementById('filter-classif').value : '';
+
+    const casesUrl = "{% url 'api_cases' %}";
+
+
+
+    const params = new URLSearchParams({ time_range: time });
+
+    if (barangayF) params.set('barangay', barangayF);
+
+    if (syndromeF) params.set('symptom_category', syndromeF);
+
+    if (classifF) params.set('case_classification', classifF);
+
+
+
+    const requests = [];
+
+    if (reloadBoundaries !== false) {
+
+      requests.push(loadBarangayBoundaries());
+
+    } else {
+
+      requests.push(Promise.resolve());
+
+    }
+
+    requests.push(fetch(casesUrl + '?' + params.toString()).then(function (r) { return r.json(); }));
+
+
+
+    Promise.all(requests).then(function (results) {
+
+        const data = results[1];
+
+        if (!data.ok && data.error) {
+
+          console.error('Cases error:', data.error);
+
+          return;
+
+        }
+
+        const caseList = data.cases || [];
+
+        casePinsLayer.clearLayers();
+
+        if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; }
+
+        const hp = [];
+
+        let counts = { suspected: 0, probable: 0, confirmed: 0, total: 0 };
+
+
+
+        caseList.forEach(c => {
+
+          const ll = [c.latitude, c.longitude];
+
+          hp.push([c.latitude, c.longitude, c.heat_intensity]);
+
+          const pc = c.case_classification === 'confirmed' ? '#7c3aed' : c.case_classification === 'probable' ? '#ef4444' : '#f59e0b';
+
+          const ps = c.case_classification === 'confirmed' ? 10 : c.case_classification === 'probable' ? 8 : 6;
+
+          const hotspotR = 50;
+
+          const isPending = c.validation_status === 'pending';
+
+          const tooltipHtml =
+
+            '<b>Syndromic report</b><br>' +
+
+            'Status: <b>' + (c.status || 'Unclassified') + '</b><br>' +
+
+            'Classification: <b>' + c.case_classification.toUpperCase() + '</b><br>' +
+
+            'Cases: <b>' + c.case_count + '</b><br>' +
+
+            'Barangay: ' + c.barangay_name + '<br>' +
+
+            'Date: ' + c.report_date +
+
+            (isPending ? '<br><span style="color:#f59e0b;font-size:.75rem;font-weight:600;">Pending validation</span>' : '');
+
+          L.circle(ll, { radius: hotspotR, fillColor: pc, color: pc, weight: isPending ? 1 : 2, opacity: isPending ? 0.35 : 0.6, fillOpacity: isPending ? 0.08 : 0.18, dashArray: isPending ? '6 4' : null })
+
+            .bindTooltip(tooltipHtml, { sticky: true, direction: 'top', className: 'hotspot-tip' })
+
+            .addTo(casePinsLayer);
+
+          L.circleMarker(ll, { radius: ps, fillColor: pc, color: '#fff', weight: 2, fillOpacity: isPending ? 0.5 : 0.9 })
+
+            .bindTooltip(tooltipHtml, { sticky: true, direction: 'top', className: 'hotspot-tip' })
+
+            .bindPopup(buildCasePopup(c), { maxWidth: 340, className: 'map-case-popup-wrap' })
+
+            .addTo(casePinsLayer);
+
+          counts[c.case_classification] = (counts[c.case_classification] || 0) + c.case_count;
+
+          counts.total += c.case_count;
+
+        });
+
+
+
+        document.getElementById('stat-suspected').textContent = counts.suspected || 0;
+
+        document.getElementById('stat-probable').textContent = counts.probable || 0;
+
+        document.getElementById('stat-confirmed').textContent = counts.confirmed || 0;
+
+        document.getElementById('stat-total').textContent = counts.total || 0;
+
+
+
+        if (hp.length > 0) {
+
+          heatLayer = L.heatLayer(hp, { radius: 40, blur: 30, maxZoom: 17, max: 1.0, gradient: { 0.2: '#22c55e', 0.45: '#f59e0b', 0.7: '#ef4444', 1.0: '#7c3aed' } });
+
+          if (layerState.heat) map.addLayer(heatLayer);
+
+        }
+
+        if (!layerState.cases) map.removeLayer(casePinsLayer);
+
+        casePinsLayer.bringToFront();
+
+        refreshMapSize();
+
+      }).catch(e => console.error('Map data error:', e));
+
+  }
+
+  window.loadMapData = loadMapData;
+
+
+
+  loadMapData();
+
+  setInterval(loadMapData, 60000);
+
+});
+
+</script>
+
+{% endblock %}
+
+

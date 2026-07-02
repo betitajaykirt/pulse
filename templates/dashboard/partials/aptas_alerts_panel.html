@@ -1,0 +1,69 @@
+<section class="dash-section aptas-panel" aria-label="APTAS risk alerts">
+  <div class="aptas-panel__head">
+    <div>
+      <h3 class="dash-section__title">APTAS — Alerts, Patterns &amp; Thresholds</h3>
+      <p class="aptas-panel__subtitle">Computed risk signals by barangay and syndrome profile</p>
+    </div>
+    <div class="aptas-panel__summary">
+      <span class="pill-badge badge-danger">{{ aptas_risk_counts.critical|default:0 }} Critical</span>
+      <span class="pill-badge badge-warning">{{ aptas_risk_counts.high|default:0 }} High</span>
+      <span class="pill-badge badge-info">{{ aptas_risk_counts.moderate|default:0 }} Moderate</span>
+      <span class="pill-badge badge-muted">{{ aptas_alert_count|default:0 }} Active</span>
+    </div>
+  </div>
+
+  {% if aptas_alerts %}
+  <div class="aptas-alert-grid">
+    {% for alert in aptas_alerts %}
+    <article class="aptas-alert-card aptas-alert-card--{{ alert.risk_level|lower }}">
+      <header class="aptas-alert-card__head">
+        <div class="aptas-alert-card__icon" aria-hidden="true">
+          <i data-lucide="{% if alert.risk_level == 'Critical' %}shield-alert{% elif alert.risk_level == 'High' %}alert-triangle{% elif alert.risk_level == 'Moderate' %}activity{% else %}check-circle-2{% endif %}" class="lucide-icon lucide-icon--sm"></i>
+        </div>
+        <div>
+          <h4 class="aptas-alert-card__title">{{ alert.barangay }}</h4>
+          <p class="aptas-alert-card__syndrome">{{ alert.syndrome }}</p>
+        </div>
+        <span class="pill-badge aptas-alert-card__badge aptas-alert-card__badge--{{ alert.risk_level|lower }}">
+          {{ alert.risk_level }}
+        </span>
+      </header>
+      <div class="aptas-alert-card__scores">
+        <div class="aptas-score">
+          <span class="aptas-score__label">Final</span>
+          <strong class="aptas-score__value">{{ alert.final_risk_score|floatformat:2 }}</strong>
+        </div>
+        <div class="aptas-score">
+          <span class="aptas-score__label">Anomaly</span>
+          <span class="aptas-score__value">{{ alert.anomaly_score|floatformat:2 }}</span>
+        </div>
+        <div class="aptas-score">
+          <span class="aptas-score__label">Temporal</span>
+          <span class="aptas-score__value">{{ alert.temporal_score|floatformat:2 }}</span>
+        </div>
+        <div class="aptas-score">
+          <span class="aptas-score__label">Spatial</span>
+          <span class="aptas-score__value">{{ alert.spatial_score|floatformat:2 }}</span>
+        </div>
+        <div class="aptas-score">
+          <span class="aptas-score__label">Environmental</span>
+          <span class="aptas-score__value">{{ alert.environmental_score|floatformat:2 }}</span>
+        </div>
+      </div>
+      <footer class="aptas-alert-card__foot">
+        <span class="um-muted">Logged {{ alert.created_at|date:"M d, Y H:i" }}</span>
+        {% if alert.is_active_alert %}
+        <span class="pill-badge badge-danger">Active Alert</span>
+        {% endif %}
+      </footer>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="aptas-empty pulse-panel">
+    <i data-lucide="radar" class="lucide-icon"></i>
+    <p>No active APTAS alerts{% if aptas_barangay_scope %} for <strong>{{ aptas_barangay_scope }}</strong>{% endif %}.</p>
+    <small class="um-muted">Risk scores will appear here once the APTAS calculation engine runs.</small>
+  </div>
+  {% endif %}
+</section>

@@ -1,0 +1,89 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block page_title %}Surveillance Officer Dashboard{% endblock %}
+{% block content %}
+<div class="pulse-page dash-home">
+
+  <header class="dash-hero">
+    <div class="dash-hero__text">
+      <span class="pulse-eyebrow">Overview</span>
+      <h2>Welcome, {{ session_full_name|truncatewords:1 }}</h2>
+      <p>Surveillance Officer — Bago City</p>
+    </div>
+    <span class="dash-hero__date pill-badge badge-info">
+      <i data-lucide="calendar" class="lucide-icon lucide-icon--xs"></i>
+      {% now "l, F d, Y" %}
+    </span>
+  </header>
+
+  {% include "dashboard/partials/aptas_alerts_panel.html" %}
+
+  <div class="dash-metrics">
+    <article class="dash-metric-card">
+      <div class="dash-metric-card__head">
+        <div class="dash-metric-card__icon dash-metric-card__icon--danger"><i data-lucide="bell-ring" class="lucide-icon lucide-icon--sm"></i></div>
+        <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
+      </div>
+      <div class="dash-metric-card__value">{{ active_alerts }}</div>
+      <div class="dash-metric-card__label">Active Alerts</div>
+    </article>
+  </div>
+
+  <section class="dash-section">
+    <h3 class="dash-section__title">Surveillance Core Tools</h3>
+    <div class="dash-widget-grid">
+      <a href="{% url 'case_records' %}" class="dash-widget-card">
+        <div class="dash-widget-card__head">
+          <div class="dash-widget-card__icon dash-widget-card__icon--teal"><i data-lucide="clipboard-list" class="lucide-icon lucide-icon--sm"></i></div>
+          <span class="dash-widget-menu" aria-hidden="true"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></span>
+        </div>
+        <h4>Case Monitoring</h4>
+        <p>Validate and investigate submitted reports</p>
+        <span class="dash-widget-card__link">Open <i data-lucide="arrow-right" class="lucide-icon lucide-icon--xs"></i></span>
+      </a>
+      <a href="{% url 'map_view' %}" class="dash-widget-card">
+        <div class="dash-widget-card__head">
+          <div class="dash-widget-card__icon dash-widget-card__icon--accent"><i data-lucide="map" class="lucide-icon lucide-icon--sm"></i></div>
+          <span class="dash-widget-menu" aria-hidden="true"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></span>
+        </div>
+        <h4>Geospatial Map</h4>
+        <p>Explore case clusters on the interactive map</p>
+        <span class="dash-widget-card__link">Open <i data-lucide="arrow-right" class="lucide-icon lucide-icon--xs"></i></span>
+      </a>
+      <a href="{% url 'alerts_inbox' %}" class="dash-widget-card">
+        <div class="dash-widget-card__head">
+          <div class="dash-widget-card__icon dash-widget-card__icon--danger"><i data-lucide="bell-ring" class="lucide-icon lucide-icon--sm"></i></div>
+          <span class="dash-widget-menu" aria-hidden="true"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></span>
+        </div>
+        <h4>Alerts</h4>
+        <p>Review outbreak indicators</p>
+        <span class="dash-widget-card__link">Open <i data-lucide="arrow-right" class="lucide-icon lucide-icon--xs"></i></span>
+      </a>
+    </div>
+  </section>
+
+  <section class="dash-section">
+    <h3 class="dash-section__title">Analysis</h3>
+    <div class="dash-widget-grid">
+      <a href="{% url 'analytics' %}" class="dash-widget-card">
+        <div class="dash-widget-card__head">
+          <div class="dash-widget-card__icon dash-widget-card__icon--primary"><i data-lucide="line-chart" class="lucide-icon lucide-icon--sm"></i></div>
+          <span class="dash-widget-menu" aria-hidden="true"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></span>
+        </div>
+        <h4>Surveillance Analytics</h4>
+        <p>Epi-curves, age–sex demographics, and trends</p>
+        <span class="dash-widget-card__link">Open <i data-lucide="arrow-right" class="lucide-icon lucide-icon--xs"></i></span>
+      </a>
+      <a href="{% url 'incident_reports' %}" class="dash-widget-card">
+        <div class="dash-widget-card__head">
+          <div class="dash-widget-card__icon dash-widget-card__icon--warning"><i data-lucide="file-search" class="lucide-icon lucide-icon--sm"></i></div>
+          <span class="dash-widget-menu" aria-hidden="true"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></span>
+        </div>
+        <h4>Incident Reports</h4>
+        <p>Structured health incident documentation</p>
+        <span class="dash-widget-card__link">Open <i data-lucide="arrow-right" class="lucide-icon lucide-icon--xs"></i></span>
+      </a>
+    </div>
+  </section>
+
+</div>
+{% endblock %}

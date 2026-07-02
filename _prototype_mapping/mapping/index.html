@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bago City Mapping Prototype</title>
+  <meta name="description" content="Interactive mapping prototype for Bago City, Philippines — visualizing city and barangay boundaries with Leaflet.js." />
+
+  <!-- Leaflet CSS (official CDN) -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+
+  <!-- Google Fonts — Inter for a clean, modern feel -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Turf.js — Client-Side Spatial Mathematical Analysis (official CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@7.3.5/turf.min.js"></script>
+
+  <!-- External Stylesheet -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Mobile sidebar toggle -->
+  <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">☰</button>
+
+  <!-- ===== Floating Sidebar Overlay ===== -->
+  <aside class="sidebar" id="sidebar" role="complementary" aria-label="Map controls and legend">
+
+    <!-- Header -->
+    <header class="sidebar-header">
+      <div class="logo-row">
+        <div class="logo-icon" aria-hidden="true">📍</div>
+        <h1>Bago City Mapping Prototype</h1>
+      </div>
+      <p>Interactive boundary visualization for Bago City, Negros Occidental. Click on any highlighted region to view details.</p>
+    </header>
+
+    <!-- Tab Navigation -->
+    <nav class="sidebar-tabs" aria-label="Sidebar Sections">
+      <button class="tab-btn active" id="tabGis" aria-selected="true" role="tab">🌐 Layers & GIS</button>
+      <button class="tab-btn" id="tabPulse" aria-selected="false" role="tab">🏥 PULSE Outbreak</button>
+    </nav>
+
+    <!-- Scrollable Content -->
+    <div class="sidebar-body">
+
+      <!-- ================= GIS TAB CONTENT ================= -->
+      <div id="contentGis" class="tab-pane active" role="tabpanel" aria-labelledby="tabGis">
+        <!-- Quick Stats -->
+        <section class="section-card" aria-label="Statistics">
+          <h2>Overview</h2>
+          <div class="stats-grid">
+            <div class="stat-item">
+              <div class="stat-value">1</div>
+              <div class="stat-label">City Limit</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value">24</div>
+              <div class="stat-label">Barangays</div>
+            </div>
+            <div class="stat-item span-2">
+              <div class="stat-value">187,409</div>
+              <div class="stat-label">Population</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Layer Toggles -->
+        <section class="section-card" aria-label="Layer controls">
+          <h2>Layers</h2>
+          <div class="layer-toggles">
+            <label class="layer-toggle" for="toggleCity">
+              <span class="layer-toggle-label">City Boundary</span>
+              <input type="checkbox" class="toggle-switch" id="toggleCity" checked />
+            </label>
+            <label class="layer-toggle" for="toggleBarangay">
+              <span class="layer-toggle-label">Barangay Zones</span>
+              <input type="checkbox" class="toggle-switch" id="toggleBarangay" checked />
+            </label>
+            <label class="layer-toggle" for="toggleLabels">
+              <span class="layer-toggle-label">Area Labels</span>
+              <input type="checkbox" class="toggle-switch" id="toggleLabels" checked />
+            </label>
+          </div>
+        </section>
+
+        <!-- Legend -->
+        <section class="section-card" aria-label="Map legend">
+          <h2>Legend</h2>
+          <ul class="legend-list">
+            <li class="legend-item">
+              <span class="legend-swatch city"></span>
+              <div>
+                <div class="legend-label">City Limit</div>
+                <div class="legend-sublabel">Heavy black dashed boundary</div>
+              </div>
+            </li>
+            <li class="legend-item">
+              <span class="legend-swatch barangay"></span>
+              <div>
+                <div class="legend-label">Barangay</div>
+                <div class="legend-sublabel">Thin gray border</div>
+              </div>
+            </li>
+            <li class="legend-item" id="legendCriticalItem" style="display: none;">
+              <span class="legend-swatch critical-swatch"></span>
+              <div>
+                <div class="legend-label" style="color: #ff2a5f; font-weight: 600;">Critical Zone</div>
+                <div class="legend-sublabel">Levitating neon outline</div>
+              </div>
+            </li>
+          </ul>
+        </section>
+
+        <!-- Location Tool -->
+        <section class="section-card card" aria-label="Location services">
+          <h2>Location Tool</h2>
+          <button class="locate-btn" id="locateBtn" disabled>⏳ Loading GIS Data...</button>
+          <div id="locationDetails" style="display: none;"></div>
+        </section>
+
+        <!-- Info -->
+        <section class="section-card" aria-label="Instructions">
+          <h2>How to Use</h2>
+          <p style="font-size: 12.5px; color: rgba(255,255,255,0.5); line-height: 1.65;">
+            Use scroll or pinch to zoom. Click on any highlighted boundary region to see its details. Toggle layers on/off. Use the <b>Location Tool</b> to dynamically test point-in-polygon boundary highlighting.
+          </p>
+        </section>
+      </div>
+
+      <!-- ================= PULSE OUTBREAK TAB CONTENT ================= -->
+      <div id="contentPulse" class="tab-pane" role="tabpanel" aria-labelledby="tabPulse" style="display: none;">
+        <!-- Surveillance Status -->
+        <section class="section-card" aria-label="Surveillance Stats">
+          <div class="pulse-status-header">
+            <h2>Surveillance Stats</h2>
+            <div id="pulseStatusIndicator" class="pulse-indicator-badge stable">
+              <span class="status-indicator-dot"></span>
+              <span class="status-indicator-text">Stable</span>
+            </div>
+          </div>
+          <div class="stats-grid">
+            <div class="stat-item pulse-stat critical">
+              <div class="stat-value" id="pulseCritCount">0</div>
+              <div class="stat-label">Critical</div>
+            </div>
+            <div class="stat-item pulse-stat warning">
+              <div class="stat-value" id="pulseWarnCount">0</div>
+              <div class="stat-label">Warning</div>
+            </div>
+            <div class="stat-item pulse-stat stable span-2">
+              <div class="stat-value" id="pulseStableCount">24</div>
+              <div class="stat-label">Stable</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Simulation Controls -->
+        <section class="section-card" aria-label="Simulation Controls">
+          <h2>Outbreak Simulator</h2>
+          <div class="sim-controls">
+            <button id="simPlayBtn" class="sim-btn play-btn" aria-label="Play Simulation">
+              <span class="btn-icon">▶</span> Run Real-time Simulation
+            </button>
+            
+            <div class="sim-speed-control">
+              <label for="simSpeedRange" class="sim-label">Update Rate: <span id="simSpeedVal" class="sim-value">3s</span></label>
+              <input type="range" id="simSpeedRange" class="sim-slider" min="1" max="10" value="3" step="1" />
+            </div>
+
+            <div class="sim-actions-row">
+              <button id="simTriggerBtn" class="sim-action-btn pulse-trigger" title="Randomly elevate a few barangays to Critical">
+                💥 Spike Outbreaks
+              </button>
+              <button id="simResetBtn" class="sim-action-btn pulse-reset" title="Reset all risk scores to normal">
+                🔄 Clear Dashboard
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Barangay list -->
+        <section class="section-card" aria-label="Barangay Risk Profiles">
+          <h2>Barangay Risk Profiles</h2>
+          <p class="section-info">Click a barangay to focus on the map and adjust its risk score manually to trigger levitation.</p>
+          <div id="pulseBarangayList" class="pulse-list" role="list">
+            <div class="pulse-list-placeholder">Loading barangay layers...</div>
+          </div>
+        </section>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <footer class="sidebar-footer">
+      <span><span class="status-dot"></span>Prototype</span>
+      <span>v1.2.0</span>
+    </footer>
+
+  </aside>
+
+  <!-- ===== Map Container ===== -->
+  <div id="map" role="application" aria-label="Interactive map of Bago City"></div>
+
+  <!-- Leaflet JS (official CDN) -->
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
+  <!-- Application Logic -->
+  <script src="app.js"></script>
+</body>
+</html>

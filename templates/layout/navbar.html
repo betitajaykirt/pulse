@@ -1,0 +1,40 @@
+{% load static %}
+<header class="nc-navbar" id="site-navbar">
+  <div class="nc-navbar__inner">
+    <a href="{% url 'login' %}" class="nc-navbar__brand">
+      <span class="nc-navbar__logo" aria-hidden="true">
+        <i data-lucide="activity" class="lucide-icon"></i>
+      </span>
+      <span class="nc-navbar__brand-text">PULSE</span>
+    </a>
+
+    <button type="button" class="nc-navbar__toggle" id="navbar-toggle" aria-label="Toggle navigation" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+
+    <nav class="nc-navbar__center" id="navbar-menu">
+      <a href="{% url 'login' %}#hero" class="nc-navbar__link">Home</a>
+      <a href="{% url 'login' %}#features" class="nc-navbar__link">Features</a>
+      <a href="{% url 'login' %}#about" class="nc-navbar__link">About</a>
+      <a href="{% url 'login' %}#testimonials" class="nc-navbar__link">Testimonials</a>
+      <div class="nc-navbar__menu-actions">
+        {% if session_user_id %}
+          <a href="{% url 'dashboard' %}" class="nc-btn nc-btn--primary nc-btn--block">Dashboard</a>
+          <a href="{% url 'logout' %}" class="nc-btn nc-btn--outline nc-btn--block">Log Out</a>
+        {% else %}
+          <a href="{% url 'login' %}#sign-in" class="nc-btn nc-btn--primary nc-btn--block">Log In</a>
+        {% endif %}
+      </div>
+    </nav>
+
+    <div class="nc-navbar__actions">
+      {% if session_user_id %}
+        <a href="{% url 'dashboard' %}" class="nc-btn nc-btn--primary">Dashboard</a>
+        <a href="{% url 'logout' %}" class="nc-btn nc-btn--outline">Log Out</a>
+      {% else %}
+        <a href="{% url 'login' %}#sign-in" class="nc-btn nc-btn--primary">Log In</a>
+      {% endif %}
+    </div>
+  </div>
+  <div class="nc-navbar__backdrop" id="navbar-backdrop" aria-hidden="true"></div>
+</header>

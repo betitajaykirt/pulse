@@ -1,0 +1,72 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block page_title %}My Reports{% endblock %}
+{% block content %}
+<div class="pulse-page">
+
+  <header class="pulse-page-header">
+    <div class="pulse-page-header__text">
+      <span class="pulse-eyebrow">Reports</span>
+      <h2>My Submitted Reports</h2>
+      <p>All case reports you have submitted</p>
+    </div>
+    <a href="{% url 'submit_report' %}" class="nc-btn nc-btn--primary">
+      <i data-lucide="plus" class="lucide-icon lucide-icon--sm"></i>
+      New Report
+    </a>
+  </header>
+
+  <div class="pulse-panel pulse-table-panel">
+    <div class="pulse-table-panel__head">
+      <h3>Submission History</h3>
+      <span class="pulse-count-badge">{{ reports|length }} record{{ reports|length|pluralize }}</span>
+    </div>
+    <div class="pulse-table-wrap table-wrapper">
+      <table class="pulse-table">
+        <thead>
+          <tr>
+            <th>#</th><th>Patient</th><th>Barangay</th><th>Syndrome</th><th>Cases</th>
+            <th>Classification</th><th>Date of Onset</th><th>Status</th><th>Submitted</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% if not reports %}
+          <tr>
+            <td colspan="9">
+              <div class="pulse-empty">
+                <i data-lucide="file-text" class="lucide-icon"></i>
+                <p>No reports submitted yet. <a href="{% url 'submit_report' %}">Submit your first report.</a></p>
+              </div>
+            </td>
+          </tr>
+        {% else %}
+          {% for r in reports %}
+          <tr class="pulse-table__row">
+            <td data-label="#"><span class="um-id">{{ r.id }}</span></td>
+            <td data-label="Patient"><strong>{{ r.patient_name|default:"Unknown Resident" }}</strong></td>
+            <td data-label="Barangay">{{ r.barangay_name|default:"—" }}</td>
+            <td data-label="Syndrome">{{ r.syndrome_type }}</td>
+            <td data-label="Cases"><strong>{{ r.case_count }}</strong></td>
+            <td data-label="Classification">
+              <span class="pill-badge {% if r.case_classification == 'confirmed' %}badge-danger{% elif r.case_classification == 'probable' %}badge-probable{% else %}badge-info{% endif %}">
+                {{ r.case_classification|title }}
+              </span>
+            </td>
+            <td data-label="Onset">{{ r.date_of_onset|default:"—" }}</td>
+            <td data-label="Status">
+              <span class="pill-badge {% if r.validation_status == 'validated' %}badge-active{% elif r.validation_status == 'rejected' %}badge-inactive{% else %}badge-muted{% endif %}">
+                {{ r.validation_status|title }}
+              </span>
+            </td>
+            <td data-label="Submitted"><span class="um-date">{{ r.report_date|date:"M d, Y H:i" }}</span></td>
+          </tr>
+          {% endfor %}
+        {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+

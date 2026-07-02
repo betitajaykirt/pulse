@@ -1,0 +1,188 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block page_title %}Case Confirmation{% endblock %}
+{% block content %}
+<div class="pulse-page">
+
+  <header class="pulse-page-header">
+    <div class="pulse-page-header__text">
+      <span class="pulse-eyebrow">Laboratory Verification</span>
+      <h2>Case Confirmation Panel</h2>
+      <p>Review ML-classified probable cases and confirm with laboratory results</p>
+    </div>
+    <div class="pulse-page-header__actions">
+      <span class="pulse-count-badge pulse-count-badge--accent">{{ queue_count }} awaiting</span>
+    </div>
+  </header>
+
+  <div class="pulse-panel">
+    <form method="GET" action="{% url 'admin_confirmation_panel' %}">
+      <div class="pulse-filter-search">
+        <span class="pulse-search-bar__icon" aria-hidden="true">
+          <i data-lucide="search" class="lucide-icon lucide-icon--sm"></i>
+        </span>
+        <input type="text" name="search" class="input-soft input-soft--plain"
+               value="{{ search }}"
+               placeholder="Search patient name, report ID, patient ID, or barangay…">
+        <button type="submit" class="nc-btn nc-btn--primary nc-btn--sm">Search</button>
+        {% if search %}
+        <a href="{% url 'admin_confirmation_panel' %}" class="nc-btn nc-btn--outline nc-btn--sm">Clear</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  <div class="pulse-panel pulse-table-panel">
+    <div class="pulse-table-panel__head">
+      <h3>Pending Lab Confirmation</h3>
+      <span class="pulse-count-badge">{{ queue_count }} case{{ queue_count|pluralize }}</span>
+    </div>
+    <div class="pulse-table-wrap table-wrapper">
+      <table class="pulse-table">
+        <thead>
+          <tr>
+            <th>Report ID</th>
+            <th>Patient Name</th>
+            <th>Barangay</th>
+            <th>ML Predicted Disease</th>
+            <th>Date of Onset</th>
+            <th>Date Reported</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% if not pending_cases %}
+          <tr>
+            <td colspan="8">
+              <div class="pulse-empty">
+                <i data-lucide="check-circle-2" class="lucide-icon"></i>
+                <p>No cases awaiting laboratory confirmation.</p>
+              </div>
+            </td>
+          </tr>
+        {% else %}
+          {% for item in pending_cases %}
+          {% with r=item.report %}
+          <tr class="pulse-table__row">
+            <td data-label="Report ID"><span class="um-id">#{{ r.id }}</span></td>
+            <td data-label="Patient Name">
+              <strong>{{ item.patient_name }}</strong>
+              <div class="um-muted">ID: {{ item.patient_id_display }}</div>
+            </td>
+            <td data-label="Barangay">{{ r.barangay_name|default:"—" }}</td>
+            <td data-label="ML Disease">
+              <span class="pill-badge badge-info">{{ item.ml_disease }}</span>
+              {% if r.is_anomaly %}
+              <span class="pill-badge badge-danger" style="margin-left:.25rem;">Anomaly</span>
+              {% endif %}
+            </td>
+            <td data-label="Date of Onset">{{ item.onset_date|date:"M d, Y"|default:"—" }}</td>
+            <td data-label="Date Reported">{{ r.report_date|date:"M d, Y H:i" }}</td>
+            <td data-label="Status">
+              <span class="pill-badge badge-probable">{{ r.status }}</span>
+            </td>
+            <td data-label="Action">
+              <button type="button" class="nc-btn nc-btn--primary nc-btn--sm"
+                onclick="openLabModal(
+                  {{ r.id }},
+                  '{{ item.patient_name|escapejs }}',
+                  '{{ item.patient_id_display|escapejs }}',
+                  '{{ r.barangay_name|default:"—"|escapejs }}',
+                  '{{ item.ml_disease|escapejs }}',
+                  '{{ r.report_date|date:"M d, Y H:i"|escapejs }}'
+                )">
+                <i data-lucide="flask-conical" class="lucide-icon lucide-icon--xs"></i>
+                Process Lab Result
+              </button>
+            </td>
+          </tr>
+          {% endwith %}
+          {% endfor %}
+        {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<div class="pulse-modal-overlay" id="lab-modal" onclick="closeLabModal(event)">
+  <div class="pulse-modal pulse-modal--form">
+    <div class="pulse-modal__head">
+      <h3>Process Laboratory Result</h3>
+      <button type="button" class="pulse-modal__close" onclick="closeLabModal()">&times;</button>
+    </div>
+    <div class="pulse-modal__body">
+      <div class="confirmation-summary" id="lab-modal-summary"></div>
+
+      <form method="POST" id="lab-confirm-form" action="">
+        {% csrf_token %}
+        <input type="hidden" name="redirect_to" value="admin_confirmation_panel">
+
+        <div class="form-group">
+          <label for="lab_control_number">Laboratory Control Number <span class="um-muted">(required)</span></label>
+          <input type="text" id="lab_control_number" name="lab_control_number" class="input-soft"
+                 placeholder="e.g. LC-2026-004821" required maxlength="64">
+        </div>
+
+        <div class="form-group">
+          <label for="test_type">Test Type <span class="um-muted">(required)</span></label>
+          <select id="test_type" name="test_type" class="input-soft" required>
+            <option value="">Select test type…</option>
+            <option value="NS1 Antigen">NS1 Antigen</option>
+            <option value="IgM ELISA">IgM ELISA</option>
+            <option value="PCR">PCR</option>
+            <option value="Rapid Diagnostic Test">Rapid Diagnostic Test</option>
+            <option value="Culture">Culture</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div class="pulse-modal__actions">
+          <button type="button" class="nc-btn nc-btn--outline" onclick="closeLabModal()">Cancel</button>
+          <button type="submit" class="nc-btn nc-btn--primary"
+                  onclick="return confirm('Confirm this case as laboratory-verified? This will trigger epidemic threshold evaluation.');">
+            <i data-lucide="badge-check" class="lucide-icon lucide-icon--xs"></i>
+            Confirm Case
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CONFIRM_URL_TEMPLATE = "{% url 'confirm_case' 0 %}";
+document.addEventListener('DOMContentLoaded', function () { if (window.lucide) lucide.createIcons(); });
+
+function openLabModal(reportId, patientName, patientId, barangay, disease, reportedAt) {
+  document.getElementById('lab-confirm-form').action = CONFIRM_URL_TEMPLATE.replace('/0/', '/' + reportId + '/');
+  document.getElementById('lab_control_number').value = '';
+  document.getElementById('test_type').value = '';
+
+  document.getElementById('lab-modal-summary').innerHTML =
+    '<div class="section-divider">Case Summary</div>' +
+    row('Report ID', '#' + reportId) +
+    row('Patient', patientName) +
+    row('Patient / Case ID', patientId) +
+    row('Barangay', barangay) +
+    row('ML Predicted Disease', disease) +
+    row('Date Reported', reportedAt);
+
+  document.getElementById('lab-modal').classList.add('open');
+  document.getElementById('lab_control_number').focus();
+  if (window.lucide) lucide.createIcons();
+}
+
+function row(label, value) {
+  return '<div class="detail-row"><span class="detail-label">' + label + '</span><span class="detail-value">' + value + '</span></div>';
+}
+
+function closeLabModal(e) {
+  if (e && e.target !== document.getElementById('lab-modal')) return;
+  document.getElementById('lab-modal').classList.remove('open');
+}
+</script>
+{% endblock %}

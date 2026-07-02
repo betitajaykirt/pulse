@@ -1,0 +1,270 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block page_title %}Case Records{% endblock %}
+{% block content %}
+<div class="pulse-page">
+
+  <header class="pulse-page-header">
+    <div class="pulse-page-header__text">
+      <span class="pulse-eyebrow">Validation</span>
+      <h2>Case Records</h2>
+      <p>Validate, update, and search all submitted surveillance reports</p>
+    </div>
+  </header>
+
+  <div class="pulse-panel">
+    <form method="GET" action="{% url 'case_records' %}">
+      <div class="pulse-filter-search">
+        <span class="pulse-search-bar__icon" aria-hidden="true">
+          <i data-lucide="search" class="lucide-icon lucide-icon--sm"></i>
+        </span>
+        <input type="text" name="search" class="input-soft input-soft--plain"
+               value="{{ search }}" placeholder="Search barangay, symptoms, remarks…">
+        <button type="submit" class="nc-btn nc-btn--primary nc-btn--sm">Search</button>
+      </div>
+
+      <details class="filter-drawer" {% if case_status or validation or barangay or symptom_category %}open{% endif %} style="margin-top:1rem;">
+        <summary>
+          <i data-lucide="chevron-right" class="lucide-icon lucide-icon--xs filter-drawer__chevron"></i>
+          Advanced Filters
+          {% if case_status or validation or barangay or symptom_category %}
+            <span class="pill-badge badge-info" style="margin-left:.35rem;">Active</span>
+          {% endif %}
+        </summary>
+        <div class="filter-drawer__panel">
+          <div class="filter-drawer__grid">
+            <div class="form-group">
+              <label>Case Status</label>
+              <select name="case_status" class="input-soft input-soft--plain">
+                <option value="">All Case Statuses</option>
+                <option value="Unclassified" {% if case_status == 'Unclassified' %}selected{% endif %}>Unclassified</option>
+                <option value="Pending ML Analysis" {% if case_status == 'Pending ML Analysis' %}selected{% endif %}>Pending ML Analysis</option>
+                <option value="Suspected" {% if case_status == 'Suspected' %}selected{% endif %}>Suspected</option>
+                <option value="Probable" {% if case_status == 'Probable' %}selected{% endif %}>Probable</option>
+                <option value="Confirmed" {% if case_status == 'Confirmed' %}selected{% endif %}>Confirmed</option>
+                <option value="Discarded" {% if case_status == 'Discarded' %}selected{% endif %}>Discarded</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Validation</label>
+              <select name="validation" class="input-soft input-soft--plain">
+                <option value="">All Validation</option>
+                <option value="pending" {% if validation == 'pending' %}selected{% endif %}>Pending</option>
+                <option value="validated" {% if validation == 'validated' %}selected{% endif %}>Validated</option>
+                <option value="rejected" {% if validation == 'rejected' %}selected{% endif %}>Rejected</option>
+              </select>
+            </div>
+            {% if city_wide %}
+            <div class="form-group">
+              <label>Barangay</label>
+              <select name="barangay" class="input-soft input-soft--plain">
+                <option value="">All Barangays</option>
+                {% for b in barangays %}
+                  <option value="{{ b.id }}" {% if barangay == b.id|stringformat:"s" %}selected{% endif %}>{{ b.barangay_name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            {% endif %}
+            <div class="form-group">
+              <label>Symptom Category</label>
+              <select name="symptom_category" class="input-soft input-soft--plain">
+                {% for value, label in symptom_category_choices %}
+                  <option value="{{ value }}" {% if symptom_category == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="filter-drawer__actions">
+            <button type="submit" class="nc-btn nc-btn--primary nc-btn--sm">Apply Filters</button>
+            <a href="{% url 'case_records' %}" class="nc-btn nc-btn--outline nc-btn--sm">Clear</a>
+          </div>
+        </div>
+      </details>
+    </form>
+  </div>
+
+  <div class="pulse-panel pulse-table-panel">
+    <div class="pulse-table-panel__head">
+      <h3>All Case Records</h3>
+      <span class="pulse-count-badge">{{ records|length }} record{{ records|length|pluralize }}</span>
+    </div>
+    <div class="pulse-table-wrap table-wrapper">
+      <table class="pulse-table">
+        <thead>
+          <tr><th>#</th><th>Patient</th><th>Barangay</th><th>Record</th><th>Cases</th><th>Classification</th><th>Onset</th><th>Reporter</th><th>Case Status</th><th>Validation</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+        {% if not records %}
+          <tr>
+            <td colspan="11">
+              <div class="pulse-empty">
+                <i data-lucide="folder-open" class="lucide-icon"></i>
+                <p>No records found.</p>
+              </div>
+            </td>
+          </tr>
+        {% else %}
+          {% for r in records %}
+          <tr class="pulse-table__row">
+            <td data-label="#"><span class="um-id">{{ r.id }}</span></td>
+            <td data-label="Patient">
+              <strong>{{ r.patient_name|default:"Unknown Resident" }}</strong>
+            </td>
+            <td data-label="Barangay">{{ r.barangay_name|default:"—" }}</td>
+            <td data-label="Record">{{ r.syndrome_type }}</td>
+            <td data-label="Cases"><strong>{{ r.case_count }}</strong></td>
+            <td data-label="Classification">
+              <span class="pill-badge {% if r.case_classification == 'confirmed' %}badge-danger{% elif r.case_classification == 'probable' %}badge-probable{% else %}badge-info{% endif %}">{{ r.case_classification|title }}</span>
+            </td>
+            <td data-label="Onset">{{ r.date_of_onset|default:"—" }}</td>
+            <td data-label="Reporter">{{ r.submitted_by_name|default:"—" }}</td>
+            <td data-label="Case Status">
+              <span class="pill-badge {% if r.status == 'Unclassified' or r.status == 'Pending ML Analysis' %}badge-muted{% elif r.status == 'Suspected' %}badge-suspected{% elif r.status == 'Confirmed' %}badge-confirmed{% elif r.status == 'Discarded' %}badge-discarded{% elif r.status == 'Probable' %}badge-probable{% else %}badge-muted{% endif %}">
+                {{ r.status }}
+              </span>
+              {% if r.confirmed_at %}<div class="um-muted" style="margin-top:.25rem;">{{ r.confirmed_at|date:"M d, Y" }}</div>{% endif %}
+            </td>
+            <td data-label="Validation">
+              <span class="pill-badge {% if r.validation_status == 'validated' %}badge-active{% elif r.validation_status == 'rejected' %}badge-inactive{% else %}badge-muted{% endif %}">{{ r.validation_status|title }}</span>
+            </td>
+            <td data-label="Actions">
+              <div class="pulse-actions">
+                <button type="button" class="nc-btn nc-btn--outline nc-btn--sm"
+                  onclick="viewRecord(
+                    '{{ r.id }}',
+                    '{{ r.barangay_name|default:"—" }}',
+                    '{{ r.syndrome_type }}',
+                    '{{ r.case_classification }}',
+                    '{{ r.case_count }}',
+                    '{{ r.date_of_onset|default:"" }}',
+                    '{{ r.status }}',
+                    '{{ r.validation_status }}',
+                    '{{ r.submitted_by_name|default:"—" }}',
+                    '{{ r.report_date|date:"M d, Y H:i" }}',
+                    '{{ r.confirmed_at|date:"M d, Y H:i"|default:"" }}',
+                    {{ r.latitude|default:"null" }},
+                    {{ r.longitude|default:"null" }},
+                    `{{ r.remarks|default:""|escapejs }}`
+                  )">View</button>
+                {% if r.status == 'Suspected' and can_confirm %}
+                <form method="POST" action="{% url 'confirm_case' r.id %}" class="um-inline-form" onsubmit="return confirm('Confirm this case as verified by CHO?');">
+                  {% csrf_token %}
+                  <button type="submit" class="nc-btn nc-btn--primary nc-btn--sm">Confirm</button>
+                </form>
+                {% endif %}
+                {% if r.validation_status == 'pending' and can_validate %}
+                <form method="POST" action="{% url 'validate_report' r.id %}" class="um-inline-form">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="validate">
+                  <button type="submit" class="nc-btn nc-btn--success nc-btn--sm">Validate</button>
+                </form>
+                <form method="POST" action="{% url 'validate_report' r.id %}" class="um-inline-form" onsubmit="return confirm('Reject this report?');">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="reject">
+                  <button type="submit" class="nc-btn nc-btn--danger nc-btn--sm">Reject</button>
+                </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<div class="pulse-modal-overlay" id="record-modal" onclick="closeModal(event)">
+  <div class="pulse-modal">
+    <div class="pulse-modal__head">
+      <h3 id="modal-title">Case Report Details</h3>
+      <button type="button" class="pulse-modal__close" onclick="document.getElementById('record-modal').classList.remove('open')">&times;</button>
+    </div>
+    <div class="pulse-modal__body" id="modal-body"></div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () { if (window.lucide) lucide.createIcons(); });
+
+function viewRecord(id, barangay, disease, classif, cases, onset, caseStatus, validationStatus, reporter, date, confirmedAt, lat, lng, remarks) {
+  document.getElementById('modal-title').textContent = 'Case Report #' + id;
+
+  const parts = remarks ? remarks.split(' | ') : [];
+  let patient = {}, symptoms = '', address = '', notes = '';
+  parts.forEach(p => {
+    if (p.startsWith('Patient:'))   patient.name    = p.replace('Patient: ', '');
+    else if (p.startsWith('Age:'))  patient.age     = p.replace('Age: ', '');
+    else if (p.startsWith('Sex:'))  patient.sex     = p.replace('Sex: ', '');
+    else if (p.startsWith('Address:'))  address     = p.replace('Address: ', '');
+    else if (p.startsWith('Symptoms:')) symptoms    = p.replace('Symptoms: ', '');
+    else if (p.startsWith('Outcome:'))  patient.outcome = p.replace('Outcome: ', '');
+    else if (p.startsWith('Notes:'))    notes       = p.replace('Notes: ', '');
+  });
+
+  const classifColor = classif === 'confirmed' ? '#DC2626' : classif === 'probable' ? '#F59E0B' : '#0F4C81';
+  const caseStatusColor = caseStatus === 'Confirmed' ? '#DC2626' : caseStatus === 'Suspected' ? '#F59E0B' : caseStatus === 'Discarded' ? '#64748B' : '#C2410C';
+  const validationColor  = validationStatus === 'validated' ? '#16A34A' : validationStatus === 'rejected' ? '#DC2626' : '#94a3b8';
+
+  let html = '';
+
+  html += '<div class="section-divider">Report Info</div>';
+  html += row('Disease', disease);
+  html += row('Classification', `<span style="color:${classifColor};font-weight:700;">${cap(classif)}</span>`);
+  html += row('Number of Cases', `<strong>${cases}</strong>`);
+  html += row('Barangay', barangay);
+  if (address) html += row('Purok / Address', address);
+  html += row('Date of Onset', onset || '—');
+  html += row('Reported By', reporter);
+  html += row('Submitted On', date);
+  html += row('Case Status', `<span style="color:${caseStatusColor};font-weight:700;">${caseStatus}</span>`);
+  if (confirmedAt) html += row('Confirmed On', confirmedAt);
+  html += row('Validation', `<span style="color:${validationColor};font-weight:700;">${cap(validationStatus)}</span>`);
+
+  if (lat && lng) {
+    html += '<div class="section-divider">Location</div>';
+    html += row('Coordinates', lat.toFixed(6) + ', ' + lng.toFixed(6));
+    html += `<div style="margin-top:.5rem;"><a href="/map/" style="font-size:.82rem;color:var(--secondary);font-weight:600;">View on Geospatial Map</a></div>`;
+  }
+
+  if (symptoms) {
+    html += '<div class="section-divider">Reported Symptoms</div>';
+    const syms = symptoms.split(', ');
+    html += '<div style="display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.25rem;">';
+    syms.forEach(s => {
+      html += `<span class="symptom-tag">${s}</span>`;
+    });
+    html += '</div>';
+  }
+
+  if (patient.name || patient.age || patient.sex || patient.outcome) {
+    html += '<div class="section-divider">Patient Information</div>';
+    if (patient.name)    html += row('Name', patient.name);
+    if (patient.age)     html += row('Age', patient.age);
+    if (patient.sex)     html += row('Sex', patient.sex);
+    if (patient.outcome) html += row('Outcome', patient.outcome);
+  }
+
+  if (notes) {
+    html += '<div class="section-divider">Additional Notes</div>';
+    html += `<p style="font-size:.85rem;margin:0;">${notes}</p>`;
+  }
+
+  document.getElementById('modal-body').innerHTML = html;
+  document.getElementById('record-modal').classList.add('open');
+}
+
+function row(label, value) {
+  return `<div class="detail-row"><span class="detail-label">${label}</span><span class="detail-value">${value}</span></div>`;
+}
+function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+function closeModal(e) {
+  if (e.target === document.getElementById('record-modal'))
+    document.getElementById('record-modal').classList.remove('open');
+}
+</script>
+{% endblock %}

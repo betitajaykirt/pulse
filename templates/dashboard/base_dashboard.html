@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% load static %}
+{% block body_class %}app-shell{% endblock %}
+{% block body %}
+<div class="app-layout">
+{% include "layout/sidebar.html" %}
+
+<div class="main-content">
+  <header class="topbar">
+    <button type="button" class="sidebar-toggle" id="sidebar-toggle" aria-label="Open navigation menu">
+      <i data-lucide="menu" class="lucide-icon lucide-icon--sm"></i>
+    </button>
+    <div class="topbar-title">
+      <h1>{% block page_title %}Dashboard{% endblock %}</h1>
+      <span class="topbar-subtitle">Bago City Health Office</span>
+    </div>
+    <div class="topbar-actions">
+      <button type="button" class="topbar-icon-btn" aria-label="Search">
+        <i data-lucide="search" class="lucide-icon lucide-icon--sm"></i>
+      </button>
+      <a href="{% url 'alerts_inbox' %}" class="topbar-icon-btn topbar-icon-btn--alert" aria-label="Notifications">
+        <i data-lucide="bell" class="lucide-icon lucide-icon--sm"></i>
+        <span class="topbar-badge" aria-hidden="true"></span>
+      </a>
+      {% if session_full_name %}
+      <a href="{% url 'profile' %}" class="topbar-profile">
+        {% if session_avatar %}
+          <img src="{% url 'serve_avatar' session_avatar %}" class="topbar-profile__avatar topbar-profile__avatar--img" alt="">
+        {% else %}
+          <span class="topbar-profile__avatar">{{ session_full_name|slice:":1"|upper }}</span>
+        {% endif %}
+        <span class="topbar-profile__text">
+          <span class="topbar-profile__name">{{ session_full_name }}</span>
+          <span class="topbar-profile__role">{{ session_role|title }}</span>
+        </span>
+        <i data-lucide="chevron-down" class="lucide-icon lucide-icon--xs topbar-profile__chevron"></i>
+      </a>
+      {% endif %}
+    </div>
+  </header>
+  <div class="page-body">
+    {% if messages %}
+      {% for msg in messages %}
+        <div class="alert alert-{{ msg.tags }}" data-auto-dismiss>{{ msg }}</div>
+      {% endfor %}
+    {% endif %}
+    {% include "dashboard/partials/weather_widget.html" %}
+    {% block content %}{% endblock %}
+  </div>
+</div>
+</div>
+{% endblock %}

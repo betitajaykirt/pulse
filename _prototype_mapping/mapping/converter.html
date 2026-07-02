@@ -1,0 +1,184 @@
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Bago City Mapping Data Extractor - Diagnostic Edition</title>
+        <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; background: #f4f6f9; color: #333; }
+            .card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); display: inline-block; max-width: 550px; width: 100%; margin-bottom: 20px; text-align: left; }
+            h2 { color: #0078ff; margin-top: 0; text-align: center; }
+            .section { margin: 20px 0; padding: 15px; border-radius: 8px; background: #f8f9fa; border-left: 5px solid #0078ff; }
+            .section.purok { border-left-color: #2a9d8f; }
+            input[type="file"] { margin: 10px 0; display: block; width: 100%; }
+            button { color: white; border: none; padding: 12px 20px; font-size: 15px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 5px; }
+            #brgyBtn { background: #0078ff; }
+            #purokBtn { background: #2a9d8f; }
+            button:disabled { background: #ccc !important; cursor: not-allowed; }
+            #status { margin-top: 20px; font-weight: bold; color: #555; font-size: 15px; min-height: 24px; text-align: center; white-space: pre-line; }
+        </style>
+    </head>
+    <body>
+
+    <div class="card">
+        <h2>Bago City Asset Extractor (Diagnostic Mode)</h2>
+        
+        <div class="section">
+            <strong>1. Extract Barangay Borders (Polygons)</strong>
+            <p style="font-size:13px; margin: 5px 0;">Select your large GADM file to isolate the boundary walls.</p>
+            <input type="file" id="gadmFile" accept=".json">
+            <button id="brgyBtn" disabled>Save barangays.geojson</button>
+        </div>
+
+        <div class="section purok">
+            <strong>2. Force Extract All Points (Puroks)</strong>
+            <p style="font-size:13px; margin: 5px 0;">Select your original OpenStreetMap mixed file to force isolate point structures.</p>
+            <input type="file" id="osmFile" accept=".geojson,.json">
+            <button id="purokBtn" disabled>Force Save puroks.geojson</button>
+        </div>
+
+        <div id="status">Please select a file to begin.</div>
+    </div>
+
+    <script>
+    let gadmData = null;
+    let osmData = null;
+
+    const gadmInput = document.getElementById('gadmFile');
+    const osmInput = document.getElementById('osmFile');
+    const brgyBtn = document.getElementById('brgyBtn');
+    const purokBtn = document.getElementById('purokBtn');
+    const status = document.getElementById('status');
+
+    // 1. Handle GADM File Input
+    gadmInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        status.textContent = "⏳ Reading GADM dataset...";
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            try {
+                gadmData = JSON.parse(event.target.result);
+                status.textContent = `✅ GADM file ready for Barangay extraction!`;
+                status.style.color = "#0078ff";
+                brgyBtn.disabled = false;
+            } catch (e) { status.textContent = "❌ Error: Invalid GADM JSON file."; status.style.color = "#e63946"; }
+        };
+        reader.readAsText(file);
+    });
+
+    // 2. Handle OSM File Input
+    osmInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        status.textContent = "⏳ Reading OSM dataset...";
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            try {
+                osmData = JSON.parse(event.target.result);
+                
+                // Analyze what kind of shapes are inside this file
+                let pointCount = 0;
+                let polyCount = 0;
+                if(osmData.features) {
+                    osmData.features.forEach(f => {
+                        if(f.geometry && f.geometry.type === 'Point') pointCount++;
+                        else polyCount++;
+                    });
+                }
+
+                status.textContent = `✅ OSM file loaded.\nFound: ${pointCount} Points, ${polyCount} Other Geometries.`;
+                status.style.color = "#2a9d8f";
+                purokBtn.disabled = false;
+            } catch (e) { status.textContent = "❌ Error: Invalid OSM GeoJSON file."; status.style.color = "#e63946"; }
+        };
+        reader.readAsText(file);
+    });
+
+    // Helper function to trigger browser downloads
+    function triggerDownload(data, filename) {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute("href", dataStr);
+        downloadAnchor.setAttribute("download", filename);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+    }
+
+    // 3. Extract Barangays from GADM
+    brgyBtn.addEventListener('click', function() {
+        try {
+            const bagoFeatures = gadmData.features.filter(f => {
+                if (!f.properties) return false;
+                const p1 = String(f.properties.NAME_1 || "").trim().toLowerCase();
+                const p2 = String(f.properties.NAME_2 || "").trim().toLowerCase();
+                return p2 === "bago" && p1 === "negros occidental";
+            });
+
+            if (bagoFeatures.length === 0) throw new Error("No features matched 'Bago' inside Negros Occidental.");
+
+            const cleaned = bagoFeatures.map(f => ({
+                type: "Feature",
+                properties: { name: f.properties.NAME_3, type: "barangay", city: "Bago City" },
+                geometry: f.geometry
+            }));
+
+            triggerDownload({ type: "FeatureCollection", name: "Bago_Barangays", features: cleaned }, "barangays.geojson");
+            status.textContent = `✅ Success! Exported ${cleaned.length} Barangay borders.`;
+            status.style.color = "#2a9d8f";
+        } catch(err) { status.textContent = "❌ Error: " + err.message; status.style.color = "#e63946"; }
+    });
+
+    // 4. Force Extract ALL Points
+    purokBtn.addEventListener('click', function() {
+        status.textContent = "⚡ Force-isolating all coordinate points...";
+        try {
+            if (!osmData || !osmData.features) {
+                throw new Error("Missing valid OSM feature data setup.");
+            }
+
+            // Catch EVERY single coordinate map pin node regardless of property keys
+            const pointFeatures = osmData.features.filter(f => 
+                f.geometry && f.geometry.type === "Point"
+            );
+
+            if (pointFeatures.length === 0) {
+                throw new Error("This file does not contain any 'Point' coordinates. Check your file source.");
+            }
+
+            const cleaned = pointFeatures.map(f => {
+                // Find any name key present
+                const finalName = f.properties.name || 
+                                f.properties.official_name || 
+                                f.properties.old_name || 
+                                f.properties.designation || 
+                                "Unnamed Location";
+                                
+                const parentBrgy = f.properties["is_in:barangay"] || 
+                                f.properties["is_in:village"] || 
+                                f.properties["is_in:sitio"] || 
+                                "Bago City";
+
+                return {
+                    type: "Feature",
+                    properties: {
+                        name: finalName,
+                        type: "purok",
+                        barangay: parentBrgy
+                    },
+                    geometry: f.geometry
+                };
+            });
+
+            triggerDownload({ type: "FeatureCollection", name: "Bago_Puroks", features: cleaned }, "puroks.geojson");
+            status.textContent = `✅ Force-Extraction Complete!\nSaved ${cleaned.length} locations to puroks.geojson.`;
+            status.style.color = "#2a9d8f";
+        } catch(err) { 
+            status.textContent = "❌ Error: " + err.message; 
+            status.style.color = "#e63946"; 
+        }
+    });
+    </script>
+
+    </body>
+    </html>

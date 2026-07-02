@@ -1,0 +1,95 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block page_title %}Alerts Inbox{% endblock %}
+{% block content %}
+<div class="pulse-page dash-home">
+
+  <header class="dash-hero">
+    <div class="dash-hero__text">
+      <span class="pulse-eyebrow">Notifications</span>
+      <h2>Alerts Inbox</h2>
+      <p>Active surveillance alerts and notification delivery history</p>
+    </div>
+  </header>
+
+  <section class="dash-section">
+    <h3 class="dash-section__title">Active Alerts</h3>
+    <div class="pulse-panel pulse-table-panel">
+      <div class="pulse-table-panel__head">
+        <h3>Live Alerts</h3>
+        <span class="pulse-count-badge">{{ alerts|length }} record{{ alerts|length|pluralize }}</span>
+      </div>
+      <div class="pulse-table-wrap table-wrapper">
+        <table class="pulse-table">
+          <thead>
+            <tr>
+              <th>ID</th><th>Date</th><th>Type</th><th>Level</th><th>Status</th><th>Analysis ID</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for alert in alerts %}
+            <tr class="pulse-table__row">
+              <td data-label="ID"><span class="um-id">#{{ alert.id }}</span></td>
+              <td data-label="Date"><span class="um-date">{{ alert.alert_date|date:"M d, Y H:i" }}</span></td>
+              <td data-label="Type">{{ alert.alert_type }}</td>
+              <td data-label="Level"><span class="pill-badge badge-{{ alert.alert_level }}">{{ alert.alert_level|title }}</span></td>
+              <td data-label="Status"><span class="pill-badge badge-{{ alert.status }}">{{ alert.status|title }}</span></td>
+              <td data-label="Analysis ID">{{ alert.analysis_id }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6">
+                <div class="pulse-empty">
+                  <i data-lucide="bell-off" class="lucide-icon"></i>
+                  <p>No alerts recorded yet. Alerts will appear here when the risk pipeline triggers them.</p>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="dash-section">
+    <h3 class="dash-section__title">Notification Log</h3>
+    <div class="pulse-panel pulse-table-panel">
+      <div class="pulse-table-panel__head">
+        <h3>Delivery History</h3>
+        <span class="pulse-count-badge">{{ notifications|length }} record{{ notifications|length|pluralize }}</span>
+      </div>
+      <div class="pulse-table-wrap table-wrapper">
+        <table class="pulse-table">
+          <thead>
+            <tr>
+              <th>Sent At</th><th>Alert</th><th>Recipient</th><th>Channel</th><th>Status</th><th>Summary</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for note in notifications %}
+            <tr class="pulse-table__row">
+              <td data-label="Sent At"><span class="um-date">{{ note.sent_at|date:"M d, Y H:i" }}</span></td>
+              <td data-label="Alert">#{{ note.alert_id }}</td>
+              <td data-label="Recipient">{{ note.recipient_name|default:note.recipient_role }}</td>
+              <td data-label="Channel">{{ note.channel|title }}</td>
+              <td data-label="Status"><span class="pill-badge badge-{{ note.delivery_status }}">{{ note.delivery_status|title }}</span></td>
+              <td data-label="Summary">{{ note.message_summary|default:"—"|truncatechars:80 }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6">
+                <div class="pulse-empty">
+                  <i data-lucide="inbox" class="lucide-icon"></i>
+                  <p>No notifications have been sent yet.</p>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+</div>
+{% endblock %}
