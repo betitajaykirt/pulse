@@ -200,7 +200,7 @@ class SurveillanceReport(models.Model):
         Barangay, on_delete=models.DO_NOTHING, db_column='barangay_id',
     )
     patient = models.ForeignKey(
-        Patient, on_delete=models.DO_NOTHING,
+        Patient, on_delete=models.SET_NULL,
         null=True, blank=True, db_column='patient_id',
         related_name='surveillance_reports',
     )
@@ -216,7 +216,7 @@ class SurveillanceReport(models.Model):
     patient_name = models.CharField(max_length=255, default='Unknown Resident')
     civil_status = models.CharField(max_length=50, null=True, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
-    detailed_address = models.TextField(blank=True, default='')
+    detailed_address = models.TextField(null=True, blank=True)
     is_student = models.BooleanField(default=False)
     grade_year_section = models.CharField(max_length=100, null=True, blank=True)
     school_name = models.CharField(max_length=255, null=True, blank=True)
@@ -232,7 +232,7 @@ class SurveillanceReport(models.Model):
     ml_anomaly_score = models.DecimalField(
         max_digits=8, decimal_places=4, null=True, blank=True,
     )
-    epidemic_threshold_status = models.CharField(max_length=32, blank=True, default='')
+    epidemic_threshold_status = models.CharField(max_length=32, default='')
     validated_by = models.ForeignKey(
         Admin, on_delete=models.DO_NOTHING,
         null=True, blank=True, db_column='validated_by',
@@ -249,7 +249,7 @@ class SurveillanceReport(models.Model):
 
     class Meta:
         db_table = 'surveillance_reports'
-        # managed = False  # Uncomment after running migration 0004
+        managed = False
 
     def __str__(self):
         return f"Report #{self.pk} — {self.syndrome_type}"
@@ -272,6 +272,7 @@ class SurveillanceSession(models.Model):
 
     class Meta:
         db_table = 'surveillance_sessions'
+        managed = False
 
     def __str__(self):
         return f"Session #{self.pk} — {self.syndrome_type} ({self.patient_count} cases)"
@@ -404,6 +405,7 @@ class Symptom(models.Model):
 
     class Meta:
         db_table = 'symptoms'
+        managed = False
         ordering = ['name']
 
     def __str__(self):
@@ -436,6 +438,7 @@ class MitigationProtocol(models.Model):
 
     class Meta:
         db_table = 'mitigation_protocols'
+        managed = False
         ordering = ['disease_label', '-priority', 'sort_order']
         constraints = [
             models.UniqueConstraint(
@@ -461,6 +464,7 @@ class DiseaseCategoryThreshold(models.Model):
 
     class Meta:
         db_table = 'disease_category_thresholds'
+        managed = False
         ordering = ['category_level']
 
     def __str__(self):
@@ -474,7 +478,7 @@ class BarangayEpidemicStatus(models.Model):
     """Latest threshold evaluation snapshot per barangay + disease (map indicators)."""
 
     barangay = models.ForeignKey(
-        Barangay, on_delete=models.CASCADE, db_column='barangay_id',
+        Barangay, on_delete=models.DO_NOTHING, db_column='barangay_id',
         related_name='epidemic_statuses',
     )
     disease_label = models.CharField(max_length=150)
@@ -485,6 +489,7 @@ class BarangayEpidemicStatus(models.Model):
 
     class Meta:
         db_table = 'barangay_epidemic_statuses'
+        managed = False
         constraints = [
             models.UniqueConstraint(
                 fields=['barangay', 'disease_label'],
@@ -518,6 +523,7 @@ class OutbreakThresholdLog(models.Model):
 
     class Meta:
         db_table = 'outbreak_threshold_logs'
+        managed = False
         ordering = ['-created_at']
 
     def __str__(self):
@@ -548,7 +554,7 @@ class PatientCase(models.Model):
     patient_name = models.CharField(max_length=255, default='Unknown Resident')
     civil_status = models.CharField(max_length=50, null=True, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
-    detailed_address = models.TextField(blank=True, default='')
+    detailed_address = models.TextField(null=True, blank=True)
     is_student = models.BooleanField(default=False)
     grade_year_section = models.CharField(max_length=100, null=True, blank=True)
     school_name = models.CharField(max_length=255, null=True, blank=True)
@@ -565,6 +571,7 @@ class PatientCase(models.Model):
 
     class Meta:
         db_table = 'patient_cases'
+        managed = False
 
     def __str__(self):
         return f"PatientCase #{self.pk} — Session #{self.session_id}"
@@ -849,6 +856,174 @@ class AuditLog(models.Model):
 
     def __str__(self):
         return f"Audit #{self.pk} — {self.action}"
+
+
+# ── Legacy / prototype tables (pulse.sql — unused by active PULSE app) ──
+
+class LegacyAdmin(models.Model):
+    """Legacy singular ``admin`` table from early schema."""
+
+    id = models.AutoField(primary_key=True, db_column='admin_id')
+    name = models.CharField(max_length=255)
+    email = models.EmailField(max_length=254, unique=True)
+    password = models.CharField(max_length=255)
+    role = models.CharField(max_length=50)
+    status = models.CharField(max_length=50)
+
+    class Meta:
+        db_table = 'admin'
+        managed = False
+
+
+class LegacySuperAdmin(models.Model):
+    """Legacy singular ``super_admin`` table from early schema."""
+
+    id = models.AutoField(primary_key=True, db_column='super_admin_id')
+    name = models.CharField(max_length=255)
+    email = models.EmailField(max_length=254, unique=True)
+    password = models.CharField(max_length=255)
+    role = models.CharField(max_length=50)
+    status = models.CharField(max_length=50)
+
+    class Meta:
+        db_table = 'super_admin'
+        managed = False
+
+
+class Bhw(models.Model):
+    """Legacy BHW table (superseded by ``users`` with role barangay_health_worker)."""
+
+    id = models.AutoField(primary_key=True, db_column='bhw_id')
+    name = models.CharField(max_length=255)
+    password = models.CharField(max_length=255)
+    email = models.EmailField(max_length=254, unique=True)
+    contact_info = models.CharField(max_length=100)
+    barangay = models.ForeignKey(
+        Barangay, on_delete=models.DO_NOTHING, db_column='barangay_id',
+    )
+
+    class Meta:
+        db_table = 'bhw'
+        managed = False
+
+
+class EnvironmentData(models.Model):
+    """Legacy ``environment_data`` table (superseded by ``environmental_data``)."""
+
+    id = models.AutoField(primary_key=True, db_column='environment_id')
+    temperature = models.DecimalField(max_digits=5, decimal_places=2)
+    humidity = models.DecimalField(max_digits=5, decimal_places=2)
+    weather_condition = models.CharField(max_length=100)
+    recorded_date = models.DateTimeField()
+    barangay = models.ForeignKey(
+        Barangay, on_delete=models.DO_NOTHING, db_column='barangay_id',
+    )
+
+    class Meta:
+        db_table = 'environment_data'
+        managed = False
+
+
+class MlAiPrediction(models.Model):
+    id = models.AutoField(primary_key=True, db_column='prediction_id')
+    disease_type = models.CharField(max_length=100)
+    risk_score = models.FloatField()
+    prediction_probability = models.FloatField()
+    severity_level = models.CharField(max_length=50)
+    algorithm_used = models.CharField(max_length=100)
+    prediction_date = models.DateTimeField()
+
+    class Meta:
+        db_table = 'ml_ai_predictions'
+        managed = False
+
+
+class RiskAnalysis(models.Model):
+    id = models.AutoField(primary_key=True, db_column='analysis_id')
+    risk_score = models.FloatField()
+    anomaly_flag = models.BooleanField()
+    analysis_date = models.DateTimeField()
+    prediction = models.ForeignKey(
+        MlAiPrediction, on_delete=models.DO_NOTHING, db_column='prediction_id',
+    )
+
+    class Meta:
+        db_table = 'risk_analysis'
+        managed = False
+
+
+class HealthReport(models.Model):
+    id = models.AutoField(primary_key=True, db_column='report_id')
+    symptoms = models.TextField()
+    severity_level = models.CharField(max_length=50)
+    report_date = models.DateTimeField()
+    admin = models.ForeignKey(
+        LegacyAdmin, on_delete=models.DO_NOTHING,
+        null=True, blank=True, db_column='admin_id',
+    )
+    barangay = models.ForeignKey(
+        Barangay, on_delete=models.DO_NOTHING, db_column='barangay_id',
+    )
+    bhw = models.ForeignKey(
+        Bhw, on_delete=models.DO_NOTHING, db_column='bhw_id',
+    )
+
+    class Meta:
+        db_table = 'health_report'
+        managed = False
+
+
+class IncidentReport(models.Model):
+    id = models.AutoField(primary_key=True, db_column='incident_id')
+    disease_type = models.CharField(max_length=100)
+    case_count = models.IntegerField()
+    incident_date = models.DateField()
+    response_action = models.TextField()
+    health_report = models.ForeignKey(
+        HealthReport, on_delete=models.DO_NOTHING, db_column='report_id',
+    )
+    patient = models.ForeignKey(
+        Patient, on_delete=models.DO_NOTHING, db_column='patient_id',
+    )
+
+    class Meta:
+        db_table = 'incident_report'
+        managed = False
+
+
+class HistoricalRecord(models.Model):
+    id = models.AutoField(primary_key=True, db_column='record_id')
+    disease_type = models.CharField(max_length=100)
+    case_status = models.CharField(max_length=50)
+    treatment_status = models.CharField(max_length=100)
+    date_recorded = models.DateField()
+    notes = models.TextField(null=True, blank=True)
+    incident = models.ForeignKey(
+        IncidentReport, on_delete=models.DO_NOTHING, db_column='incident_id',
+    )
+    patient = models.ForeignKey(
+        Patient, on_delete=models.DO_NOTHING, db_column='patient_id',
+    )
+
+    class Meta:
+        db_table = 'historical_records'
+        managed = False
+
+
+class LegacyNotification(models.Model):
+    """Legacy ``notification`` table (distinct from ``notification_logs``)."""
+
+    id = models.AutoField(primary_key=True, db_column='notification_id')
+    recipient_role = models.CharField(max_length=100)
+    notification_message = models.TextField()
+    sent_date = models.DateTimeField()
+    alert = models.ForeignKey(
+        Alert, on_delete=models.DO_NOTHING, db_column='alert_id',
+    )
+
+    class Meta:
+        db_table = 'notification'
+        managed = False
 
 
 # ── Application Sessions (table: sessions) ────────────────────────

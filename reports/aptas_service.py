@@ -302,6 +302,7 @@ def compute_and_log_barangay_risk(
         final_risk_score=final_score,
         risk_level=risk_level,
         is_active_alert=is_active,
+        created_at=timezone.now(),
     )
 
     logger.info(
