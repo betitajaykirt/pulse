@@ -28,25 +28,25 @@
           {{ alert.risk_level }}
         </span>
       </header>
-      <div class="aptas-alert-card__scores" role="list" aria-label="APTAS score breakdown">
+      <div class="aptas-alert-card__scores" role="list" aria-label="APTAS score breakdown" style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;width:100%;align-items:stretch;">
         <div class="aptas-score" role="listitem">
-          <span class="aptas-score__label" title="Final risk score">Final</span>
+          <span class="aptas-score__label" title="Final risk score" style="font-size:10px !important;letter-spacing:-0.02em !important;white-space:normal !important;text-align:center;word-break:break-word;line-height:1.1;">Final</span>
           <strong class="aptas-score__value">{{ alert.final_risk_score|floatformat:2 }}</strong>
         </div>
         <div class="aptas-score" role="listitem">
-          <span class="aptas-score__label" title="Anomaly score (A)">Anomaly</span>
+          <span class="aptas-score__label" title="Anomaly score (A)" style="font-size:10px !important;letter-spacing:-0.02em !important;white-space:normal !important;text-align:center;word-break:break-word;line-height:1.1;">Anomaly</span>
           <span class="aptas-score__value">{{ alert.anomaly_score|floatformat:2 }}</span>
         </div>
         <div class="aptas-score" role="listitem">
-          <span class="aptas-score__label" title="Temporal score (T)">Temporal</span>
+          <span class="aptas-score__label" title="Temporal score (T)" style="font-size:10px !important;letter-spacing:-0.02em !important;white-space:normal !important;text-align:center;word-break:break-word;line-height:1.1;">Temporal</span>
           <span class="aptas-score__value">{{ alert.temporal_score|floatformat:2 }}</span>
         </div>
         <div class="aptas-score" role="listitem">
-          <span class="aptas-score__label" title="Spatial score (S)">Spatial</span>
+          <span class="aptas-score__label" title="Spatial score (S)" style="font-size:10px !important;letter-spacing:-0.02em !important;white-space:normal !important;text-align:center;word-break:break-word;line-height:1.1;">Spatial</span>
           <span class="aptas-score__value">{{ alert.spatial_score|floatformat:2 }}</span>
         </div>
         <div class="aptas-score" role="listitem">
-          <span class="aptas-score__label" title="Environmental score (E)">Environmental</span>
+          <span class="aptas-score__label" title="Environmental score (E)" style="font-size:10px !important;letter-spacing:-0.02em !important;white-space:normal !important;text-align:center;word-break:break-word;line-height:1.1;">Environmental</span>
           <span class="aptas-score__value">{{ alert.environmental_score|floatformat:2 }}</span>
         </div>
       </div>
