@@ -15,7 +15,7 @@
   {% if aptas_alerts %}
   <div class="aptas-alert-grid">
     {% for alert in aptas_alerts %}
-    <article class="aptas-alert-card aptas-alert-card--{{ alert.risk_level|lower }}">
+    <article class="aptas-alert-card aptas-alert-card--{{ alert.risk_level|lower }}" style="width: 100%; max-width: 100%; padding: 1.5rem; box-sizing: border-box;">
       <header class="aptas-alert-card__head">
         <div class="aptas-alert-card__icon" aria-hidden="true">
           <i data-lucide="{% if alert.risk_level == 'Critical' %}shield-alert{% elif alert.risk_level == 'High' %}alert-triangle{% elif alert.risk_level == 'Moderate' %}activity{% else %}check-circle-2{% endif %}" class="lucide-icon lucide-icon--sm"></i>
@@ -28,24 +28,24 @@
           {{ alert.risk_level }}
         </span>
       </header>
-      <div class="aptas-alert-card__scores" role="list" aria-label="APTAS score breakdown" style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; width: 100%; align-items: center;">
-        <div class="aptas-score" role="listitem" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 6px 2px; background: #f8f9fa; border-radius: 12px; width: 100%; text-align: center;">
+      <div class="aptas-alert-card__scores" role="list" aria-label="APTAS score breakdown" style="display: flex; gap: 8px; width: 100%; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none;">
+        <div class="aptas-score" role="listitem" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 6px 2px; background: #f8f9fa; border-radius: 12px; width: 100%; text-align: center; flex: 0 0 auto; min-width: 92px;">
           <span class="aptas-score__label" title="Final risk score" style="font-size: 10px !important; font-weight: 600; color: #6c757d; white-space: normal !important; word-break: break-all; line-height: 1.1; margin-bottom: 4px; display: block;">FINAL</span>
           <span class="aptas-score__value" style="font-size: 14px !important; font-weight: 700; color: #004b87; margin: 0;">{{ alert.final_risk_score|floatformat:2 }}</span>
         </div>
-        <div class="aptas-score" role="listitem" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 6px 2px; background: #f8f9fa; border-radius: 12px; width: 100%; text-align: center;">
+        <div class="aptas-score" role="listitem" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 6px 2px; background: #f8f9fa; border-radius: 12px; width: 100%; text-align: center; flex: 0 0 auto; min-width: 92px;">
           <span class="aptas-score__label" title="Anomaly score (A)" style="font-size: 10px !important; font-weight: 600; color: #6c757d; white-space: normal !important; word-break: break-all; line-height: 1.1; margin-bottom: 4px; display: block;">ANOMALY</span>
           <span class="aptas-score__value" style="font-size: 14px !important; font-weight: 700; color: #004b87; margin: 0;">{{ alert.anomaly_score|floatformat:2 }}</span>
         </div>
-        <div class="aptas-score" role="listitem" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 6px 2px; background: #f8f9fa; border-radius: 12px; width: 100%; text-align: center;">
+        <div class="aptas-score" role="listitem" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 6px 2px; background: #f8f9fa; border-radius: 12px; width: 100%; text-align: center; flex: 0 0 auto; min-width: 92px;">
           <span class="aptas-score__label" title="Temporal score (T)" style="font-size: 10px !important; font-weight: 600; color: #6c757d; white-space: normal !important; word-break: break-all; line-height: 1.1; margin-bottom: 4px; display: block;">TEMPORAL</span>
           <span class="aptas-score__value" style="font-size: 14px !important; font-weight: 700; color: #004b87; margin: 0;">{{ alert.temporal_score|floatformat:2 }}</span>
         </div>
-        <div class="aptas-score" role="listitem" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 6px 2px; background: #f8f9fa; border-radius: 12px; width: 100%; text-align: center;">
+        <div class="aptas-score" role="listitem" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 6px 2px; background: #f8f9fa; border-radius: 12px; width: 100%; text-align: center; flex: 0 0 auto; min-width: 92px;">
           <span class="aptas-score__label" title="Spatial score (S)" style="font-size: 10px !important; font-weight: 600; color: #6c757d; white-space: normal !important; word-break: break-all; line-height: 1.1; margin-bottom: 4px; display: block;">SPATIAL</span>
           <span class="aptas-score__value" style="font-size: 14px !important; font-weight: 700; color: #004b87; margin: 0;">{{ alert.spatial_score|floatformat:2 }}</span>
         </div>
-        <div class="aptas-score" role="listitem" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 6px 2px; background: #f8f9fa; border-radius: 12px; width: 100%; text-align: center;">
+        <div class="aptas-score" role="listitem" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 6px 2px; background: #f8f9fa; border-radius: 12px; width: 100%; text-align: center; flex: 0 0 auto; min-width: 92px;">
           <span class="aptas-score__label" title="Environmental score (E)" style="font-size: 10px !important; font-weight: 600; color: #6c757d; white-space: normal !important; word-break: break-all; line-height: 1.1; margin-bottom: 4px; display: block;">ENVIRONMENTAL</span>
           <span class="aptas-score__value" style="font-size: 14px !important; font-weight: 700; color: #004b87; margin: 0;">{{ alert.environmental_score|floatformat:2 }}</span>
         </div>
