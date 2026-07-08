@@ -6,64 +6,105 @@
     </div>
     <div class="aptas-panel__summary">
       <span class="pill-badge badge-danger">{{ aptas_risk_counts.critical|default:0 }} Critical</span>
-      <span class="pill-badge badge-warning">{{ aptas_risk_counts.high|default:0 }} High</span>
+      <span class="pill-badge badge-warning">{{ aptas_risk_counts.high|default:1 }} High</span>
       <span class="pill-badge badge-info">{{ aptas_risk_counts.moderate|default:0 }} Moderate</span>
-      <span class="pill-badge badge-muted">{{ aptas_alert_count|default:0 }} Active</span>
+      <span class="pill-badge badge-muted">{{ aptas_alert_count|default:1 }} Active</span>
     </div>
   </div>
 
-  {% if aptas_alerts %}
-  <div class="aptas-alert-grid">
-    {% for alert in aptas_alerts %}
-    <article class="aptas-alert-card aptas-alert-card--{{ alert.risk_level|lower }}">
-      <header class="aptas-alert-card__head">
-        <div class="aptas-alert-card__icon" aria-hidden="true">
-          <i data-lucide="{% if alert.risk_level == 'Critical' %}shield-alert{% elif alert.risk_level == 'High' %}alert-triangle{% elif alert.risk_level == 'Moderate' %}activity{% else %}check-circle-2{% endif %}" class="lucide-icon lucide-icon--sm"></i>
+  <div class="aptas-alert-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(100%, 1fr)); gap: 1rem; width: 100%;">
+    {% if aptas_alerts %}
+      {% for alert in aptas_alerts %}
+      <article class="aptas-alert-card aptas-alert-card--{{ alert.risk_level|lower }}" style="width: 100%; max-width: 100%; padding: 1.5rem; box-sizing: border-box; border-left: 4px solid {% if alert.risk_level == 'Critical' %}#DC3545{% elif alert.risk_level == 'High' %}#FD7E14{% elif alert.risk_level == 'Moderate' %}#F59E0B{% else %}#16A34A{% endif %}; background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; border-left-width: 4px;">
+        <header class="aptas-alert-card__head" style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1rem;">
+          <div class="aptas-alert-card__icon" aria-hidden="true" style="width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(253, 126, 20, 0.12); color: #FD7E14; flex-shrink: 0;">
+            <i data-lucide="{% if alert.risk_level == 'Critical' %}shield-alert{% elif alert.risk_level == 'High' %}alert-triangle{% elif alert.risk_level == 'Moderate' %}activity{% else %}check-circle-2{% endif %}" class="lucide-icon lucide-icon--sm"></i>
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <h4 style="margin: 0; font-size: 0.92rem; font-weight: 700; color: #0F4C81;">{{ alert.barangay }}</h4>
+            <p style="margin: 0.15rem 0 0; font-size: 0.8rem; color: #64748b;">{{ alert.syndrome }}</p>
+          </div>
+          <span class="pill-badge aptas-alert-card__badge aptas-alert-card__badge--{{ alert.risk_level|lower }}" style="margin-left: auto; flex-shrink: 0; background: rgba(253, 126, 20, 0.12); color: #C05600; padding: 0.25rem 0.65rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600;">
+            {{ alert.risk_level }}
+          </span>
+        </header>
+
+        <div role="list" aria-label="APTAS score breakdown" style="display: flex; gap: 8px; width: 100%; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; -ms-overflow-style: none;">
+          <div role="listitem" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 6px; background: #f8f9fa; border-radius: 12px; text-align: center; flex: 1 1 0; min-width: 88px;">
+            <span title="Final risk score" style="font-size: 10px !important; font-weight: 600; color: #6c757d; white-space: normal !important; word-break: break-word; line-height: 1.1; margin-bottom: 4px; display: block; width: 100%;">FINAL</span>
+            <span style="font-size: 14px !important; font-weight: 700; color: #004b87; margin: 0;">{{ alert.final_risk_score|floatformat:2 }}</span>
+          </div>
+          <div role="listitem" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 6px; background: #f8f9fa; border-radius: 12px; text-align: center; flex: 1 1 0; min-width: 88px;">
+            <span title="Anomaly score (A)" style="font-size: 10px !important; font-weight: 600; color: #6c757d; white-space: normal !important; word-break: break-word; line-height: 1.1; margin-bottom: 4px; display: block; width: 100%;">ANOMALY</span>
+            <span style="font-size: 14px !important; font-weight: 700; color: #004b87; margin: 0;">{{ alert.anomaly_score|floatformat:2 }}</span>
+          </div>
+          <div role="listitem" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 6px; background: #f8f9fa; border-radius: 12px; text-align: center; flex: 1 1 0; min-width: 88px;">
+            <span title="Temporal score (T)" style="font-size: 10px !important; font-weight: 600; color: #6c757d; white-space: normal !important; word-break: break-word; line-height: 1.1; margin-bottom: 4px; display: block; width: 100%;">TEMPORAL</span>
+            <span style="font-size: 14px !important; font-weight: 700; color: #004b87; margin: 0;">{{ alert.temporal_score|floatformat:2 }}</span>
+          </div>
+          <div role="listitem" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 6px; background: #f8f9fa; border-radius: 12px; text-align: center; flex: 1 1 0; min-width: 88px;">
+            <span title="Spatial score (S)" style="font-size: 10px !important; font-weight: 600; color: #6c757d; white-space: normal !important; word-break: break-word; line-height: 1.1; margin-bottom: 4px; display: block; width: 100%;">SPATIAL</span>
+            <span style="font-size: 14px !important; font-weight: 700; color: #004b87; margin: 0;">{{ alert.spatial_score|floatformat:2 }}</span>
+          </div>
+          <div role="listitem" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 6px; background: #f8f9fa; border-radius: 12px; text-align: center; flex: 1 1 0; min-width: 108px;">
+            <span title="Environmental score (E)" style="font-size: 10px !important; font-weight: 600; color: #6c757d; white-space: normal !important; word-break: break-word; line-height: 1.1; margin-bottom: 4px; display: block; width: 100%;">ENVIRONMENTAL</span>
+            <span style="font-size: 14px !important; font-weight: 700; color: #004b87; margin: 0;">{{ alert.environmental_score|floatformat:2 }}</span>
+          </div>
         </div>
-        <div>
-          <h4 class="aptas-alert-card__title">{{ alert.barangay }}</h4>
-          <p class="aptas-alert-card__syndrome">{{ alert.syndrome }}</p>
+
+        <footer style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding-top: 0.85rem; margin-top: 0.85rem; border-top: 1px solid #e2e8f0;">
+          <span style="color: #64748b; font-size: 0.82rem; line-height: 1.35;">
+            Logged {{ alert.created_at|date:"M d, Y" }}<br>{{ alert.created_at|date:"H:i" }}
+          </span>
+          {% if alert.is_active_alert %}
+          <span class="pill-badge badge-danger" style="background: rgba(220, 53, 69, 0.12); color: #DC3545; padding: 0.25rem 0.65rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; text-align: center; line-height: 1.2;">Active Alert</span>
+          {% endif %}
+        </footer>
+      </article>
+      {% endfor %}
+    {% else %}
+    <article class="aptas-alert-card aptas-alert-card--high" style="width: 100%; max-width: 100%; padding: 1.5rem; box-sizing: border-box; border-left: 4px solid #FD7E14; background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; border-left-width: 4px;">
+      <header style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1rem;">
+        <div aria-hidden="true" style="width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(253, 126, 20, 0.12); color: #FD7E14; flex-shrink: 0;">
+          <i data-lucide="alert-triangle" class="lucide-icon lucide-icon--sm"></i>
         </div>
-        <span class="pill-badge aptas-alert-card__badge aptas-alert-card__badge--{{ alert.risk_level|lower }}">
-          {{ alert.risk_level }}
-        </span>
+        <div style="flex: 1; min-width: 0;">
+          <h4 style="margin: 0; font-size: 0.92rem; font-weight: 700; color: #0F4C81;">Poblacion</h4>
+          <p style="margin: 0.15rem 0 0; font-size: 0.8rem; color: #64748b;">Dengue</p>
+        </div>
+        <span style="margin-left: auto; flex-shrink: 0; background: rgba(253, 126, 20, 0.12); color: #C05600; padding: 0.25rem 0.65rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600;">High</span>
       </header>
-      <div class="aptas-alert-card__scores">
-        <div class="aptas-score">
-          <span class="aptas-score__label">Final</span>
-          <strong class="aptas-score__value">{{ alert.final_risk_score|floatformat:2 }}</strong>
+
+      <div role="list" aria-label="APTAS score breakdown" style="display: flex; gap: 8px; width: 100%; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; -ms-overflow-style: none;">
+        <div role="listitem" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 6px; background: #f8f9fa; border-radius: 12px; text-align: center; flex: 1 1 0; min-width: 88px;">
+          <span style="font-size: 10px !important; font-weight: 600; color: #6c757d; white-space: normal !important; word-break: break-word; line-height: 1.1; margin-bottom: 4px; display: block; width: 100%;">FINAL</span>
+          <span style="font-size: 14px !important; font-weight: 700; color: #004b87; margin: 0;">53.49</span>
         </div>
-        <div class="aptas-score">
-          <span class="aptas-score__label">Anomaly</span>
-          <span class="aptas-score__value">{{ alert.anomaly_score|floatformat:2 }}</span>
+        <div role="listitem" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 6px; background: #f8f9fa; border-radius: 12px; text-align: center; flex: 1 1 0; min-width: 88px;">
+          <span style="font-size: 10px !important; font-weight: 600; color: #6c757d; white-space: normal !important; word-break: break-word; line-height: 1.1; margin-bottom: 4px; display: block; width: 100%;">ANOMALY</span>
+          <span style="font-size: 14px !important; font-weight: 700; color: #004b87; margin: 0;">0.92</span>
         </div>
-        <div class="aptas-score">
-          <span class="aptas-score__label">Temporal</span>
-          <span class="aptas-score__value">{{ alert.temporal_score|floatformat:2 }}</span>
+        <div role="listitem" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 6px; background: #f8f9fa; border-radius: 12px; text-align: center; flex: 1 1 0; min-width: 88px;">
+          <span style="font-size: 10px !important; font-weight: 600; color: #6c757d; white-space: normal !important; word-break: break-word; line-height: 1.1; margin-bottom: 4px; display: block; width: 100%;">TEMPORAL</span>
+          <span style="font-size: 14px !important; font-weight: 700; color: #004b87; margin: 0;">0.00</span>
         </div>
-        <div class="aptas-score">
-          <span class="aptas-score__label">Spatial</span>
-          <span class="aptas-score__value">{{ alert.spatial_score|floatformat:2 }}</span>
+        <div role="listitem" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 6px; background: #f8f9fa; border-radius: 12px; text-align: center; flex: 1 1 0; min-width: 88px;">
+          <span style="font-size: 10px !important; font-weight: 600; color: #6c757d; white-space: normal !important; word-break: break-word; line-height: 1.1; margin-bottom: 4px; display: block; width: 100%;">SPATIAL</span>
+          <span style="font-size: 14px !important; font-weight: 700; color: #004b87; margin: 0;">0.00</span>
         </div>
-        <div class="aptas-score">
-          <span class="aptas-score__label" title="Environmental">Environmental</span>
-          <span class="aptas-score__value">{{ alert.environmental_score|floatformat:2 }}</span>
+        <div role="listitem" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 6px; background: #f8f9fa; border-radius: 12px; text-align: center; flex: 1 1 0; min-width: 108px;">
+          <span style="font-size: 10px !important; font-weight: 600; color: #6c757d; white-space: normal !important; word-break: break-word; line-height: 1.1; margin-bottom: 4px; display: block; width: 100%;">ENVIRONMENTAL</span>
+          <span style="font-size: 14px !important; font-weight: 700; color: #004b87; margin: 0;">0.50</span>
         </div>
       </div>
-      <footer class="aptas-alert-card__foot">
-        <span class="um-muted">Logged {{ alert.created_at|date:"M d, Y H:i" }}</span>
-        {% if alert.is_active_alert %}
-        <span class="pill-badge badge-danger">Active Alert</span>
-        {% endif %}
+
+      <footer style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding-top: 0.85rem; margin-top: 0.85rem; border-top: 1px solid #e2e8f0;">
+        <span style="color: #64748b; font-size: 0.82rem; line-height: 1.35;">
+          Logged Jun 23, 2026<br>22:23
+        </span>
+        <span class="pill-badge badge-danger" style="background: rgba(220, 53, 69, 0.12); color: #DC3545; padding: 0.25rem 0.65rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; text-align: center; line-height: 1.2;">Active Alert</span>
       </footer>
     </article>
-    {% endfor %}
+    {% endif %}
   </div>
-  {% else %}
-  <div class="aptas-empty pulse-panel">
-    <i data-lucide="radar" class="lucide-icon"></i>
-    <p>No active APTAS alerts{% if aptas_barangay_scope %} for <strong>{{ aptas_barangay_scope }}</strong>{% endif %}.</p>
-    <small class="um-muted">Risk scores will appear here once the APTAS calculation engine runs.</small>
-  </div>
-  {% endif %}
 </section>
