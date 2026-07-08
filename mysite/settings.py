@@ -14,13 +14,14 @@ import os
 from pathlib import Path
 import environ
 
-env = environ.Env()
-environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Load environment variables from .env file in the project root
+env = environ.Env()
+env_file = os.path.join(BASE_DIR, '.env')
+if os.path.exists(env_file):
+    environ.Env.read_env(env_file)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
@@ -34,7 +35,14 @@ DEBUG = True
 ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
+    'pulse.bccbsis.com',
+    'bccbsis.com',
     '.vercel.app',
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://pulse.bccbsis.com',
+    'https://*.vercel.app',
 ]
 
 
