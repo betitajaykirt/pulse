@@ -276,6 +276,30 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
+  /* ── Custom panes for correct z-stacking ─────────────────────── */
+
+  /* Stacking order: Tiles → Heatmap (340) → Boundaries (350, created in pulse_map_boundaries.js) → Pins (450) */
+
+  if (!map.getPane('heatmapPane')) {
+
+    map.createPane('heatmapPane');
+
+    map.getPane('heatmapPane').style.zIndex = 340;
+
+  }
+
+  if (!map.getPane('casePinsPane')) {
+
+    map.createPane('casePinsPane');
+
+    map.getPane('casePinsPane').style.zIndex = 450;
+
+    map.getPane('casePinsPane').style.pointerEvents = 'auto';
+
+  }
+
+
+
   function refreshMapSize() {
 
     map.invalidateSize({ animate: false });
@@ -594,6 +618,66 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
+  function buildClusterPopup(cases) {
+
+    var totalCases = cases.reduce(function (s, c) { return s + c.case_count; }, 0);
+
+    var html = '<div class="map-cluster-popup">';
+
+    html += '<div class="map-cluster-popup__header">';
+
+    html += '<span>Cluster — ' + cases[0].barangay_name + '</span>';
+
+    html += '<span class="map-cluster-popup__header-count">' + cases.length + ' reports · ' + totalCases + ' cases</span>';
+
+    html += '</div>';
+
+    html += '<div class="map-cluster-popup__scroll">';
+
+    cases.forEach(function (c, idx) {
+
+      var classifCls = 'map-cluster-popup__case-classif map-cluster-popup__case-classif--' + c.case_classification;
+
+      html += '<div class="map-cluster-popup__case">';
+
+      html += '<div class="map-cluster-popup__case-title">';
+
+      html += '<span class="' + classifCls + '">' + c.case_classification.toUpperCase() + '</span> ';
+
+      html += (c.status || 'Unclassified');
+
+      if (c.validation_status === 'pending') html += ' <span style="color:#f59e0b;font-size:.7rem;font-weight:600;">(pending)</span>';
+
+      html += '</div>';
+
+      html += '<div class="map-cluster-popup__case-meta">';
+
+      html += '<div><strong>Disease:</strong> ' + (c.syndrome_type || '—') + '</div>';
+
+      html += '<div><strong>Cases:</strong> ' + c.case_count + ' · <strong>Date:</strong> ' + c.report_date + '</div>';
+
+      if (c.epidemic_threshold_status) {
+
+        html += '<div><strong>Threshold:</strong> ' + c.epidemic_threshold_status.replace(/_/g, ' ') + '</div>';
+
+      }
+
+      html += '</div>';
+
+      html += buildMitigationBanner(c.mitigation_suggestions);
+
+      html += '</div>';
+
+    });
+
+    html += '</div></div>';
+
+    return html;
+
+  }
+
+
+
   function loadMapData(reloadBoundaries) {
 
     const time = document.getElementById('filter-time').value;
@@ -658,45 +742,159 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
-        caseList.forEach(c => {
+        /* ── Tally stats + heatmap points ───────────────────────── */
 
-          const ll = [c.latitude, c.longitude];
+        caseList.forEach(function (c) {
 
           hp.push([c.latitude, c.longitude, c.heat_intensity]);
-
-          const pc = c.case_classification === 'confirmed' ? '#7c3aed' : c.case_classification === 'probable' ? '#ef4444' : '#f59e0b';
-
-          const ps = c.case_classification === 'confirmed' ? 10 : c.case_classification === 'probable' ? 8 : 6;
-
-          const isPending = c.validation_status === 'pending';
-
-          const tooltipHtml =
-
-            '<b>Syndromic report</b><br>' +
-
-            'Status: <b>' + (c.status || 'Unclassified') + '</b><br>' +
-
-            'Classification: <b>' + c.case_classification.toUpperCase() + '</b><br>' +
-
-            'Cases: <b>' + c.case_count + '</b><br>' +
-
-            'Barangay: ' + c.barangay_name + '<br>' +
-
-            'Date: ' + c.report_date +
-
-            (isPending ? '<br><span style="color:#f59e0b;font-size:.75rem;font-weight:600;">Pending validation</span>' : '');
-
-          L.circleMarker(ll, { radius: ps, fillColor: pc, color: '#fff', weight: 2, fillOpacity: isPending ? 0.5 : 0.9 })
-
-            .bindTooltip(tooltipHtml, { sticky: true, direction: 'top', className: 'hotspot-tip' })
-
-            .bindPopup(buildCasePopup(c), { maxWidth: 340, className: 'map-case-popup-wrap' })
-
-            .addTo(casePinsLayer);
 
           counts[c.case_classification] = (counts[c.case_classification] || 0) + c.case_count;
 
           counts.total += c.case_count;
+
+        });
+
+
+
+        /* ── Group cases by location (5 decimal places ≈ ~1 m) ── */
+
+        const CLASSIF_RANK = { confirmed: 3, probable: 2, suspected: 1 };
+
+        const clusters = {};
+
+        caseList.forEach(function (c) {
+
+          var key = c.latitude.toFixed(5) + ',' + c.longitude.toFixed(5);
+
+          if (!clusters[key]) clusters[key] = [];
+
+          clusters[key].push(c);
+
+        });
+
+
+
+        /* ── Render one consolidated pin per cluster ────────────── */
+
+        Object.keys(clusters).forEach(function (key) {
+
+          var group = clusters[key];
+
+          var first = group[0];
+
+          var ll = [first.latitude, first.longitude];
+
+
+
+          /* Pick worst classification for pin colour / size */
+
+          var worst = group.reduce(function (best, c) {
+
+            return (CLASSIF_RANK[c.case_classification] || 0) > (CLASSIF_RANK[best.case_classification] || 0) ? c : best;
+
+          }, first);
+
+          var pc = worst.case_classification === 'confirmed' ? '#7c3aed'
+
+                 : worst.case_classification === 'probable'  ? '#ef4444' : '#f59e0b';
+
+          var ps = worst.case_classification === 'confirmed' ? 10
+
+                 : worst.case_classification === 'probable'  ? 8 : 6;
+
+
+
+          var anyPending = group.some(function (c) { return c.validation_status === 'pending'; });
+
+          var totalCasesInGroup = group.reduce(function (s, c) { return s + c.case_count; }, 0);
+
+
+
+          /* Tooltip summary */
+
+          var tooltipHtml = '<b>' + (group.length > 1 ? group.length + ' reports' : 'Syndromic report') + '</b><br>';
+
+          tooltipHtml += 'Total cases: <b>' + totalCasesInGroup + '</b><br>';
+
+          tooltipHtml += 'Classification: <b>' + worst.case_classification.toUpperCase() + '</b><br>';
+
+          tooltipHtml += 'Barangay: ' + first.barangay_name;
+
+          if (anyPending) tooltipHtml += '<br><span style="color:#f59e0b;font-size:.75rem;font-weight:600;">Contains pending reports</span>';
+
+
+
+          /* Popup: single-case or scrollable cluster */
+
+          var popupHtml, popupClass;
+
+          if (group.length === 1) {
+
+            popupHtml = buildCasePopup(first);
+
+            popupClass = 'map-case-popup-wrap';
+
+          } else {
+
+            popupHtml = buildClusterPopup(group);
+
+            popupClass = 'map-cluster-popup-wrap';
+
+          }
+
+
+
+          /* The pin marker — rendered on casePinsPane */
+
+          var marker = L.circleMarker(ll, {
+
+            pane: 'casePinsPane',
+
+            radius: group.length > 1 ? Math.min(ps + 3, 14) : ps,
+
+            fillColor: pc,
+
+            color: '#fff',
+
+            weight: 2,
+
+            fillOpacity: anyPending ? 0.5 : 0.9,
+
+          })
+
+            .bindTooltip(tooltipHtml, { sticky: true, direction: 'top', className: 'hotspot-tip' })
+
+            .bindPopup(popupHtml, { maxWidth: 380, className: popupClass })
+
+            .addTo(casePinsLayer);
+
+
+
+          /* Count badge for multi-case clusters */
+
+          if (group.length > 1) {
+
+            var badge = L.marker(ll, {
+
+              pane: 'casePinsPane',
+
+              interactive: false,
+
+              icon: L.divIcon({
+
+                className: 'map-cluster-badge',
+
+                html: '<span class="map-cluster-badge__label">' + group.length + '</span>',
+
+                iconSize: [24, 24],
+
+                iconAnchor: [4, 20],
+
+              }),
+
+            }).addTo(casePinsLayer);
+
+          }
 
         });
 
@@ -714,15 +912,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (hp.length > 0) {
 
-          heatLayer = L.heatLayer(hp, { radius: 45, blur: 38, maxZoom: 17, max: 0.85, minOpacity: 0.12, gradient: { 0.2: '#22c55e', 0.45: '#f59e0b', 0.7: '#ef4444', 1.0: '#7c3aed' } });
+          heatLayer = L.heatLayer(hp, { pane: 'heatmapPane', radius: 45, blur: 38, maxZoom: 17, max: 0.85, minOpacity: 0.12, gradient: { 0.2: '#22c55e', 0.45: '#f59e0b', 0.7: '#ef4444', 1.0: '#7c3aed' } });
 
           if (layerState.heat) map.addLayer(heatLayer);
 
         }
 
         if (!layerState.cases) map.removeLayer(casePinsLayer);
-
-        casePinsLayer.bringToFront();
 
         refreshMapSize();
 
