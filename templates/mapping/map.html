@@ -668,8 +668,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
           const ps = c.case_classification === 'confirmed' ? 10 : c.case_classification === 'probable' ? 8 : 6;
 
-          const hotspotR = 50;
-
           const isPending = c.validation_status === 'pending';
 
           const tooltipHtml =
@@ -687,12 +685,6 @@ document.addEventListener('DOMContentLoaded', function () {
             'Date: ' + c.report_date +
 
             (isPending ? '<br><span style="color:#f59e0b;font-size:.75rem;font-weight:600;">Pending validation</span>' : '');
-
-          L.circle(ll, { radius: hotspotR, fillColor: pc, color: pc, weight: isPending ? 1 : 2, opacity: isPending ? 0.35 : 0.6, fillOpacity: isPending ? 0.08 : 0.18, dashArray: isPending ? '6 4' : null })
-
-            .bindTooltip(tooltipHtml, { sticky: true, direction: 'top', className: 'hotspot-tip' })
-
-            .addTo(casePinsLayer);
 
           L.circleMarker(ll, { radius: ps, fillColor: pc, color: '#fff', weight: 2, fillOpacity: isPending ? 0.5 : 0.9 })
 
@@ -722,7 +714,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (hp.length > 0) {
 
-          heatLayer = L.heatLayer(hp, { radius: 40, blur: 30, maxZoom: 17, max: 1.0, gradient: { 0.2: '#22c55e', 0.45: '#f59e0b', 0.7: '#ef4444', 1.0: '#7c3aed' } });
+          heatLayer = L.heatLayer(hp, { radius: 45, blur: 38, maxZoom: 17, max: 0.85, minOpacity: 0.12, gradient: { 0.2: '#22c55e', 0.45: '#f59e0b', 0.7: '#ef4444', 1.0: '#7c3aed' } });
 
           if (layerState.heat) map.addLayer(heatLayer);
 
