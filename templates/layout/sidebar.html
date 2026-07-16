@@ -15,7 +15,8 @@
 
   <nav class="sidebar-nav">
     <div class="nav-section-label">Main</div>
-    <a href="{% url 'dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+    <a href="{% url 'dashboard' %}"
+      class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
       <span class="nav-icon"><i data-lucide="layout-dashboard" class="lucide-icon lucide-icon--sm"></i></span>
       <span>Dashboard</span>
     </a>
@@ -38,9 +39,15 @@
       <span>System Settings</span>
     </a>
     {% endif %}
-    <a href="{% url 'admin_confirmation_panel' %}" class="nav-item {% if request.resolver_match.url_name == 'admin_confirmation_panel' %}active{% endif %}">
+    <a href="{% url 'admin_confirmation_panel' %}"
+      class="nav-item {% if request.resolver_match.url_name == 'admin_confirmation_panel' %}active{% endif %}">
       <span class="nav-icon"><i data-lucide="microscope" class="lucide-icon lucide-icon--sm"></i></span>
       <span>Case Confirmation</span>
+    </a>
+    <a href="{% url 'outbreak_thresholds' %}"
+      class="nav-item {% if request.resolver_match.url_name == 'outbreak_thresholds' %}active{% endif %}">
+      <span class="nav-icon"><i data-lucide="sliders" class="lucide-icon lucide-icon--sm"></i></span>
+      <span>Outbreak Thresholds</span>
     </a>
     {% endif %}
 
@@ -49,7 +56,8 @@
       <span class="nav-icon"><i data-lucide="clipboard-list" class="lucide-icon lucide-icon--sm"></i></span>
       <span>Case Monitoring</span>
     </a>
-    <a href="{% url 'map_view' %}{{ scoped_map_query }}" class="nav-item {% if 'map' in request.path %}active{% endif %}">
+    <a href="{% url 'map_view' %}{{ scoped_map_query }}"
+      class="nav-item {% if 'map' in request.path %}active{% endif %}">
       <span class="nav-icon"><i data-lucide="map" class="lucide-icon lucide-icon--sm"></i></span>
       <span>Geospatial Map</span>
     </a>

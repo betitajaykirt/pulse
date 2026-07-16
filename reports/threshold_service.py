@@ -89,6 +89,44 @@ def evaluate_confirmed_thresholds(
     if not barangay:
         raise ValueError('Barangay not found for threshold evaluation.')
 
+    # Check for specific disease threshold first
+    from myapp.models import OutbreakThreshold
+    if disease_label:
+        specific_threshold = OutbreakThreshold.objects.filter(
+            disease_label__iexact=disease_label,
+            is_active=True
+        ).first()
+
+        if specific_threshold:
+            confirmed_count = _count_confirmed_cases(
+                barangay,
+                disease_label=disease_label,
+                window_days=specific_threshold.rolling_window_days,
+            )
+            
+            # Simple threshold logic: if cases >= threshold, it's an outbreak
+            status = THRESHOLD_STATUS_NORMAL
+            if confirmed_count >= specific_threshold.case_threshold:
+                status = THRESHOLD_STATUS_OUTBREAK
+            elif specific_threshold.case_threshold > 1 and confirmed_count == specific_threshold.case_threshold - 1:
+                # Optionally warn if they are 1 case away, or just use PROBABLE
+                status = THRESHOLD_STATUS_PROBABLE
+            elif confirmed_count > 0:
+                status = THRESHOLD_STATUS_ISOLATED
+
+            return {
+                'status': status,
+                'confirmed_count': confirmed_count,
+                'category_level': 'Disease Specific',
+                'warning_threshold': specific_threshold.case_threshold,
+                'outbreak_threshold': specific_threshold.case_threshold,
+                'time_window_days': specific_threshold.rolling_window_days,
+                'disease_label': disease_label,
+                'barangay_id': barangay.id,
+                'barangay_name': barangay.barangay_name,
+            }
+
+    # Fallback to category logic
     config = DiseaseCategoryThreshold.objects.filter(
         category_level=disease_category,
         is_active=True,

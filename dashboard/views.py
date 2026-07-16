@@ -153,3 +153,44 @@ def api_analytics_data(request):
         time_range=time_range,
     )
     return JsonResponse({'ok': True, **payload})
+
+
+@role_required('admin', 'super_admin')
+def outbreak_thresholds_view(request):
+    from myapp.models import OutbreakThreshold
+    
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'delete':
+            threshold_id = request.POST.get('threshold_id')
+            if threshold_id:
+                OutbreakThreshold.objects.filter(id=threshold_id).delete()
+        elif action == 'save':
+            threshold_id = request.POST.get('threshold_id')
+            disease_label = request.POST.get('disease_label', '').strip()
+            case_threshold = request.POST.get('case_threshold', 3)
+            rolling_window_days = request.POST.get('rolling_window_days', 7)
+            is_active = request.POST.get('is_active') == 'on'
+            
+            if disease_label:
+                if threshold_id:
+                    OutbreakThreshold.objects.filter(id=threshold_id).update(
+                        disease_label=disease_label,
+                        case_threshold=case_threshold,
+                        rolling_window_days=rolling_window_days,
+                        is_active=is_active
+                    )
+                else:
+                    OutbreakThreshold.objects.create(
+                        disease_label=disease_label,
+                        case_threshold=case_threshold,
+                        rolling_window_days=rolling_window_days,
+                        is_active=is_active
+                    )
+        return redirect('outbreak_thresholds')
+
+    thresholds = OutbreakThreshold.objects.all().order_by('disease_label')
+    return render(request, 'dashboard/outbreak_thresholds.html', {
+        'thresholds': thresholds,
+    })
+

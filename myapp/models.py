@@ -474,6 +474,25 @@ class DiseaseCategoryThreshold(models.Model):
         )
 
 
+class OutbreakThreshold(models.Model):
+    """Dynamic outbreak threshold configuration per disease."""
+
+    disease_label = models.CharField(max_length=150, unique=True)
+    case_threshold = models.PositiveSmallIntegerField(default=3)
+    rolling_window_days = models.PositiveSmallIntegerField(default=7)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'outbreak_thresholds'
+        managed = False
+        ordering = ['disease_label']
+
+    def __str__(self):
+        return f'{self.disease_label} — threshold {self.case_threshold} / {self.rolling_window_days}d'
+
+
 class BarangayEpidemicStatus(models.Model):
     """Latest threshold evaluation snapshot per barangay + disease (map indicators)."""
 

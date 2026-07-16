@@ -7,4 +7,5 @@ urlpatterns = [
     path('alerts/', views.alerts_inbox_view, name='alerts_inbox'),
     path('analytics/', views.analytics_view, name='analytics'),
     path('api/analytics/', views.api_analytics_data, name='api_analytics'),
+    path('outbreak-thresholds/', views.outbreak_thresholds_view, name='outbreak_thresholds'),
 ]
