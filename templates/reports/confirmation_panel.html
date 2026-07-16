@@ -138,6 +138,17 @@
           </select>
         </div>
 
+        <div class="form-group">
+          <label for="confirmed_disease">Confirmed Disease <span class="um-muted">(required)</span></label>
+          <select id="confirmed_disease" name="confirmed_disease" class="input-soft" required>
+            <option value="">Select confirmed disease…</option>
+            {% for syndrome in syndrome_types %}
+              <option value="{{ syndrome }}">{{ syndrome }}</option>
+            {% endfor %}
+            <option value="Other / Non-specific">Other / Non-specific</option>
+          </select>
+        </div>
+
         <div class="pulse-modal__actions">
           <button type="button" class="nc-btn nc-btn--outline" onclick="closeLabModal()">Cancel</button>
           <button type="submit" class="nc-btn nc-btn--primary"
@@ -161,6 +172,10 @@ function openLabModal(reportId, patientName, patientId, barangay, disease, repor
   document.getElementById('lab-confirm-form').action = CONFIRM_URL_TEMPLATE.replace('/0/', '/' + reportId + '/');
   document.getElementById('lab_control_number').value = '';
   document.getElementById('test_type').value = '';
+  
+  const diseaseSelect = document.getElementById('confirmed_disease');
+  let optionExists = Array.from(diseaseSelect.options).some(opt => opt.value === disease);
+  diseaseSelect.value = optionExists ? disease : '';
 
   document.getElementById('lab-modal-summary').innerHTML =
     '<div class="section-divider">Case Summary</div>' +

@@ -438,6 +438,7 @@ def _perform_case_confirmation(
     actor_id,
     lab_control_number='',
     test_type='',
+    confirmed_disease='',
     actor_type='admin',
     request=None,
 ):
@@ -449,6 +450,9 @@ def _perform_case_confirmation(
         'confirmed_at': now,
         'updated_at': now,
     }
+
+    if confirmed_disease:
+        update_fields['syndrome_type'] = confirmed_disease
 
     lab_notes = []
     if lab_control_number:
@@ -522,6 +526,7 @@ def admin_confirmation_panel(request):
         'pending_cases': pending_cases,
         'search': search,
         'queue_count': len(pending_cases),
+        'syndrome_types': SYNDROME_TYPES,
     })
 
 
@@ -540,12 +545,14 @@ def confirm_case(request, report_id):
 
     lab_control_number = request.POST.get('lab_control_number', '').strip()
     test_type = request.POST.get('test_type', '').strip()
+    confirmed_disease = request.POST.get('confirmed_disease', '').strip()
 
     threshold_result = _perform_case_confirmation(
         report,
         actor_id=request.session.get('user_id'),
         lab_control_number=lab_control_number,
         test_type=test_type,
+        confirmed_disease=confirmed_disease,
         actor_type=request.session.get('user_type', 'admin'),
         request=request,
     )
