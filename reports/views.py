@@ -601,8 +601,8 @@ def close_case(request, report_id):
         messages.error(request, 'Report not found.')
         return redirect('case_records')
 
-    if report.status != 'Confirmed':
-        messages.error(request, f'Only Confirmed cases can be closed (current status: {report.status}).')
+    if report.status not in ('Confirmed', 'Probable'):
+        messages.error(request, f'Only Confirmed or Probable cases can be closed (current status: {report.status}).')
         return redirect('case_records')
 
     outcome = request.POST.get('resolution_outcome', '').strip()

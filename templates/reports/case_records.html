@@ -193,7 +193,8 @@
           <label>Resolution Outcome <span class="um-muted">(required)</span></label>
           <select name="resolution_outcome" class="input-soft" required>
             <option value="">Select outcome...</option>
-            <option value="Recovered">Recovered</option>
+            <option value="Recovered (Confirmed Case)">Recovered (Confirmed Case)</option>
+            <option value="Discarded (Not a Case / False Alarm)">Discarded (Not a Case / False Alarm)</option>
             <option value="Deceased">Deceased</option>
             <option value="Lost to Follow-up">Lost to Follow-up</option>
           </select>
@@ -296,7 +297,7 @@ function viewRecord(id, barangay, disease, classif, cases, onset, caseStatus, va
   document.getElementById('modal-body').innerHTML = html;
   
   const closeContainer = document.getElementById('close-case-container');
-  if (caseStatus === 'Confirmed') {
+  if (caseStatus === 'Confirmed' || caseStatus === 'Probable') {
     closeContainer.style.display = 'block';
     document.getElementById('close-case-form').action = CLOSE_URL_TEMPLATE.replace('/0/', '/' + id + '/');
   } else {
