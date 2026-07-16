@@ -45,86 +45,50 @@ def _persist_aptas_risk_log(report, raw_anomaly_score):
 
 
 def trigger_aptas_for_report(report_id, *, is_anomaly=False):
-
     """
-
     Evaluate risk and dispatch dashboard alerts after ML-analyzed submission.
-
-
-
     Outbreak anomaly flags escalate to high/critical APTAS thresholds immediately.
-
     """
-
     report = SurveillanceReport.objects.filter(id=report_id).select_related('barangay').first()
-
     if not report:
-
         return None
 
-    _persist_aptas_risk_log(report, _raw_anomaly_for_report(report, is_anomaly=is_anomaly))
+    aptas_log = _persist_aptas_risk_log(report, _raw_anomaly_for_report(report, is_anomaly=is_anomaly))
 
-    if is_anomaly or report.is_anomaly:
-
+    if aptas_log:
+        risk_level = aptas_log.risk_level.lower()
+        anomaly_score = Decimal(str(aptas_log.anomaly_score))
+        risk_score = Decimal(str(aptas_log.final_risk_score)) / Decimal('100.0')
+    elif is_anomaly or report.is_anomaly:
         risk_level = 'critical'
-
         anomaly_score = report.ml_anomaly_score or Decimal('0.9000')
-
+        risk_score = Decimal('1.0000')
     else:
-
         risk_level = 'moderate'
-
         anomaly_score = report.ml_anomaly_score or Decimal('0.3500')
-
-
-
-    score_map = {
-
-        'low': Decimal('0.2500'),
-
-        'moderate': Decimal('0.5000'),
-
-        'high': Decimal('0.7500'),
-
-        'critical': Decimal('1.0000'),
-
-    }
-
-    risk_score = score_map.get(risk_level, Decimal('0.5000'))
-
-
+        risk_score = Decimal('0.5000')
 
     assessment = RiskAssessment.objects.create(
-
         report_id=report.id,
-
         barangay_id=report.barangay_id,
-
         anomaly_score=anomaly_score,
-
         risk_score=risk_score,
-
         risk_level=risk_level,
-
-        model_version='isolation-forest-v1' if is_anomaly else 'random-forest-v1',
-
+        model_version='aptas-engine-v1' if aptas_log else ('isolation-forest-v1' if is_anomaly else 'random-forest-v1'),
         evaluation_status='completed',
-
         evaluated_at=timezone.now(),
-
         recommended_action=_recommended_action(risk_level, report.syndrome_type),
-
         created_at=timezone.now(),
-
     )
 
+    is_active_alert = False
+    if aptas_log:
+        is_active_alert = aptas_log.is_active_alert
+    else:
+        is_active_alert = risk_level in ('high', 'critical')
 
-
-    if risk_level in ('high', 'critical'):
-
-        _create_alert(assessment, report.barangay, report, is_anomaly=is_anomaly)
-
-
+    if is_active_alert:
+        _create_alert(assessment, report.barangay, report, is_anomaly=is_anomaly, alert_level=risk_level)
 
     return assessment
 
@@ -168,20 +132,15 @@ def _recommended_action(risk_level, syndrome_type):
 
 
 
-def _create_alert(assessment, barangay, report, *, is_anomaly=False):
-
+def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level=None):
     """Create a legacy-format alert row (pulse_db.alerts)."""
-
-    alert_level = 'critical' if is_anomaly else 'high'
+    if not alert_level:
+        alert_level = 'critical' if is_anomaly else 'high'
 
     summary = (
-
-        f'OUTBREAK SPIKE: {report.syndrome_type} in {barangay.barangay_name}'
-
-        if is_anomaly else
-
+        f'APTAS RISK: {report.syndrome_type} at {alert_level.title()} level in {barangay.barangay_name}'
+        if alert_level in ('high', 'critical') else
         f'{report.syndrome_type} alert in {barangay.barangay_name}'
-
     )
 
 
