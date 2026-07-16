@@ -591,6 +591,65 @@ def validate_report(request, report_id):
     return redirect('case_records')
 
 
+@require_POST
+@role_required('admin', 'super_admin', 'health_officer', 'surveillance_officer', 'barangay_health_worker', 'encoder')
+def close_case(request, report_id):
+    """Close an active Confirmed case."""
+    report = SurveillanceReport.objects.filter(id=report_id)
+    report = barangay_queryset_filter(request, report).first()
+    if not report:
+        messages.error(request, 'Report not found.')
+        return redirect('case_records')
+
+    if report.status != 'Confirmed':
+        messages.error(request, f'Only Confirmed cases can be closed (current status: {report.status}).')
+        return redirect('case_records')
+
+    outcome = request.POST.get('resolution_outcome', '').strip()
+    closed_at_str = request.POST.get('closed_at', '').strip()
+    notes = request.POST.get('closing_notes', '').strip()
+
+    if not outcome:
+        messages.error(request, 'Resolution Outcome is required.')
+        return redirect('case_records')
+
+    # Parse closed_at or use now
+    closed_at = timezone.now()
+    if closed_at_str:
+        try:
+            closed_at = datetime.fromisoformat(closed_at_str)
+        except ValueError:
+            pass # fallback to now
+
+    update_fields = {
+        'status': 'Closed',
+        'resolution_outcome': outcome,
+        'closed_at': closed_at,
+        'updated_at': timezone.now()
+    }
+
+    if notes:
+        existing = (report.remarks or '').strip()
+        new_remarks = f"Closing Notes: {notes}"
+        update_fields['remarks'] = f"{existing} | {new_remarks}".strip(" | ") if existing else new_remarks
+
+    SurveillanceReport.objects.filter(id=report.id).update(**update_fields)
+    
+    actor_id = request.session.get('user_id')
+    actor_type = request.session.get('user_type', 'admin')
+    
+    log_audit(
+        actor_id=actor_id,
+        actor_type=actor_type,
+        action='case_closed',
+        target_id=report.id,
+        request=request,
+    )
+
+    messages.success(request, f'Case #{report.id} successfully closed as "{outcome}".')
+    return redirect('case_records')
+
+
 # Outbreak thresholds — confirmed cases within 30 days triggers escalation
 OUTBREAK_THRESHOLDS = {
     'Dengue':                              3,

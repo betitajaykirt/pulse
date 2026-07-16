@@ -59,7 +59,7 @@ def _local_barangay_stats(user):
             'recent_reports': [],
         }
 
-    base_qs = SurveillanceReport.objects.filter(barangay_id=barangay.id)
+    base_qs = SurveillanceReport.objects.filter(barangay_id=barangay.id).exclude(status='Closed')
     return {
         'barangay_name': barangay.barangay_name,
         'total_reports': base_qs.count(),
@@ -78,13 +78,13 @@ def _get_stats(role, user_id=None):
         ctx['total_users']     = User.objects.count()
         ctx['active_alerts']   = Alert.objects.filter(status='active').count()
         ctx['total_barangays'] = Barangay.objects.count()
-        ctx['pending_reports'] = SurveillanceReport.objects.filter(validation_status='pending').count()
+        ctx['pending_reports'] = SurveillanceReport.objects.filter(validation_status='pending').exclude(status='Closed').count()
     if role == 'super_admin':
         ctx['total_admins']  = Admin.objects.count()
-        ctx['total_reports'] = SurveillanceReport.objects.count()
+        ctx['total_reports'] = SurveillanceReport.objects.exclude(status='Closed').count()
     if role in ('health_officer', 'surveillance_officer'):
         ctx['active_alerts'] = Alert.objects.filter(status='active').count()
-        ctx['pending_reports'] = SurveillanceReport.objects.filter(validation_status='pending').count()
+        ctx['pending_reports'] = SurveillanceReport.objects.filter(validation_status='pending').exclude(status='Closed').count()
         ctx['suspected_count'] = SurveillanceReport.objects.filter(status='Suspected').count()
         ctx['confirmed_count'] = SurveillanceReport.objects.filter(status='Confirmed').count()
     if role in BARANGAY_SCOPED_ROLES and user_id:

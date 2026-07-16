@@ -35,7 +35,7 @@ def _count_confirmed_cases(
         status='Confirmed',
         case_classification='confirmed',
         confirmed_at__gte=cutoff,
-    )
+    ).exclude(status='Closed')
     if disease_label:
         qs = qs.filter(syndrome_type=disease_label)
     total = qs.aggregate(total=Sum('case_count'))['total']

@@ -112,7 +112,7 @@ def _syndrome_report_count(barangay_name: str, syndrome_name: str, start, end) -
         syndrome_type__iexact=syndrome_name,
         report_date__date__gte=start,
         report_date__date__lte=end,
-    ).count()
+    ).exclude(status='Closed').count()
 
 
 def compute_temporal_score(barangay_name: str, syndrome_name: str) -> float:

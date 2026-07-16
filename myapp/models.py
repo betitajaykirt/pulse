@@ -193,6 +193,7 @@ class SurveillanceReport(models.Model):
         ('Suspected', 'Suspected'),
         ('Probable', 'Probable'),
         ('Confirmed', 'Confirmed'),
+        ('Closed', 'Closed'),
         ('Discarded', 'Discarded'),
     ]
 
@@ -228,6 +229,8 @@ class SurveillanceReport(models.Model):
     latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
     longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
     validation_status = models.CharField(max_length=10, default='pending')
+    resolution_outcome = models.CharField(max_length=50, null=True, blank=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
     is_anomaly = models.BooleanField(default=False)
     ml_anomaly_score = models.DecimalField(
         max_digits=8, decimal_places=4, null=True, blank=True,

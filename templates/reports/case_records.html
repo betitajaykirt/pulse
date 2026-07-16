@@ -41,6 +41,7 @@
                 <option value="Suspected" {% if case_status == 'Suspected' %}selected{% endif %}>Suspected</option>
                 <option value="Probable" {% if case_status == 'Probable' %}selected{% endif %}>Probable</option>
                 <option value="Confirmed" {% if case_status == 'Confirmed' %}selected{% endif %}>Confirmed</option>
+                <option value="Closed" {% if case_status == 'Closed' %}selected{% endif %}>Closed</option>
                 <option value="Discarded" {% if case_status == 'Discarded' %}selected{% endif %}>Discarded</option>
               </select>
             </div>
@@ -143,7 +144,9 @@
                     '{{ r.confirmed_at|date:"M d, Y H:i"|default:"" }}',
                     {{ r.latitude|default:"null" }},
                     {{ r.longitude|default:"null" }},
-                    `{{ r.remarks|default:""|escapejs }}`
+                    `{{ r.remarks|default:""|escapejs }}`,
+                    '{{ r.resolution_outcome|default:""|escapejs }}',
+                    '{{ r.closed_at|date:"M d, Y H:i"|default:"" }}'
                   )">View</button>
                 {% if r.status == 'Suspected' and can_confirm %}
                 <form method="POST" action="{% url 'confirm_case' r.id %}" class="um-inline-form" onsubmit="return confirm('Confirm this case as verified by CHO?');">
@@ -182,6 +185,34 @@
       <button type="button" class="pulse-modal__close" onclick="document.getElementById('record-modal').classList.remove('open')">&times;</button>
     </div>
     <div class="pulse-modal__body" id="modal-body"></div>
+    <div class="pulse-modal__body" id="close-case-container" style="display:none; border-top: 1px solid var(--border); padding-top: 1rem;">
+      <h4 style="margin-top:0; margin-bottom:.5rem;">Close Active Case</h4>
+      <form method="POST" id="close-case-form" action="">
+        {% csrf_token %}
+        <div class="form-group">
+          <label>Resolution Outcome <span class="um-muted">(required)</span></label>
+          <select name="resolution_outcome" class="input-soft" required>
+            <option value="">Select outcome...</option>
+            <option value="Recovered">Recovered</option>
+            <option value="Deceased">Deceased</option>
+            <option value="Lost to Follow-up">Lost to Follow-up</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Resolution Date</label>
+          <input type="datetime-local" name="closed_at" class="input-soft" value="{% now 'Y-m-d\TH:i' %}">
+        </div>
+        <div class="form-group">
+          <label>Closing Notes <span class="um-muted">(optional)</span></label>
+          <textarea name="closing_notes" class="input-soft" rows="2" placeholder="Any final remarks..."></textarea>
+        </div>
+        <div class="pulse-modal__actions" style="margin-top: 1rem;">
+          <button type="submit" class="nc-btn nc-btn--danger" onclick="return confirm('Are you sure you want to close this case? This will remove it from active tracking.');">
+            <i data-lucide="archive" class="lucide-icon lucide-icon--xs"></i> Close Case
+          </button>
+        </div>
+      </form>
+    </div>
   </div>
 </div>
 
@@ -191,7 +222,9 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () { if (window.lucide) lucide.createIcons(); });
 
-function viewRecord(id, barangay, disease, classif, cases, onset, caseStatus, validationStatus, reporter, date, confirmedAt, lat, lng, remarks) {
+const CLOSE_URL_TEMPLATE = "{% url 'close_case' 0 %}";
+
+function viewRecord(id, barangay, disease, classif, cases, onset, caseStatus, validationStatus, reporter, date, confirmedAt, lat, lng, remarks, resolutionOutcome, closedAt) {
   document.getElementById('modal-title').textContent = 'Case Report #' + id;
 
   const parts = remarks ? remarks.split(' | ') : [];
@@ -249,13 +282,29 @@ function viewRecord(id, barangay, disease, classif, cases, onset, caseStatus, va
     if (patient.outcome) html += row('Outcome', patient.outcome);
   }
 
+  if (caseStatus === 'Closed' && resolutionOutcome) {
+    html += '<div class="section-divider">Case Resolution</div>';
+    html += row('Outcome', `<span style="font-weight:600;">${resolutionOutcome}</span>`);
+    if (closedAt) html += row('Closed On', closedAt);
+  }
+
   if (notes) {
     html += '<div class="section-divider">Additional Notes</div>';
     html += `<p style="font-size:.85rem;margin:0;">${notes}</p>`;
   }
 
   document.getElementById('modal-body').innerHTML = html;
+  
+  const closeContainer = document.getElementById('close-case-container');
+  if (caseStatus === 'Confirmed') {
+    closeContainer.style.display = 'block';
+    document.getElementById('close-case-form').action = CLOSE_URL_TEMPLATE.replace('/0/', '/' + id + '/');
+  } else {
+    closeContainer.style.display = 'none';
+  }
+
   document.getElementById('record-modal').classList.add('open');
+  if (window.lucide) lucide.createIcons();
 }
 
 function row(label, value) {
