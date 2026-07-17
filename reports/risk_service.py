@@ -10,12 +10,10 @@ from decimal import Decimal
 from django.utils import timezone
 
 from myapp.models import (
-
     Barangay, SurveillanceReport, RiskAssessment, Alert, NotificationLog,
     MlAiPrediction, RiskAnalysis,
-
 )
-
+from myapp.barangay_scope import CITY_WIDE_ROLES, BARANGAY_SCOPED_ROLES
 from reports.aptas_service import compute_and_log_barangay_risk
 
 logger = logging.getLogger(__name__)
@@ -163,7 +161,7 @@ def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level
 
 
 
-    for role in ('admin', 'health_officer', 'surveillance_officer', 'barangay_health_worker'):
+    for role in (CITY_WIDE_ROLES | BARANGAY_SCOPED_ROLES):
 
         NotificationLog.objects.create(
 
@@ -271,7 +269,7 @@ def trigger_threshold_outbreak_alert(*, report_id, threshold_result):
         analysis_id=analysis.id,
     )
 
-    for role in ('admin', 'health_officer', 'surveillance_officer', 'barangay_health_worker'):
+    for role in (CITY_WIDE_ROLES | BARANGAY_SCOPED_ROLES):
         NotificationLog.objects.create(
             alert_id=alert.id,
             recipient_role=role,
