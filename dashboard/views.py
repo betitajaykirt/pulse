@@ -131,10 +131,19 @@ def alerts_inbox_view(request):
         alerts = Alert.objects.none()
         notifications = NotificationLog.objects.none()
 
-    return render(request, 'dashboard/alerts_inbox.html', {
+    ctx = {
         'alerts': alerts,
         'notifications': notifications,
-    })
+    }
+
+    barangay_filter = resolve_aptas_barangay_filter(
+        role, request.session.get('user_id'), ctx,
+    )
+    ctx.update(get_aptas_dashboard_context(barangay_name=barangay_filter))
+    if barangay_filter:
+        ctx['aptas_barangay_scope'] = barangay_filter
+
+    return render(request, 'dashboard/alerts_inbox.html', ctx)
 
 
 @role_required('surveillance_officer', 'admin', 'super_admin', 'health_officer')
