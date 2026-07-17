@@ -91,12 +91,12 @@
     <div class="pulse-table-wrap table-wrapper">
       <table class="pulse-table">
         <thead>
-          <tr><th>#</th><th>Patient</th><th>Barangay</th><th>Disease</th><th>Cases</th><th>Onset</th><th>Reporter</th><th>Case Status</th><th>Validation</th><th>Actions</th></tr>
+          <tr><th>#</th><th>Patient</th><th>Barangay</th><th>Disease</th><th>Onset</th><th>Reporter</th><th>Case Status</th><th>Validation</th><th>Actions</th></tr>
         </thead>
         <tbody>
         {% if not records %}
           <tr>
-            <td colspan="10">
+            <td colspan="9">
               <div class="pulse-empty">
                 <i data-lucide="folder-open" class="lucide-icon"></i>
                 <p>No records found.</p>
@@ -112,7 +112,6 @@
             </td>
             <td data-label="Barangay">{{ r.barangay_name|default:"—" }}</td>
             <td data-label="Disease">{{ r.syndrome_type }}</td>
-            <td data-label="Cases"><strong>{{ r.case_count }}</strong></td>
             <td data-label="Onset">{{ r.date_of_onset|default:"—" }}</td>
             <td data-label="Reporter">{{ r.submitted_by_name|default:"—" }}</td>
             <td data-label="Case Status">

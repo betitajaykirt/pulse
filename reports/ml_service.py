@@ -97,7 +97,6 @@ def _classification_from_label(disease_label: str) -> str:
     if normalized == 'confirmed':
         return 'confirmed'
     inconclusive = {
-        'undetermined',
         'inconclusive syndromic pattern',
         'insufficient data for prediction',
         '',
@@ -163,7 +162,7 @@ def analyze_patient_case(
             )
         except Exception as exc:
             logger.exception('Random Forest classification failed: %s', exc)
-            disease_label = 'Undetermined'
+            disease_label = 'Inconclusive Syndromic Pattern'
 
     return {
         'is_anomaly': is_anomaly,
@@ -196,7 +195,7 @@ def analyze_batch_cases(cases: List[dict], barangay_names: Optional[dict] = None
             results.append({
                 'is_anomaly': False,
                 'anomaly_score': 0.0,
-                'disease_label': 'Undetermined',
+                'disease_label': 'Inconclusive Syndromic Pattern',
                 'case_classification': 'unassigned',
                 'symptom_count': _count_reported_symptoms(symptoms),
             })

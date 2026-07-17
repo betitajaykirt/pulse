@@ -343,7 +343,7 @@ PIDSR_SYMPTOM_LABELS = {
     'neonatal_suck_failure': 'Normal Crying/Sucking for First 2 Days of Life, then Stopped',
 }
 
-DEFAULT_SYNDROME_TYPE = 'Undetermined'
+DEFAULT_SYNDROME_TYPE = 'Inconclusive Syndromic Pattern'
 DEFAULT_INTAKE_STATUS = 'Unclassified'
 DEFAULT_INTAKE_CLASSIFICATION = 'unassigned'
 

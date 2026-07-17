@@ -17,7 +17,7 @@ demonstrates how validated syndromic intake records can be processed through:
 2. **Stage 2 — Supervised syndromic classification (Random Forest)**
    Maps validated, cleaned feature vectors (demographics + binary symptom
    indicators from Groups A–E) to provisional disease labels such as
-   *Dengue*, *Respiratory Illness*, or *Undetermined*.
+   *Dengue*, *Respiratory Illness*, or *Inconclusive Syndromic Pattern*.
 
 Architecture note for academic documentation
 --------------------------------------------
@@ -124,7 +124,7 @@ DISEASE_LABELS: Sequence[str] = (
     "Acute Gastroenteritis",
     "Hand, Foot, and Mouth Disease",
     "Influenza-like Illness (ILI)",
-    "Undetermined",
+    "Inconclusive Syndromic Pattern",
 )
 
 # Returned when ``predict_proba`` max score is below the confidence cutoff
@@ -419,7 +419,7 @@ def train_and_classify(
     -------
     str
         Predicted disease classification label, e.g. ``'Dengue'``,
-        ``'Respiratory Illness'``, or ``'Undetermined'``.
+        ``'Respiratory Illness'``, or ``'Inconclusive Syndromic Pattern'``.
 
     Raises
     ------
@@ -448,7 +448,7 @@ def train_and_classify(
     classifier.fit(x_train, y_train)
 
     if incoming_patient.empty:
-        return "Undetermined"
+        return "Inconclusive Syndromic Pattern"
 
     x_infer = _prepare_feature_frame(incoming_patient.iloc[[0]])
     proba = classifier.predict_proba(x_infer)[0]
@@ -504,11 +504,11 @@ def _build_mock_training_set() -> pd.DataFrame:
              temperature=29.0, humidity=75.0, rainfall=1.5, disease_label="Acute Gastroenteritis"),
         dict(age=40, sex="Female", diarrhea_watery=1, vomiting=1, fever_low=1,
              temperature=28.5, humidity=72.0, rainfall=0.8, disease_label="Acute Gastroenteritis"),
-        # Sparse / ambiguous presentations → Undetermined in training
+        # Sparse / ambiguous presentations → Inconclusive Syndromic Pattern in training
         dict(age=50, sex="Male", fatigue=1, headache=1,
-             temperature=30.0, humidity=70.0, rainfall=0.0, disease_label="Undetermined"),
+             temperature=30.0, humidity=70.0, rainfall=0.0, disease_label="Inconclusive Syndromic Pattern"),
         dict(age=19, sex="Female", fever_low=1,
-             temperature=30.0, humidity=70.0, rainfall=0.0, disease_label="Undetermined"),
+             temperature=30.0, humidity=70.0, rainfall=0.0, disease_label="Inconclusive Syndromic Pattern"),
     ]
     return ensure_climate_columns(pd.DataFrame(rows))
 
@@ -593,7 +593,7 @@ if __name__ == "__main__":
                 f"(anomaly_score={screened.iloc[len(training) + idx]['anomaly_score']:.4f})"
             )
             print("  Action: Escalate for cluster investigation before individual classification")
-            print("  Provisional label: Undetermined (pending outbreak surveillance review)")
+            print("  Provisional label: Inconclusive Syndromic Pattern (pending outbreak surveillance review)")
             continue
 
         label = train_and_classify(training, patient_df)

@@ -13,7 +13,6 @@ DISEASE_PIDSR_CATEGORY = {
     'Cholera': 'Category 1',
     'Polio': 'Category 1',
     'Rabies': 'Category 1',
-    'Undetermined': 'Category 2',
     'Influenza-like Illness (ILI)': 'Category 2',
     'Inconclusive Syndromic Pattern': 'Category 2',
     'Insufficient Data for Prediction': 'Category 2',

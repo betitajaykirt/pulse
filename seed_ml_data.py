@@ -68,7 +68,7 @@ DISEASE_LABELS = (
     'Acute Gastroenteritis',
     'Hand, Foot, and Mouth Disease',
     'Influenza-like Illness (ILI)',
-    'Undetermined',
+    'Inconclusive Syndromic Pattern',
 )
 
 # Symptom activation profiles (keys must exist in SYNDROMIC_FEATURE_COLUMNS)
@@ -88,7 +88,7 @@ AGE_SEVERE = ('fatigue',)
 HFMD_CORE = ('fever_low', 'sore_throat', 'fatigue', 'headache')
 HFMD_DERM = ('maculopapular_rash',)
 
-UNDETERMINED_WEAK = (
+INCONCLUSIVE_WEAK = (
     ('runny_nose',),
     ('fatigue',),
     ('headache',),
@@ -143,7 +143,7 @@ def _empty_feature_row() -> dict:
     row['sex'] = 'Female'
     row['barangay'] = BARANGAYS_BASELINE[0]
     row['submission_date'] = date.today().isoformat()
-    row[TARGET_COLUMN] = 'Undetermined'
+    row[TARGET_COLUMN] = 'Inconclusive Syndromic Pattern'
     for col, default in CLIMATE_DEFAULTS.items():
         row[col] = default
     return row
@@ -258,14 +258,14 @@ def _make_hfmd_row(start: date, end: date) -> dict:
     return row
 
 
-def _make_undetermined_row(start: date, end: date) -> dict:
+def _make_inconclusive_row(start: date, end: date) -> dict:
     row = _empty_feature_row()
-    row[TARGET_COLUMN] = 'Undetermined'
+    row[TARGET_COLUMN] = 'Inconclusive Syndromic Pattern'
     row['age'] = random.randint(5, 70)
     row['sex'] = _random_sex()
     row['barangay'] = _random_barangay(exclude=OUTBREAK_BARANGAY)
     row['submission_date'] = _random_date(start, end).isoformat()
-    weak_set = random.choice(UNDETERMINED_WEAK)
+    weak_set = random.choice(INCONCLUSIVE_WEAK)
     _activate(row, weak_set, 0.95)
     _assign_climate(row, 'neutral')
     return row
@@ -335,7 +335,7 @@ def build_historical_training_dataframe(
         'Leptospirosis': 44,
         'Acute Gastroenteritis': 44,
         'Hand, Foot, and Mouth Disease': 38,
-        'Undetermined': baseline_rows - (52 + 52 + 44 + 44 + 38),
+        'Inconclusive Syndromic Pattern': baseline_rows - (52 + 52 + 44 + 44 + 38),
     }
 
     builders = {
@@ -344,7 +344,7 @@ def build_historical_training_dataframe(
         'Leptospirosis': _make_leptospirosis_row,
         'Acute Gastroenteritis': _make_age_row,
         'Hand, Foot, and Mouth Disease': _make_hfmd_row,
-        'Undetermined': _make_undetermined_row,
+        'Inconclusive Syndromic Pattern': _make_inconclusive_row,
     }
 
     records = []
