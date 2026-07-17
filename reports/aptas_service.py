@@ -231,7 +231,7 @@ def classify_risk_level(final_risk_score: float) -> str:
     return 'Low'
 
 
-def should_activate_aptas_alert(final_risk_score: float, anomaly_score: float) -> bool:
+def should_activate_aptas_alert(final_risk_score: float, anomaly_score: float, force_activate: bool = False) -> bool:
     """
     Stability circuit-breaker gate.
 
@@ -239,6 +239,8 @@ def should_activate_aptas_alert(final_risk_score: float, anomaly_score: float) -
     - final RiskScore >= 60 (High or Critical tier), and
     - normalized anomaly A >= 0.50 (confirmed ML deviation).
     """
+    if force_activate:
+        return True
     return (
         final_risk_score >= CIRCUIT_BREAKER_MIN_RISK_SCORE
         and anomaly_score >= CIRCUIT_BREAKER_MIN_ANOMALY
@@ -266,6 +268,7 @@ def compute_and_log_barangay_risk(
     raw_anomaly_score,
     *,
     deactivate_previous: bool = True,
+    force_activate: bool = False,
 ) -> BarangayRiskLog:
     """
     Run the APTAS multi-variate formula and persist a ``BarangayRiskLog`` row.
@@ -283,7 +286,7 @@ def compute_and_log_barangay_risk(
     spatial = compute_spatial_score(barangay, syndrome)
     final_score = compute_final_risk_score(anomaly, temporal, environmental, spatial)
     risk_level = classify_risk_level(final_score)
-    is_active = should_activate_aptas_alert(final_score, anomaly)
+    is_active = should_activate_aptas_alert(final_score, anomaly, force_activate=force_activate)
 
     if deactivate_previous:
         BarangayRiskLog.objects.filter(

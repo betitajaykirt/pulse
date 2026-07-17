@@ -29,7 +29,7 @@ def _raw_anomaly_for_report(report, *, is_anomaly=False) -> float:
     return 0.25
 
 
-def _persist_aptas_risk_log(report, raw_anomaly_score):
+def _persist_aptas_risk_log(report, raw_anomaly_score, force_activate=False):
     if not report.barangay_id:
         return None
     try:
@@ -37,6 +37,7 @@ def _persist_aptas_risk_log(report, raw_anomaly_score):
             report.barangay.barangay_name,
             report.syndrome_type,
             raw_anomaly_score,
+            force_activate=force_activate,
         )
     except Exception as exc:
         logger.exception('APTAS risk log failed for report %s: %s', report.id, exc)
@@ -162,7 +163,7 @@ def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level
 
 
 
-    for role in ('admin', 'health_officer', 'surveillance_officer'):
+    for role in ('admin', 'health_officer', 'surveillance_officer', 'barangay_health_worker'):
 
         NotificationLog.objects.create(
 
@@ -210,7 +211,7 @@ def trigger_threshold_outbreak_alert(*, report_id, threshold_result):
         if report.ml_anomaly_score is not None
         else (-0.5 if risk_level == 'critical' else -0.35)
     )
-    _persist_aptas_risk_log(report, raw_anomaly)
+    _persist_aptas_risk_log(report, raw_anomaly, force_activate=True)
     anomaly_score = Decimal('0.9500') if risk_level == 'critical' else Decimal('0.7500')
     score_map = {
         'high': Decimal('0.7500'),
@@ -270,7 +271,7 @@ def trigger_threshold_outbreak_alert(*, report_id, threshold_result):
         analysis_id=analysis.id,
     )
 
-    for role in ('admin', 'health_officer', 'surveillance_officer'):
+    for role in ('admin', 'health_officer', 'surveillance_officer', 'barangay_health_worker'):
         NotificationLog.objects.create(
             alert_id=alert.id,
             recipient_role=role,

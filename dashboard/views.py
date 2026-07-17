@@ -114,6 +114,19 @@ def alerts_inbox_view(request):
     if is_city_wide_role(role):
         alerts = Alert.objects.order_by('-alert_date')[:50]
         notifications = NotificationLog.objects.select_related('alert').order_by('-sent_at')[:50]
+    elif role in BARANGAY_SCOPED_ROLES:
+        user = User.objects.filter(id=request.session.get('user_id')).first()
+        barangay = resolve_user_barangay(user)
+        if barangay:
+            notifications = NotificationLog.objects.select_related('alert').filter(
+                recipient_role=role,
+                message_summary__icontains=barangay.barangay_name
+            ).order_by('-sent_at')[:50]
+            alert_ids = [n.alert_id for n in notifications]
+            alerts = Alert.objects.filter(id__in=alert_ids).order_by('-alert_date')[:50]
+        else:
+            alerts = Alert.objects.none()
+            notifications = NotificationLog.objects.none()
     else:
         alerts = Alert.objects.none()
         notifications = NotificationLog.objects.none()
