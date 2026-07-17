@@ -12,6 +12,7 @@ from django.utils import timezone
 from myapp.models import (
 
     Barangay, SurveillanceReport, RiskAssessment, Alert, NotificationLog,
+    MlAiPrediction, RiskAnalysis,
 
 )
 
@@ -243,12 +244,30 @@ def trigger_threshold_outbreak_alert(*, report_id, threshold_result):
         f'{threshold_result.get("time_window_days")}d)'
     )
 
+    # Bridge to legacy schema: alerts.analysis_id FK → risk_analysis.analysis_id
+    # which in turn FK → ml_ai_predictions.prediction_id.
+    now_ts = timezone.now()
+    prediction = MlAiPrediction.objects.create(
+        disease_type=report.syndrome_type or 'Unknown',
+        risk_score=float(risk_score),
+        prediction_probability=float(anomaly_score),
+        severity_level=risk_level,
+        algorithm_used='pidsr-threshold-v1',
+        prediction_date=now_ts,
+    )
+    analysis = RiskAnalysis.objects.create(
+        risk_score=float(risk_score),
+        anomaly_flag=(risk_level == 'critical'),
+        analysis_date=now_ts,
+        prediction=prediction,
+    )
+
     alert = Alert.objects.create(
         alert_level=alert_level,
-        alert_date=timezone.now(),
+        alert_date=now_ts,
         status='active',
         alert_type=threshold_result.get('disease_label') or report.syndrome_type,
-        analysis_id=assessment.id,
+        analysis_id=analysis.id,
     )
 
     for role in ('admin', 'health_officer', 'surveillance_officer'):
