@@ -844,8 +844,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
-          /* The pin marker — rendered on casePinsPane */
+          /* The radius circle for visibility */
+          var hotspotR = 50;
+          L.circle(ll, {
+            pane: 'casePinsPane',
+            radius: hotspotR,
+            fillColor: pc,
+            color: pc,
+            weight: anyPending ? 1 : 2,
+            opacity: anyPending ? 0.35 : 0.6,
+            fillOpacity: anyPending ? 0.08 : 0.18,
+            dashArray: anyPending ? '6 4' : null
+          })
+            .bindTooltip(tooltipHtml, { sticky: true, direction: 'top', className: 'hotspot-tip' })
+            .addTo(casePinsLayer);
 
+          /* The pin marker — rendered on casePinsPane */
           var marker = L.circleMarker(ll, {
 
             pane: 'casePinsPane',
