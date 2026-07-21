@@ -756,19 +756,61 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
-        /* ── Group cases by location (5 decimal places ≈ ~1 m) ── */
+        /* ── Group cases by location (25m distance threshold) ── */
 
         const CLASSIF_RANK = { confirmed: 3, probable: 2, suspected: 1 };
 
-        const clusters = {};
+        const clusters = [];
 
         caseList.forEach(function (c) {
 
-          var key = c.latitude.toFixed(5) + ',' + c.longitude.toFixed(5);
+          var cLat = parseFloat(c.latitude);
 
-          if (!clusters[key]) clusters[key] = [];
+          var cLon = parseFloat(c.longitude);
 
-          clusters[key].push(c);
+          var added = false;
+
+          for (var i = 0; i < clusters.length; i++) {
+
+            var cluster = clusters[i];
+
+            var dist = L.latLng(cLat, cLon).distanceTo(L.latLng(cluster.centroid[0], cluster.centroid[1]));
+
+            if (dist <= 25) {
+
+              cluster.cases.push(c);
+
+              var sumLat = 0, sumLon = 0;
+
+              cluster.cases.forEach(function (cc) {
+
+                sumLat += parseFloat(cc.latitude);
+
+                sumLon += parseFloat(cc.longitude);
+
+              });
+
+              cluster.centroid = [sumLat / cluster.cases.length, sumLon / cluster.cases.length];
+
+              added = true;
+
+              break;
+
+            }
+
+          }
+
+          if (!added) {
+
+            clusters.push({
+
+              cases: [c],
+
+              centroid: [cLat, cLon]
+
+            });
+
+          }
 
         });
 
@@ -776,13 +818,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
         /* ── Render one consolidated pin per cluster ────────────── */
 
-        Object.keys(clusters).forEach(function (key) {
+        clusters.forEach(function (cluster) {
 
-          var group = clusters[key];
+          var group = cluster.cases;
 
           var first = group[0];
 
-          var ll = [first.latitude, first.longitude];
+          var ll = cluster.centroid;
 
 
 
@@ -845,7 +887,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
           /* The radius circle for visibility */
-          var hotspotR = 50;
+          var hotspotR = 25;
           L.circle(ll, {
             pane: 'casePinsPane',
             radius: hotspotR,

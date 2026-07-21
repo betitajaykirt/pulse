@@ -193,7 +193,7 @@ def api_cases(request):
         latitude__isnull=False,
         longitude__isnull=False,
         report_date__gte=cutoff,
-    ).exclude(status='Closed')
+    ).exclude(status__in=['Closed', 'Discarded'])
 
     if scoped_barangay:
         base_qs = base_qs.filter(barangay_id=scoped_barangay.id)
