@@ -181,7 +181,17 @@ def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level
 
         )
 
-
+    from dashboard.models import AppNotification
+    AppNotification.objects.create(
+        alert_id=alert.id,
+        disease=report.syndrome_type,
+        barangay_name=barangay.barangay_name,
+        severity_level=alert_level.title(),
+        final_risk_score=assessment.risk_score,
+        anomaly_score=assessment.anomaly_score,
+        spatial_metric=f"Spatial Risk: {assessment.risk_score} — Elevated risk in {barangay.barangay_name}",
+        temporal_metric=f"Temporal Surge: {assessment.anomaly_score} — Recent anomaly detected",
+    )
 
     return alert
 
@@ -279,6 +289,18 @@ def trigger_threshold_outbreak_alert(*, report_id, threshold_result):
             sent_at=timezone.now(),
             created_at=timezone.now(),
         )
+
+    from dashboard.models import AppNotification
+    AppNotification.objects.create(
+        alert_id=alert.id,
+        disease=threshold_result.get('disease_label') or report.syndrome_type,
+        barangay_name=threshold_result.get("barangay_name") or report.barangay.barangay_name,
+        severity_level=alert_level.title(),
+        final_risk_score=risk_score,
+        anomaly_score=anomaly_score,
+        spatial_metric=f"Spatial Cluster Score: {risk_score} — High density in {threshold_result.get('barangay_name')}",
+        temporal_metric=f"Temporal Surge Score: {anomaly_score} — {threshold_result.get('confirmed_count')} cases within {threshold_result.get('time_window_days')} days",
+    )
 
     return alert
 

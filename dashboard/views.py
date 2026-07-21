@@ -216,3 +216,69 @@ def outbreak_thresholds_view(request):
         'thresholds': thresholds,
     })
 
+
+@login_required
+@require_GET
+def api_notifications(request):
+    from dashboard.models import AppNotification, AppNotificationRead
+    
+    role = request.session.get('role')
+    user_id = request.session.get('user_id')
+    user_type = request.session.get('user_type', role)
+    
+    if is_city_wide_role(role):
+        notifications = AppNotification.objects.order_by('-created_at')[:20]
+    elif role in BARANGAY_SCOPED_ROLES:
+        user = User.objects.filter(id=user_id).first()
+        barangay = resolve_user_barangay(user)
+        if barangay:
+            notifications = AppNotification.objects.filter(barangay_name__iexact=barangay.barangay_name).order_by('-created_at')[:20]
+        else:
+            notifications = AppNotification.objects.none()
+    else:
+        notifications = AppNotification.objects.none()
+
+    read_notification_ids = AppNotificationRead.objects.filter(
+        notification__in=notifications,
+        user_id=user_id,
+        user_type=user_type
+    ).values_list('notification_id', flat=True)
+
+    data = []
+    unread_count = 0
+    for notif in notifications:
+        is_read = notif.id in read_notification_ids
+        if not is_read:
+            unread_count += 1
+        data.append({
+            'id': notif.id,
+            'disease': notif.disease,
+            'barangay_name': notif.barangay_name,
+            'severity_level': notif.severity_level,
+            'spatial_metric': notif.spatial_metric,
+            'temporal_metric': notif.temporal_metric,
+            'created_at': notif.created_at.isoformat(),
+            'is_read': is_read,
+        })
+
+    return JsonResponse({'ok': True, 'unread_count': unread_count, 'notifications': data})
+
+
+@login_required
+def api_notification_read(request, notif_id):
+    from dashboard.models import AppNotification, AppNotificationRead
+    
+    user_id = request.session.get('user_id')
+    user_type = request.session.get('user_type', request.session.get('role'))
+    
+    if request.method == 'POST':
+        notification = AppNotification.objects.filter(id=notif_id).first()
+        if notification:
+            AppNotificationRead.objects.get_or_create(
+                notification=notification,
+                user_id=user_id,
+                user_type=user_type
+            )
+            return JsonResponse({'ok': True})
+    return JsonResponse({'ok': False}, status=400)
+
