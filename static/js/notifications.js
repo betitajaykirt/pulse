@@ -2,8 +2,7 @@
     const NOTIFICATIONS_API_URL = '/dashboard/api/notifications/';
     const POLL_INTERVAL = 15000; // 15 seconds
     
-    let notifiedIds = new Set();
-    let isFirstLoad = true;
+    let notifiedIds = new Set(JSON.parse(localStorage.getItem('notifiedAlerts') || '[]'));
 
     const bellBtn = document.getElementById('notification-bell-btn');
     const badge = document.getElementById('notification-badge');
@@ -43,13 +42,17 @@
         
         toast.innerHTML = `
             <div class="toast-header">
-                <span class="toast-badge">${notif.severity_level.toUpperCase()}</span>
+                <span class="toast-badge">${notif.severity_level.toUpperCase()} OUTBREAK ALERT</span>
                 <button class="toast-close">&times;</button>
             </div>
             <div class="toast-body">
                 <h4>${notif.disease} Alert - ${notif.barangay_name}</h4>
                 <p><strong>${notif.spatial_metric || 'Spatial risk detected'}</strong></p>
                 <p>${notif.temporal_metric || 'Recent surge detected'}</p>
+                <div class="toast-actions" style="margin-top: 12px; display: flex; gap: 8px;">
+                    <button class="btn btn-sm btn-secondary toast-dismiss-btn">Dismiss</button>
+                    <a href="/dashboard/alerts/" class="btn btn-sm btn-primary">View Details</a>
+                </div>
             </div>
         `;
 
@@ -58,15 +61,18 @@
         // Trigger animation
         setTimeout(() => toast.classList.add('show'), 10);
 
-        // Auto remove after 8 seconds
+        // Auto remove after 15 seconds
         const timeout = setTimeout(() => {
             removeToast(toast);
-        }, 8000);
+        }, 15000);
 
-        toast.querySelector('.toast-close').addEventListener('click', () => {
+        const closeHandler = () => {
             clearTimeout(timeout);
             removeToast(toast);
-        });
+        };
+
+        toast.querySelector('.toast-close').addEventListener('click', closeHandler);
+        toast.querySelector('.toast-dismiss-btn').addEventListener('click', closeHandler);
     }
 
     function removeToast(toast) {
@@ -150,18 +156,21 @@
                         listContainer.appendChild(renderDropdownItem(notif));
                         
                         // Show toast if new
-                        if (!isFirstLoad && !notifiedIds.has(notif.id) && !notif.is_read) {
+                        if (!notifiedIds.has(notif.id) && !notif.is_read) {
                             createToast(notif);
                         }
                         notifiedIds.add(notif.id);
                     });
+                    
+                    // Persist to local storage so they don't reappear on page refresh
+                    localStorage.setItem('notifiedAlerts', JSON.stringify([...notifiedIds]));
                     
                     // Re-initialize lucide icons for new elements
                     if (window.lucide) {
                         window.lucide.createIcons();
                     }
                 }
-                isFirstLoad = false;
+
             }
         } catch (err) {
             console.error('Failed to fetch notifications:', err);
