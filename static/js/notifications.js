@@ -3,6 +3,8 @@
     const POLL_INTERVAL = 15000; // 15 seconds
     
     let notifiedIds = new Set(JSON.parse(localStorage.getItem('notifiedAlerts') || '[]'));
+    let modalQueue = [];
+    let isModalActive = false;
 
     const bellBtn = document.getElementById('notification-bell-btn');
     const badge = document.getElementById('notification-badge');
@@ -35,23 +37,26 @@
         return 'moderate';
     }
 
-    function createToast(notif) {
+    function createToastUI(notif) {
         const severityClass = getSeverityClass(notif.severity_level);
         const toast = document.createElement('div');
         toast.className = `toast toast-${severityClass}`;
         
         toast.innerHTML = `
-            <div class="toast-header">
-                <span class="toast-badge">${notif.severity_level.toUpperCase()} OUTBREAK ALERT</span>
+            <div class="toast-header" style="padding: 16px; font-size: 1.1rem;">
+                <span class="toast-badge" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">${notif.severity_level.toUpperCase()} OUTBREAK ALERT</span>
                 <button class="toast-close">&times;</button>
             </div>
-            <div class="toast-body">
-                <h4>${notif.disease} Alert - ${notif.barangay_name}</h4>
-                <p><strong>${notif.spatial_metric || 'Spatial risk detected'}</strong></p>
-                <p>${notif.temporal_metric || 'Recent surge detected'}</p>
-                <div class="toast-actions" style="margin-top: 12px; display: flex; gap: 8px;">
-                    <button class="btn btn-sm btn-secondary toast-dismiss-btn">Dismiss</button>
-                    <a href="/dashboard/alerts/" class="btn btn-sm btn-primary">View Details</a>
+            <div class="toast-body" style="padding: 20px;">
+                <h4 style="font-size: 1.25rem; margin-bottom: 12px;">${notif.disease} Alert - ${notif.barangay_name}</h4>
+                <p style="font-size: 1.05rem;"><strong>${notif.spatial_metric || 'Spatial risk detected'}</strong></p>
+                <p style="font-size: 1rem; margin-bottom: 20px;">${notif.temporal_metric || 'Recent surge detected'}</p>
+                
+                ${modalQueue.length > 0 ? `<div style="font-size: 0.85rem; color: #666; margin-bottom: 16px;">+ ${modalQueue.length} more unread alert(s) queued</div>` : ''}
+
+                <div class="toast-actions" style="display: flex; gap: 12px; justify-content: flex-end;">
+                    <button class="btn btn-secondary toast-dismiss-btn" style="padding: 0.6rem 1.2rem;">Dismiss</button>
+                    <a href="/dashboard/alerts/" class="btn btn-primary" style="padding: 0.6rem 1.2rem;">View Details</a>
                 </div>
             </div>
         `;
@@ -61,18 +66,40 @@
         // Trigger animation
         setTimeout(() => toast.classList.add('show'), 10);
 
-        // Auto remove after 15 seconds
-        const timeout = setTimeout(() => {
-            removeToast(toast);
-        }, 15000);
-
         const closeHandler = () => {
-            clearTimeout(timeout);
             removeToast(toast);
+            setTimeout(showNextModal, 300);
         };
 
         toast.querySelector('.toast-close').addEventListener('click', closeHandler);
         toast.querySelector('.toast-dismiss-btn').addEventListener('click', closeHandler);
+    }
+
+    function queueToast(notif) {
+        modalQueue.push(notif);
+        // Sort highest severity first
+        modalQueue.sort((a, b) => {
+            const sA = getSeverityClass(a.severity_level);
+            const sB = getSeverityClass(b.severity_level);
+            const weight = { 'critical': 3, 'high': 2, 'moderate': 1 };
+            return (weight[sB] || 0) - (weight[sA] || 0);
+        });
+        
+        if (!isModalActive) {
+            showNextModal();
+        }
+    }
+
+    function showNextModal() {
+        if (modalQueue.length === 0) {
+            toastContainer.classList.remove('active');
+            isModalActive = false;
+            return;
+        }
+        isModalActive = true;
+        toastContainer.classList.add('active');
+        const notif = modalQueue.shift();
+        createToastUI(notif);
     }
 
     function removeToast(toast) {
@@ -157,7 +184,7 @@
                         
                         // Show toast if new
                         if (!notifiedIds.has(notif.id) && !notif.is_read) {
-                            createToast(notif);
+                            queueToast(notif);
                         }
                         notifiedIds.add(notif.id);
                     });
