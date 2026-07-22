@@ -238,15 +238,18 @@ def api_notifications(request):
     else:
         notifications = AppNotification.objects.none()
 
-    read_notification_ids = AppNotificationRead.objects.filter(
-        notification__in=notifications,
+    notifications_list = list(notifications)
+    notification_ids = [n.id for n in notifications_list]
+
+    read_notification_ids = set(AppNotificationRead.objects.filter(
+        notification_id__in=notification_ids,
         user_id=user_id,
         user_type=user_type
-    ).values_list('notification_id', flat=True)
+    ).values_list('notification_id', flat=True))
 
     data = []
     unread_count = 0
-    for notif in notifications:
+    for notif in notifications_list:
         is_read = notif.id in read_notification_ids
         if not is_read:
             unread_count += 1
