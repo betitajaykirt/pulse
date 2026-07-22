@@ -2,7 +2,8 @@
     const NOTIFICATIONS_API_URL = '/dashboard/api/notifications/';
     const POLL_INTERVAL = 15000; // 15 seconds
     
-    let notifiedIds = new Set(JSON.parse(localStorage.getItem('notifiedAlerts') || '[]'));
+    // Keep track of queued IDs in runtime only so they don't double-queue on polling
+    let notifiedIds = new Set();
     let modalQueue = [];
     let isModalActive = false;
 
@@ -67,12 +68,22 @@
         setTimeout(() => toast.classList.add('show'), 10);
 
         const closeHandler = () => {
-            removeToast(toast);
-            setTimeout(showNextModal, 300);
+            markAsRead(notif.id).finally(() => {
+                removeToast(toast);
+                setTimeout(showNextModal, 300);
+            });
+        };
+
+        const viewDetailsHandler = (e) => {
+            e.preventDefault();
+            markAsRead(notif.id).finally(() => {
+                window.location.href = '/dashboard/alerts/';
+            });
         };
 
         toast.querySelector('.toast-close').addEventListener('click', closeHandler);
         toast.querySelector('.toast-dismiss-btn').addEventListener('click', closeHandler);
+        toast.querySelector('a.btn-primary').addEventListener('click', viewDetailsHandler);
     }
 
     function queueToast(notif) {
@@ -144,8 +155,10 @@
                     'X-CSRFToken': csrfToken
                 }
             });
-            itemElement.classList.remove('unread');
-            itemElement.classList.add('read');
+            if (itemElement) {
+                itemElement.classList.remove('unread');
+                itemElement.classList.add('read');
+            }
             
             // Decrease badge
             let currentCount = parseInt(badge.textContent) || 0;
@@ -189,8 +202,8 @@
                         notifiedIds.add(notif.id);
                     });
                     
-                    // Persist to local storage so they don't reappear on page refresh
-                    localStorage.setItem('notifiedAlerts', JSON.stringify([...notifiedIds]));
+                    // Note: We deliberately do NOT persist to localStorage.
+                    // If they refresh without dismissing, it will pop up again because is_read is false in the DB!
                     
                     // Re-initialize lucide icons for new elements
                     if (window.lucide) {
