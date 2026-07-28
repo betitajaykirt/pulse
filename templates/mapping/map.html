@@ -307,7 +307,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* ── Custom panes for correct z-stacking ─────────────────────── */
 
-  /* Stacking order: Tiles → Heatmap (340) → Boundaries (350, created in pulse_map_boundaries.js) → Pins (450) */
+  /* Stacking order: Tiles → Heatmap (340) → Boundaries (350) → Pins (450) → Cluster circles (650) */
 
   if (!map.getPane('heatmapPane')) {
 
@@ -327,7 +327,24 @@ document.addEventListener('DOMContentLoaded', function () {
 
   }
 
-  var casePinsRenderer = L.canvas({ pane: 'casePinsPane', padding: 0.5 });
+  if (!map.getPane('cluster-pane')) {
+
+    map.createPane('cluster-pane');
+
+    map.getPane('cluster-pane').style.zIndex = 650;
+
+    map.getPane('cluster-pane').style.pointerEvents = 'none';
+
+  }
+
+  var clusterSvgRenderer = L.svg({ pane: 'cluster-pane', padding: 0.5 });
+
+  var CLUSTER_CIRCLE_PATH = Object.freeze({
+    color: '#dc2626',
+    fillColor: '#ef4444',
+    fillOpacity: 0.4,
+    weight: 3,
+  });
 
 
 
@@ -359,6 +376,70 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
+  function toClusterRenderModel(cluster, index) {
+
+    var ll = normalizeLatLngPair(cluster.centroid);
+
+    return {
+
+      id: 'cluster-' + index,
+
+      lat: ll ? ll[0] : null,
+
+      lng: ll ? ll[1] : null,
+
+      cases: cluster.cases,
+
+      caseCount: cluster.cases.length,
+
+    };
+
+  }
+
+
+
+  function renderClusterRadiusCircles(clusterModels) {
+
+    clusterCirclesLayer.clearLayers();
+
+    clusterModels.forEach(function (cluster) {
+
+      if (cluster.caseCount < 2) return;
+
+      if (!isValidLatLng(cluster.lat, cluster.lng)) return;
+
+
+
+      L.circle([cluster.lat, cluster.lng], {
+
+        pane: 'cluster-pane',
+
+        renderer: clusterSvgRenderer,
+
+        radius: 25,
+
+        interactive: false,
+
+        bubblingMouseEvents: false,
+
+        color: CLUSTER_CIRCLE_PATH.color,
+
+        fillColor: CLUSTER_CIRCLE_PATH.fillColor,
+
+        fillOpacity: CLUSTER_CIRCLE_PATH.fillOpacity,
+
+        weight: CLUSTER_CIRCLE_PATH.weight,
+
+        opacity: 1,
+
+      }).addTo(clusterCirclesLayer);
+
+    });
+
+  }
+
+
+
   function refreshMapSize() {
 
     map.invalidateSize({ animate: false });
@@ -376,6 +457,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
   let casePinsLayer = L.layerGroup().addTo(map);
+
+  let clusterCirclesLayer = L.layerGroup().addTo(map);
 
   let heatLayer = null;
 
@@ -419,7 +502,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (n === 'cases') {
 
-      layerState[n] ? map.addLayer(casePinsLayer) : map.removeLayer(casePinsLayer);
+      if (layerState[n]) {
+
+        map.addLayer(casePinsLayer);
+
+        map.addLayer(clusterCirclesLayer);
+
+      } else {
+
+        map.removeLayer(casePinsLayer);
+
+        map.removeLayer(clusterCirclesLayer);
+
+      }
 
     }
 
@@ -791,6 +886,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     casePinsLayer.clearLayers();
 
+    clusterCirclesLayer.clearLayers();
+
     if (heatLayer) {
 
       map.removeLayer(heatLayer);
@@ -816,8 +913,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
 
-
-    const CLASSIF_RANK = { confirmed: 3, probable: 2, suspected: 1 };
 
     // Leaflet L.circle uses radius in meters (geographic), not screen pixels.
     const CLUSTER_RADIUS_M = 25;
@@ -871,48 +966,6 @@ document.addEventListener('DOMContentLoaded', function () {
       }
 
       return html;
-
-    }
-
-
-
-    function addClusterRadiusCircle(centerLatLng, pathOptions, tooltipHtml) {
-
-      var ll = normalizeLatLngPair(centerLatLng);
-
-      if (!ll) return null;
-
-
-
-      return L.circle(ll, {
-
-        pane: 'casePinsPane',
-
-        renderer: casePinsRenderer,
-
-        radius: 25,
-
-        interactive: false,
-
-        bubblingMouseEvents: false,
-
-        color: pathOptions.color,
-
-        fillColor: pathOptions.fillColor,
-
-        fillOpacity: pathOptions.fillOpacity,
-
-        weight: pathOptions.weight,
-
-        opacity: pathOptions.opacity,
-
-        dashArray: pathOptions.dashArray || null,
-
-      })
-
-        .bindTooltip(tooltipHtml, { sticky: true, direction: 'top', className: 'hotspot-tip' })
-
-        .addTo(casePinsLayer);
 
     }
 
@@ -1110,61 +1163,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const clusters = buildProximityClusters(caseList, CLUSTER_RADIUS_M).filter(Boolean);
 
+    const clusterRenderModels = clusters.map(toClusterRenderModel);
 
-
-    clusters.forEach(function (cluster) {
-
-      var group = cluster.cases;
-
-      var first = group[0];
-
-      var ll = normalizeLatLngPair(cluster.centroid);
+    renderClusterRadiusCircles(clusterRenderModels);
 
 
 
-      if (group.length >= 2 && ll) {
+    clusterRenderModels.forEach(function (clusterModel) {
 
-        var worst = group.reduce(function (best, c) {
+      var group = clusterModel.cases;
 
-          return (CLASSIF_RANK[c.case_classification] || 0) > (CLASSIF_RANK[best.case_classification] || 0) ? c : best;
+      var ll = isValidLatLng(clusterModel.lat, clusterModel.lng)
 
-        }, first);
+        ? [clusterModel.lat, clusterModel.lng]
 
-        var clusterAppearance = casePinAppearance(worst);
-
-        var anyPending = group.some(function (c) { return c.validation_status === 'pending'; });
-
-        var totalCasesInGroup = group.reduce(function (s, c) { return s + c.case_count; }, 0);
-
-        var strokeColor = clusterAppearance.fillColor || '#ef4444';
+        : null;
 
 
 
-        var clusterTooltip = '<b>' + group.length + ' reports in 25m cluster</b><br>';
-
-        clusterTooltip += 'Total cases: <b>' + totalCasesInGroup + '</b><br>';
-
-        clusterTooltip += 'Barangay: ' + (first.barangay_name || '—');
-
-
-
-        addClusterRadiusCircle(ll, {
-
-          color: strokeColor,
-
-          fillColor: strokeColor,
-
-          fillOpacity: anyPending ? 0.15 : 0.25,
-
-          weight: anyPending ? 1 : 2,
-
-          opacity: anyPending ? 0.35 : 0.6,
-
-          dashArray: anyPending ? '6 4' : null,
-
-        }, clusterTooltip);
-
-
+      if (clusterModel.caseCount >= 2 && ll) {
 
         L.marker(ll, {
 
@@ -1218,7 +1235,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
     }
 
-    if (!layerState.cases) map.removeLayer(casePinsLayer);
+    if (!layerState.cases) {
+
+      map.removeLayer(casePinsLayer);
+
+      map.removeLayer(clusterCirclesLayer);
+
+    } else {
+
+      if (!map.hasLayer(casePinsLayer)) map.addLayer(casePinsLayer);
+
+      if (!map.hasLayer(clusterCirclesLayer)) map.addLayer(clusterCirclesLayer);
+
+    }
 
   }
 
