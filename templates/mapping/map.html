@@ -331,6 +331,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
   var clusterSvgRenderer = L.svg({ pane: 'cluster-pane', padding: 0.5 });
 
+  var pinsSvgRenderer = L.svg({ pane: 'pins-pane', padding: 0.5 });
+
   var CLASSIF_RANK = { confirmed: 3, probable: 2, suspected: 1 };
 
   function classificationRadiusStyle(classification) {
@@ -1026,15 +1028,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
         pane: 'pins-pane',
 
+        renderer: pinsSvgRenderer,
+
         radius: appearance.radius,
 
         fillColor: appearance.fillColor,
 
-        color: '#fff',
+        color: '#ffffff',
 
-        weight: 2,
+        weight: 3,
 
-        fillOpacity: appearance.isPending ? 0.5 : 0.9,
+        fillOpacity: appearance.isPending ? 0.5 : 0.95,
 
         opacity: 1,
 
@@ -1249,6 +1253,14 @@ document.addEventListener('DOMContentLoaded', function () {
       });
 
     });
+
+
+
+    if (casePinsLayer.getLayers().length) {
+
+      casePinsLayer.bringToFront();
+
+    }
 
 
 
