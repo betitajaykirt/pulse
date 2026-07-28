@@ -338,7 +338,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var CLUSTER_CIRCLE_PATH = Object.freeze({
     color: '#dc2626',
     fillColor: '#ef4444',
-    fillOpacity: 0.5,
+    fillOpacity: 0.4,
     weight: 3,
   });
 
@@ -400,7 +400,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     clusterModels.forEach(function (cluster) {
 
-      if (cluster.caseCount < 2) return;
+      if (cluster.caseCount < 1) return;
 
       if (!isValidLatLng(cluster.lat, cluster.lng)) return;
 
@@ -420,7 +420,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         fillColor: '#ef4444',
 
-        fillOpacity: 0.5,
+        fillOpacity: 0.4,
 
         weight: 3,
 
