@@ -657,13 +657,17 @@ window.PulseMapBoundaries = (function () {
 
 
 
-      if (cityLayer && typeof cityLayer.getBounds === 'function') {
+      if (!options.skipFitBounds) {
 
-        map.fitBounds(cityLayer.getBounds().pad(0.05), { animate: false });
+        if (cityLayer && typeof cityLayer.getBounds === 'function') {
 
-      } else if (boundaryLayer && typeof boundaryLayer.getBounds === 'function') {
+          map.fitBounds(cityLayer.getBounds().pad(0.05), { animate: false });
 
-        map.fitBounds(boundaryLayer.getBounds().pad(0.05), { animate: false });
+        } else if (boundaryLayer && typeof boundaryLayer.getBounds === 'function') {
+
+          map.fitBounds(boundaryLayer.getBounds().pad(0.05), { animate: false });
+
+        }
 
       }
 
@@ -698,6 +702,28 @@ window.PulseMapBoundaries = (function () {
           boundaryLayer.eachLayer(function (layer) {
 
             if (!layer.feature) return;
+
+            applyLayerStyle(layer, layer.feature, selectedLayer === layer);
+
+          });
+
+        },
+
+        updateRiskData: function (newRiskData) {
+
+          riskData = newRiskData || {};
+
+          boundaryLayer.eachLayer(function (layer) {
+
+            if (!layer.feature) return;
+
+            var rawName = resolveBarangayName(layer.feature.properties);
+
+            var canonical = canonicalBarangayName(rawName);
+
+            var risk = lookupRisk(riskData, canonical) || lookupRisk(riskData, rawName);
+
+            layer.setPopupContent(buildPopupHtml(rawName, risk));
 
             applyLayerStyle(layer, layer.feature, selectedLayer === layer);
 

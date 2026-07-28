@@ -28,7 +28,7 @@
 
     </div>
 
-    <button type="button" class="nc-btn nc-btn--primary" onclick="loadMapData()">
+    <button type="button" class="nc-btn nc-btn--primary" onclick="loadMapData(false)">
 
       <i data-lucide="refresh-cw" class="lucide-icon lucide-icon--sm"></i>
 
@@ -142,7 +142,7 @@
 
       </select>
 
-      <select id="filter-syndrome" class="input-soft input-soft--plain" onchange="loadMapData()">
+      <select id="filter-syndrome" class="input-soft input-soft--plain" onchange="loadMapData(false)">
 
         {% for value, label in symptom_category_choices %}
 
@@ -152,7 +152,7 @@
 
       </select>
 
-      <select id="filter-classif" class="input-soft input-soft--plain" onchange="loadMapData()">
+      <select id="filter-classif" class="input-soft input-soft--plain" onchange="loadMapData(false)">
 
         <option value="">All Classifications</option>
 
@@ -264,15 +264,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
-  var map = L.map('map', { preferCanvas: false }).setView([10.5389, 122.8366], 13);
+  var map = L.map('map', {
+    preferCanvas: false,
+    zoomControl: true,
+    attributionControl: true,
+  }).setView([10.5389, 122.8366], 13);
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-
+  var MAP_VIEW = Object.freeze({ center: [10.5389, 122.8366], zoom: 13 });
+  var TILE_OPTIONS = Object.freeze({
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-
-    maxZoom: 19
-
-  }).addTo(map);
+    maxZoom: 19,
+  });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', TILE_OPTIONS).addTo(map);
 
 
 
@@ -327,6 +330,12 @@ document.addEventListener('DOMContentLoaded', function () {
   let barangayGeoCache = null;
 
   let boundaryApi = null;
+
+  let boundariesInitialized = false;
+
+  let boundariesLoadPromise = null;
+
+  let mapDataRequestId = 0;
 
   let selectedBarangayName = null;
 
@@ -456,23 +465,21 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function loadBarangayBoundaries() {
 
-    if (boundaryLayer) {
+    if (boundaryApi) {
 
-      map.removeLayer(boundaryLayer);
-
-      boundaryLayer = null;
+      return Promise.resolve(boundaryApi);
 
     }
 
-    if (cityBoundaryLayer) {
+    if (boundariesLoadPromise) {
 
-      map.removeLayer(cityBoundaryLayer);
-
-      cityBoundaryLayer = null;
+      return boundariesLoadPromise;
 
     }
 
-    return PulseMapBoundaries.load(map, {
+
+
+    boundariesLoadPromise = PulseMapBoundaries.load(map, {
 
       barangayGeoUrl: MAP_CONFIG.barangayGeoUrl,
 
@@ -481,6 +488,8 @@ document.addEventListener('DOMContentLoaded', function () {
       riskUrl: MAP_CONFIG.riskUrl,
 
       casePinsLayer: casePinsLayer,
+
+      skipFitBounds: boundariesInitialized,
 
       onBarangaySelect: function (name) {
 
@@ -508,6 +517,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         barangayGeoCache = payload.barangayGeo;
 
+        boundariesInitialized = true;
+
         if (!layerState.boundaries) {
 
           if (boundaryLayer) map.removeLayer(boundaryLayer);
@@ -532,7 +543,49 @@ document.addEventListener('DOMContentLoaded', function () {
 
       console.error('Boundary layer error:', e);
 
+      boundariesLoadPromise = null;
+
     });
+
+
+
+    return boundariesLoadPromise;
+
+  }
+
+
+
+  function refreshBoundaryRisks() {
+
+    if (!boundaryApi || !MAP_CONFIG.riskUrl) {
+
+      return Promise.resolve();
+
+    }
+
+    return fetch(MAP_CONFIG.riskUrl)
+
+      .then(function (r) { return r.json(); })
+
+      .then(function (riskData) {
+
+        if (typeof boundaryApi.updateRiskData === 'function') {
+
+          boundaryApi.updateRiskData(riskData);
+
+        } else if (typeof boundaryApi.refreshRiskStyles === 'function') {
+
+          boundaryApi.refreshRiskStyles();
+
+        }
+
+      })
+
+      .catch(function (e) {
+
+        console.error('Risk refresh error:', e);
+
+      });
 
   }
 
@@ -678,7 +731,263 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
+  function updateCaseAndHeatLayers(caseList) {
+
+    casePinsLayer.clearLayers();
+
+    if (heatLayer) {
+
+      map.removeLayer(heatLayer);
+
+      heatLayer = null;
+
+    }
+
+    const hp = [];
+
+    let counts = { suspected: 0, probable: 0, confirmed: 0, total: 0 };
+
+
+
+    caseList.forEach(function (c) {
+
+      hp.push([c.latitude, c.longitude, c.heat_intensity]);
+
+      counts[c.case_classification] = (counts[c.case_classification] || 0) + c.case_count;
+
+      counts.total += c.case_count;
+
+    });
+
+
+
+    const CLASSIF_RANK = { confirmed: 3, probable: 2, suspected: 1 };
+
+    const clusters = [];
+
+    caseList.forEach(function (c) {
+
+      var cLat = parseFloat(c.latitude);
+
+      var cLon = parseFloat(c.longitude);
+
+      var added = false;
+
+      for (var i = 0; i < clusters.length; i++) {
+
+        var cluster = clusters[i];
+
+        var dist = L.latLng(cLat, cLon).distanceTo(L.latLng(cluster.centroid[0], cluster.centroid[1]));
+
+        if (dist <= 25) {
+
+          cluster.cases.push(c);
+
+          var sumLat = 0, sumLon = 0;
+
+          cluster.cases.forEach(function (cc) {
+
+            sumLat += parseFloat(cc.latitude);
+
+            sumLon += parseFloat(cc.longitude);
+
+          });
+
+          cluster.centroid = [sumLat / cluster.cases.length, sumLon / cluster.cases.length];
+
+          added = true;
+
+          break;
+
+        }
+
+      }
+
+      if (!added) {
+
+        clusters.push({
+
+          cases: [c],
+
+          centroid: [cLat, cLon]
+
+        });
+
+      }
+
+    });
+
+
+
+    clusters.forEach(function (cluster) {
+
+      var group = cluster.cases;
+
+      var first = group[0];
+
+      var ll = cluster.centroid;
+
+
+
+      var worst = group.reduce(function (best, c) {
+
+        return (CLASSIF_RANK[c.case_classification] || 0) > (CLASSIF_RANK[best.case_classification] || 0) ? c : best;
+
+      }, first);
+
+      var pc = worst.case_classification === 'confirmed' ? '#7c3aed'
+
+             : worst.case_classification === 'probable'  ? '#ef4444' : '#f59e0b';
+
+      var ps = worst.case_classification === 'confirmed' ? 10
+
+             : worst.case_classification === 'probable'  ? 8 : 6;
+
+
+
+      var anyPending = group.some(function (c) { return c.validation_status === 'pending'; });
+
+      var totalCasesInGroup = group.reduce(function (s, c) { return s + c.case_count; }, 0);
+
+
+
+      var tooltipHtml = '<b>' + (group.length > 1 ? group.length + ' reports' : 'Syndromic report') + '</b><br>';
+
+      tooltipHtml += 'Total cases: <b>' + totalCasesInGroup + '</b><br>';
+
+      tooltipHtml += 'Classification: <b>' + worst.case_classification.toUpperCase() + '</b><br>';
+
+      tooltipHtml += 'Barangay: ' + first.barangay_name;
+
+      if (anyPending) tooltipHtml += '<br><span style="color:#f59e0b;font-size:.75rem;font-weight:600;">Contains pending reports</span>';
+
+
+
+      var popupHtml, popupClass;
+
+      if (group.length === 1) {
+
+        popupHtml = buildCasePopup(first);
+
+        popupClass = 'map-case-popup-wrap';
+
+      } else {
+
+        popupHtml = buildClusterPopup(group);
+
+        popupClass = 'map-cluster-popup-wrap';
+
+      }
+
+
+
+      var hotspotR = 25;
+
+      L.circle(ll, {
+
+        pane: 'casePinsPane',
+
+        radius: hotspotR,
+
+        fillColor: pc,
+
+        color: pc,
+
+        weight: anyPending ? 1 : 2,
+
+        opacity: anyPending ? 0.35 : 0.6,
+
+        fillOpacity: anyPending ? 0.08 : 0.18,
+
+        dashArray: anyPending ? '6 4' : null
+
+      })
+
+        .bindTooltip(tooltipHtml, { sticky: true, direction: 'top', className: 'hotspot-tip' })
+
+        .addTo(casePinsLayer);
+
+
+
+      L.circleMarker(ll, {
+
+        pane: 'casePinsPane',
+
+        radius: group.length > 1 ? Math.min(ps + 3, 14) : ps,
+
+        fillColor: pc,
+
+        color: '#fff',
+
+        weight: 2,
+
+        fillOpacity: anyPending ? 0.5 : 0.9,
+
+      })
+
+        .bindTooltip(tooltipHtml, { sticky: true, direction: 'top', className: 'hotspot-tip' })
+
+        .bindPopup(popupHtml, { maxWidth: 380, className: popupClass })
+
+        .addTo(casePinsLayer);
+
+
+
+      if (group.length > 1) {
+
+        L.marker(ll, {
+
+          pane: 'casePinsPane',
+
+          interactive: false,
+
+          icon: L.divIcon({
+
+            className: 'map-cluster-badge',
+
+            html: '<span class="map-cluster-badge__label">' + group.length + '</span>',
+
+            iconSize: [24, 24],
+
+            iconAnchor: [4, 20],
+
+          }),
+
+        }).addTo(casePinsLayer);
+
+      }
+
+    });
+
+
+
+    document.getElementById('stat-suspected').textContent = counts.suspected || 0;
+
+    document.getElementById('stat-probable').textContent = counts.probable || 0;
+
+    document.getElementById('stat-confirmed').textContent = counts.confirmed || 0;
+
+    document.getElementById('stat-total').textContent = counts.total || 0;
+
+
+
+    if (hp.length > 0) {
+
+      heatLayer = L.heatLayer(hp, { pane: 'heatmapPane', radius: 45, blur: 38, maxZoom: 17, max: 0.85, minOpacity: 0.12, gradient: { 0.2: '#22c55e', 0.45: '#f59e0b', 0.7: '#ef4444', 1.0: '#7c3aed' } });
+
+      if (layerState.heat) map.addLayer(heatLayer);
+
+    }
+
+    if (!layerState.cases) map.removeLayer(casePinsLayer);
+
+  }
+
+
+
   function loadMapData(reloadBoundaries) {
+
+    const requestId = ++mapDataRequestId;
 
     const time = document.getElementById('filter-time').value;
 
@@ -702,23 +1011,35 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
-    const requests = [];
-
-    if (reloadBoundaries !== false) {
-
-      requests.push(loadBarangayBoundaries());
-
-    } else {
-
-      requests.push(Promise.resolve());
-
-    }
-
-    requests.push(fetch(casesUrl + '?' + params.toString()).then(function (r) { return r.json(); }));
+    const shouldInitBoundaries = reloadBoundaries !== false && !boundariesInitialized;
 
 
 
-    Promise.all(requests).then(function (results) {
+    const boundaryPromise = shouldInitBoundaries
+
+      ? loadBarangayBoundaries()
+
+      : Promise.resolve(boundaryApi);
+
+
+
+    boundaryPromise
+
+      .then(function () {
+
+        return Promise.all([
+
+          refreshBoundaryRisks(),
+
+          fetch(casesUrl + '?' + params.toString()).then(function (r) { return r.json(); }),
+
+        ]);
+
+      })
+
+      .then(function (results) {
+
+        if (requestId !== mapDataRequestId) return;
 
         const data = results[1];
 
@@ -730,253 +1051,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         }
 
-        const caseList = data.cases || [];
-
-        casePinsLayer.clearLayers();
-
-        if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; }
-
-        const hp = [];
-
-        let counts = { suspected: 0, probable: 0, confirmed: 0, total: 0 };
-
-
-
-        /* ── Tally stats + heatmap points ───────────────────────── */
-
-        caseList.forEach(function (c) {
-
-          hp.push([c.latitude, c.longitude, c.heat_intensity]);
-
-          counts[c.case_classification] = (counts[c.case_classification] || 0) + c.case_count;
-
-          counts.total += c.case_count;
-
-        });
-
-
-
-        /* ── Group cases by location (25m distance threshold) ── */
-
-        const CLASSIF_RANK = { confirmed: 3, probable: 2, suspected: 1 };
-
-        const clusters = [];
-
-        caseList.forEach(function (c) {
-
-          var cLat = parseFloat(c.latitude);
-
-          var cLon = parseFloat(c.longitude);
-
-          var added = false;
-
-          for (var i = 0; i < clusters.length; i++) {
-
-            var cluster = clusters[i];
-
-            var dist = L.latLng(cLat, cLon).distanceTo(L.latLng(cluster.centroid[0], cluster.centroid[1]));
-
-            if (dist <= 25) {
-
-              cluster.cases.push(c);
-
-              var sumLat = 0, sumLon = 0;
-
-              cluster.cases.forEach(function (cc) {
-
-                sumLat += parseFloat(cc.latitude);
-
-                sumLon += parseFloat(cc.longitude);
-
-              });
-
-              cluster.centroid = [sumLat / cluster.cases.length, sumLon / cluster.cases.length];
-
-              added = true;
-
-              break;
-
-            }
-
-          }
-
-          if (!added) {
-
-            clusters.push({
-
-              cases: [c],
-
-              centroid: [cLat, cLon]
-
-            });
-
-          }
-
-        });
-
-
-
-        /* ── Render one consolidated pin per cluster ────────────── */
-
-        clusters.forEach(function (cluster) {
-
-          var group = cluster.cases;
-
-          var first = group[0];
-
-          var ll = cluster.centroid;
-
-
-
-          /* Pick worst classification for pin colour / size */
-
-          var worst = group.reduce(function (best, c) {
-
-            return (CLASSIF_RANK[c.case_classification] || 0) > (CLASSIF_RANK[best.case_classification] || 0) ? c : best;
-
-          }, first);
-
-          var pc = worst.case_classification === 'confirmed' ? '#7c3aed'
-
-                 : worst.case_classification === 'probable'  ? '#ef4444' : '#f59e0b';
-
-          var ps = worst.case_classification === 'confirmed' ? 10
-
-                 : worst.case_classification === 'probable'  ? 8 : 6;
-
-
-
-          var anyPending = group.some(function (c) { return c.validation_status === 'pending'; });
-
-          var totalCasesInGroup = group.reduce(function (s, c) { return s + c.case_count; }, 0);
-
-
-
-          /* Tooltip summary */
-
-          var tooltipHtml = '<b>' + (group.length > 1 ? group.length + ' reports' : 'Syndromic report') + '</b><br>';
-
-          tooltipHtml += 'Total cases: <b>' + totalCasesInGroup + '</b><br>';
-
-          tooltipHtml += 'Classification: <b>' + worst.case_classification.toUpperCase() + '</b><br>';
-
-          tooltipHtml += 'Barangay: ' + first.barangay_name;
-
-          if (anyPending) tooltipHtml += '<br><span style="color:#f59e0b;font-size:.75rem;font-weight:600;">Contains pending reports</span>';
-
-
-
-          /* Popup: single-case or scrollable cluster */
-
-          var popupHtml, popupClass;
-
-          if (group.length === 1) {
-
-            popupHtml = buildCasePopup(first);
-
-            popupClass = 'map-case-popup-wrap';
-
-          } else {
-
-            popupHtml = buildClusterPopup(group);
-
-            popupClass = 'map-cluster-popup-wrap';
-
-          }
-
-
-
-          /* The radius circle for visibility */
-          var hotspotR = 25;
-          L.circle(ll, {
-            pane: 'casePinsPane',
-            radius: hotspotR,
-            fillColor: pc,
-            color: pc,
-            weight: anyPending ? 1 : 2,
-            opacity: anyPending ? 0.35 : 0.6,
-            fillOpacity: anyPending ? 0.08 : 0.18,
-            dashArray: anyPending ? '6 4' : null
-          })
-            .bindTooltip(tooltipHtml, { sticky: true, direction: 'top', className: 'hotspot-tip' })
-            .addTo(casePinsLayer);
-
-          /* The pin marker — rendered on casePinsPane */
-          var marker = L.circleMarker(ll, {
-
-            pane: 'casePinsPane',
-
-            radius: group.length > 1 ? Math.min(ps + 3, 14) : ps,
-
-            fillColor: pc,
-
-            color: '#fff',
-
-            weight: 2,
-
-            fillOpacity: anyPending ? 0.5 : 0.9,
-
-          })
-
-            .bindTooltip(tooltipHtml, { sticky: true, direction: 'top', className: 'hotspot-tip' })
-
-            .bindPopup(popupHtml, { maxWidth: 380, className: popupClass })
-
-            .addTo(casePinsLayer);
-
-
-
-          /* Count badge for multi-case clusters */
-
-          if (group.length > 1) {
-
-            var badge = L.marker(ll, {
-
-              pane: 'casePinsPane',
-
-              interactive: false,
-
-              icon: L.divIcon({
-
-                className: 'map-cluster-badge',
-
-                html: '<span class="map-cluster-badge__label">' + group.length + '</span>',
-
-                iconSize: [24, 24],
-
-                iconAnchor: [4, 20],
-
-              }),
-
-            }).addTo(casePinsLayer);
-
-          }
-
-        });
-
-
-
-        document.getElementById('stat-suspected').textContent = counts.suspected || 0;
-
-        document.getElementById('stat-probable').textContent = counts.probable || 0;
-
-        document.getElementById('stat-confirmed').textContent = counts.confirmed || 0;
-
-        document.getElementById('stat-total').textContent = counts.total || 0;
-
-
-
-        if (hp.length > 0) {
-
-          heatLayer = L.heatLayer(hp, { pane: 'heatmapPane', radius: 45, blur: 38, maxZoom: 17, max: 0.85, minOpacity: 0.12, gradient: { 0.2: '#22c55e', 0.45: '#f59e0b', 0.7: '#ef4444', 1.0: '#7c3aed' } });
-
-          if (layerState.heat) map.addLayer(heatLayer);
-
-        }
-
-        if (!layerState.cases) map.removeLayer(casePinsLayer);
-
-        refreshMapSize();
+        updateCaseAndHeatLayers(data.cases || []);
 
       }).catch(e => console.error('Map data error:', e));
 
@@ -986,9 +1061,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
-  loadMapData();
+  loadMapData(true);
 
-  setInterval(loadMapData, 60000);
+  setInterval(function () { loadMapData(false); }, 60000);
 
 });
 
