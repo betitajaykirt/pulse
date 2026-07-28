@@ -74,11 +74,15 @@
 
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
 <script>
 const BARANGAY_OPTIONS = {{ barangay_options_json|safe }};
 const BARANGAY_LOCKED = {{ barangay_locked|yesno:"true,false" }};
 const DEFAULT_BARANGAY_ID = '{{ default_barangay_id }}';
 const SUBMIT_URL = '{% url "submit_report" %}';
+const ASSIGNED_BARANGAY_NAME = '{{ assigned_barangay|default:""|escapejs }}';
+const BARANGAY_GEOFENCE_ENABLED = {{ barangay_locked|yesno:"true,false" }} && !!ASSIGNED_BARANGAY_NAME;
+const BARANGAY_GEOJSON_URL = '{% static "ph-json/bago_barangay_boundaries.geojson" %}';
 
 const SYMPTOM_GROUPS = {{ symptom_groups_json|safe }};
 
@@ -491,11 +495,150 @@ function addPatient() {
 
 document.getElementById('btn-add-patient').addEventListener('click', addPatient);
 
-const pinMap = L.map('pin-map').setView([10.5389, 122.8366], 14);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
-}).addTo(pinMap);
+const pinMap = L.map('pin-map', { preferCanvas: false }).setView([10.5389, 122.8366], 14);
+
+const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors',
+  maxZoom: 20,
+});
+
+const satelliteLayer = L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  {
+    attribution: 'Tiles &copy; Esri',
+    maxNativeZoom: 18,
+    maxZoom: 20,
+  }
+);
+
+satelliteLayer.addTo(pinMap);
+
+L.control.layers(
+  { 'Street View': streetLayer, 'Satellite View': satelliteLayer },
+  null,
+  { position: 'topright', collapsed: true }
+).addTo(pinMap);
+
 let pinMarker = null;
+let assignedBarangayFeature = null;
+let assignedBarangayLayer = null;
+
+const GEOJSON_BARANGAY_ALIASES = {
+  'jorge l. araneta': 'Don Jorge Araneta',
+  'don jorge araneta': 'Don Jorge Araneta',
+  'lag-asan': 'Lag-asan',
+  'lag asan': 'Lag-asan',
+  'ma-ao barrio': 'Ma-ao',
+  'ma-ao': 'Ma-ao',
+};
+
+function canonicalSubmitBarangayName(name) {
+  if (!name) return '';
+  const trimmed = String(name).trim();
+  const key = trimmed.toLowerCase();
+  return GEOJSON_BARANGAY_ALIASES[key] || trimmed;
+}
+
+function resolveGeoFeatureName(props) {
+  if (!props) return '';
+  return props.name || props.psa_name || props.NAME_3 || '';
+}
+
+function findAssignedBarangayFeature(geojson, barangayName) {
+  if (!geojson || !geojson.features || !barangayName) return null;
+  const target = canonicalSubmitBarangayName(barangayName).toLowerCase();
+  for (let i = 0; i < geojson.features.length; i++) {
+    const feature = geojson.features[i];
+    const raw = resolveGeoFeatureName(feature.properties);
+    const canonical = canonicalSubmitBarangayName(raw).toLowerCase();
+    if (raw && raw.toLowerCase() === target) return feature;
+    if (canonical === target) return feature;
+  }
+  return null;
+}
+
+function showPinMapToast(message) {
+  const container = document.getElementById('toast-container');
+  if (!container) {
+    alert(message);
+    return;
+  }
+  const toast = document.createElement('div');
+  toast.className = 'toast toast-high show';
+  toast.innerHTML = '<div class="toast-body"><p>' + message + '</p></div>';
+  container.appendChild(toast);
+  container.classList.add('active');
+  setTimeout(() => {
+    toast.remove();
+    if (!container.children.length) container.classList.remove('active');
+  }, 5500);
+}
+
+function isPointInAssignedBarangay(lat, lng) {
+  if (!BARANGAY_GEOFENCE_ENABLED || !assignedBarangayFeature || typeof turf === 'undefined') {
+    return true;
+  }
+  return turf.booleanPointInPolygon(turf.point([lng, lat]), assignedBarangayFeature);
+}
+
+function trySetPatientLocation(p, lat, lng) {
+  if (!isPointInAssignedBarangay(lat, lng)) {
+    showPinMapToast('Invalid Location: Pins must be placed within your assigned barangay boundary.');
+    return false;
+  }
+  p.latitude = parseFloat(Number(lat).toFixed(7));
+  p.longitude = parseFloat(Number(lng).toFixed(7));
+  return true;
+}
+
+function loadAssignedBarangayBoundary() {
+  if (!BARANGAY_GEOFENCE_ENABLED) return Promise.resolve();
+
+  return fetch(BARANGAY_GEOJSON_URL)
+    .then((response) => response.json())
+    .then((geojson) => {
+      assignedBarangayFeature = findAssignedBarangayFeature(geojson, ASSIGNED_BARANGAY_NAME);
+      if (!assignedBarangayFeature) {
+        console.warn('Assigned barangay boundary not found in GeoJSON:', ASSIGNED_BARANGAY_NAME);
+        return;
+      }
+      if (assignedBarangayLayer) {
+        pinMap.removeLayer(assignedBarangayLayer);
+        assignedBarangayLayer = null;
+      }
+      assignedBarangayLayer = L.geoJSON(assignedBarangayFeature, {
+        style: {
+          color: '#2563eb',
+          weight: 2,
+          dashArray: '5, 5',
+          fillColor: '#2563eb',
+          fillOpacity: 0.1,
+        },
+      }).addTo(pinMap);
+      pinMap.fitBounds(assignedBarangayLayer.getBounds(), { padding: [28, 28], maxZoom: 17 });
+    })
+    .catch((err) => console.error('Barangay boundary load failed:', err));
+}
+
+function attachPinMarkerDragHandler(marker, patient) {
+  marker.on('dragend', function (e) {
+    const ll = e.target.getLatLng();
+    const prevLat = patient.latitude;
+    const prevLng = patient.longitude;
+    if (!trySetPatientLocation(patient, ll.lat, ll.lng)) {
+      if (prevLat != null && prevLng != null) {
+        marker.setLatLng([prevLat, prevLng]);
+      } else {
+        pinMap.removeLayer(marker);
+        pinMarker = null;
+      }
+      return;
+    }
+    updateMapForActivePatient();
+    renderPatientList();
+    setActivePatient(patient.id);
+  });
+}
 
 function updateMapForActivePatient() {
   const p = patients.find(x => x.id === activePatientId);
@@ -503,13 +646,15 @@ function updateMapForActivePatient() {
   if (pinMarker) { pinMap.removeLayer(pinMarker); pinMarker = null; }
   if (p.latitude != null && p.longitude != null) {
     pinMarker = L.marker([p.latitude, p.longitude], {
+      draggable: true,
       icon: L.divIcon({
         className: '',
         html: '<div style="width:18px;height:18px;background:#DC2626;border:3px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.35);"></div>',
         iconSize: [18, 18], iconAnchor: [9, 9]
       })
     }).addTo(pinMap);
-    pinMap.setView([p.latitude, p.longitude], 15);
+    attachPinMarkerDragHandler(pinMarker, p);
+    pinMap.setView([p.latitude, p.longitude], Math.max(pinMap.getZoom(), 15));
     document.getElementById('pin-coords').textContent = p.latitude + ', ' + p.longitude;
     document.getElementById('pin-info').style.display = 'block';
   } else {
@@ -520,8 +665,7 @@ function updateMapForActivePatient() {
 pinMap.on('click', function(e) {
   const p = patients.find(x => x.id === activePatientId);
   if (!p) return;
-  p.latitude = parseFloat(e.latlng.lat.toFixed(7));
-  p.longitude = parseFloat(e.latlng.lng.toFixed(7));
+  if (!trySetPatientLocation(p, e.latlng.lat, e.latlng.lng)) return;
   updateMapForActivePatient();
   renderPatientList();
   setActivePatient(p.id);
@@ -757,6 +901,7 @@ function toggleStudentFields(pid, show) {
 }
 
 addPatient();
+loadAssignedBarangayBoundary();
 setTimeout(() => pinMap.invalidateSize(), 400);
 </script>
 {% endblock %}
