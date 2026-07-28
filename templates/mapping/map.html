@@ -449,6 +449,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
+  function bringLayerGroupToFront(layerGroup) {
+
+    if (!layerGroup || typeof layerGroup.eachLayer !== 'function') return;
+
+    layerGroup.eachLayer(function (layer) {
+
+      if (layer && typeof layer.bringToFront === 'function') {
+
+        layer.bringToFront();
+
+      }
+
+    });
+
+  }
+
   function renderClusterRadiusCircles(clusterModels) {
 
     clusterCirclesLayer.clearLayers();
@@ -495,11 +511,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     });
 
-    if (clusterCirclesLayer.getLayers().length) {
-
-      clusterCirclesLayer.bringToFront();
-
-    }
+    bringLayerGroupToFront(clusterCirclesLayer);
 
   }
 
@@ -1256,11 +1268,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
-    if (casePinsLayer.getLayers().length) {
-
-      casePinsLayer.bringToFront();
-
-    }
+    bringLayerGroupToFront(casePinsLayer);
 
 
 

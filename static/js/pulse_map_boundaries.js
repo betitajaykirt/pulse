@@ -673,9 +673,13 @@ window.PulseMapBoundaries = (function () {
 
 
 
-      if (casePinsLayer && typeof casePinsLayer.bringToFront === 'function') {
+      if (casePinsLayer && typeof casePinsLayer.eachLayer === 'function') {
 
-        casePinsLayer.bringToFront();
+        casePinsLayer.eachLayer(function (layer) {
+
+          if (layer && typeof layer.bringToFront === 'function') layer.bringToFront();
+
+        });
 
       }
 
