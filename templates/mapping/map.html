@@ -879,35 +879,161 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
+  function escapeMapPopupHtml(value) {
+
+    if (value == null || value === '') return '—';
+
+    return String(value)
+
+      .replace(/&/g, '&amp;')
+
+      .replace(/</g, '&lt;')
+
+      .replace(/>/g, '&gt;')
+
+      .replace(/"/g, '&quot;');
+
+  }
+
+
+
+  function mapPopupClassificationKey(c) {
+
+    var cl = (c.case_classification || 'suspected').toLowerCase();
+
+    if (cl === 'confirmed') return 'confirmed';
+
+    if (cl === 'probable') return 'probable';
+
+    return 'suspected';
+
+  }
+
+
+
+  function mapPopupClassificationLabel(c) {
+
+    var raw = (c.case_classification || c.status || 'Suspected').toString();
+
+    return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+
+  }
+
+
+
+  function mapPopupRiskBadgeClass(c) {
+
+    var level = (c.risk_level || '').toLowerCase();
+
+    if (level.includes('critical') || mapPopupClassificationKey(c) === 'confirmed') return 'critical';
+
+    if (level.includes('high') || mapPopupClassificationKey(c) === 'probable') return 'high';
+
+    return 'moderate';
+
+  }
+
+
+
   function buildCasePopup(c) {
 
     var isPending = c.validation_status === 'pending';
 
+    var classKey = mapPopupClassificationKey(c);
+
+    var classLabel = mapPopupClassificationLabel(c);
+
+    var riskBadgeClass = mapPopupRiskBadgeClass(c);
+
+    var displayDate = c.date_of_onset || c.report_date || '—';
+
+    var dateLabel = c.date_of_onset ? 'Onset Date' : 'Report Date';
+
     var html = '<div class="map-case-popup">';
 
-    html += '<div class="map-case-popup__title"><b>' + (c.status || 'Unclassified') + '</b>';
+    html += '<div class="map-case-popup__header">';
 
-    if (isPending) html += ' <span class="map-case-popup__pending">(pending)</span>';
+    html += '<span class="map-case-popup__badge map-case-popup__badge--' + classKey + '">' + escapeMapPopupHtml(classLabel) + '</span>';
 
-    html += '</div>';
+    if (isPending) {
 
-    html += '<div class="map-case-popup__meta">';
-
-    html += '<div><strong>Disease:</strong> ' + (c.syndrome_type || '—') + '</div>';
-
-    html += '<div><strong>Barangay:</strong> ' + c.barangay_name + '</div>';
-
-    html += '<div><strong>Cases:</strong> ' + c.case_count + '</div>';
-
-    html += '<div><strong>Date:</strong> ' + c.report_date + '</div>';
-
-    if (c.epidemic_threshold_status) {
-
-      html += '<div><strong>Threshold:</strong> ' + c.epidemic_threshold_status.replace(/_/g, ' ') + '</div>';
+      html += ' <span class="map-case-popup__pending">Pending validation</span>';
 
     }
 
     html += '</div>';
+
+
+
+    html += '<div class="map-case-popup__section">';
+
+    html += '<div class="map-case-popup__row"><strong>Disease:</strong> ' + escapeMapPopupHtml(c.suspected_disease || c.syndrome_type) + '</div>';
+
+    html += '<div class="map-case-popup__row"><strong>Barangay:</strong> ' + escapeMapPopupHtml(c.barangay_name) + '</div>';
+
+    html += '<div class="map-case-popup__row"><strong>Cases:</strong> ' + escapeMapPopupHtml(c.case_count) + '</div>';
+
+    html += '<div class="map-case-popup__row"><strong>' + dateLabel + ':</strong> ' + escapeMapPopupHtml(displayDate) + '</div>';
+
+    if (c.status) {
+
+      html += '<div class="map-case-popup__row"><strong>Status:</strong> ' + escapeMapPopupHtml(c.status) + '</div>';
+
+    }
+
+    html += '</div>';
+
+
+
+    html += '<div class="map-case-popup__section map-case-popup__section--divider">';
+
+    html += '<div class="map-case-popup__risk map-case-popup__risk--' + riskBadgeClass + '">';
+
+    html += '<strong>Risk Score:</strong> ' + escapeMapPopupHtml(c.risk_score_line || 'Under review');
+
+    html += '</div>';
+
+    if (c.epidemic_threshold_status) {
+
+      html += '<div class="map-case-popup__row"><strong>Threshold:</strong> ' + escapeMapPopupHtml(c.epidemic_threshold_status.replace(/_/g, ' ')) + '</div>';
+
+    }
+
+    html += '</div>';
+
+
+
+    html += '<div class="map-case-popup__section map-case-popup__section--divider">';
+
+    html += '<div class="map-case-popup__row"><strong>Officer in Charge:</strong> ' + escapeMapPopupHtml(c.officer_name || 'Not recorded') + '</div>';
+
+    html += '<div class="map-case-popup__row"><strong>Contact:</strong> ' + escapeMapPopupHtml(c.officer_contact || 'Not available') + '</div>';
+
+    if (c.is_confirmed && c.confirmed_by) {
+
+        html += '<div class="map-case-popup__row"><strong>Confirmed By:</strong> ' + escapeMapPopupHtml(c.confirmed_by) + '</div>';
+
+      }
+
+      if (c.is_confirmed && c.confirmed_date) {
+
+        html += '<div class="map-case-popup__row"><strong>Confirmed Date:</strong> ' + escapeMapPopupHtml(c.confirmed_date) + '</div>';
+
+      }
+
+    html += '</div>';
+
+
+
+    html += '<div class="map-case-popup__section map-case-popup__section--divider map-case-popup__recommendations">';
+
+    html += '<strong>Recommendations</strong>';
+
+    html += '<p>' + escapeMapPopupHtml(c.recommendations) + '</p>';
+
+    html += '</div>';
+
+
 
     html += buildMitigationBanner(c.mitigation_suggestions);
 
@@ -937,35 +1063,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     cases.forEach(function (c, idx) {
 
-      var classifCls = 'map-cluster-popup__case-classif map-cluster-popup__case-classif--' + c.case_classification;
-
       html += '<div class="map-cluster-popup__case">';
 
-      html += '<div class="map-cluster-popup__case-title">';
-
-      html += '<span class="' + classifCls + '">' + c.case_classification.toUpperCase() + '</span> ';
-
-      html += (c.status || 'Unclassified');
-
-      if (c.validation_status === 'pending') html += ' <span style="color:#f59e0b;font-size:.7rem;font-weight:600;">(pending)</span>';
-
-      html += '</div>';
-
-      html += '<div class="map-cluster-popup__case-meta">';
-
-      html += '<div><strong>Disease:</strong> ' + (c.syndrome_type || '—') + '</div>';
-
-      html += '<div><strong>Cases:</strong> ' + c.case_count + ' · <strong>Date:</strong> ' + c.report_date + '</div>';
-
-      if (c.epidemic_threshold_status) {
-
-        html += '<div><strong>Threshold:</strong> ' + c.epidemic_threshold_status.replace(/_/g, ' ') + '</div>';
-
-      }
-
-      html += '</div>';
-
-      html += buildMitigationBanner(c.mitigation_suggestions);
+      html += buildCasePopup(c);
 
       html += '</div>';
 

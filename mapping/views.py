@@ -7,7 +7,7 @@ from django.utils import timezone
 from datetime import timedelta
 from accounts.auth_utils import login_required
 from myapp.models import (
-    Barangay, User, SurveillanceReport, PatientCase,
+    Barangay, User, SurveillanceReport, PatientCase, RiskAssessment,
     SYMPTOM_CATEGORY_CHOICES, SYMPTOM_CATEGORY_CODES, BarangayEpidemicStatus,
 )
 from myapp.barangay_scope import (
@@ -221,7 +221,64 @@ def api_cases(request):
     if case_classif:
         base_qs = base_qs.filter(case_classification=case_classif)
 
-    rows = base_qs.select_related('barangay').order_by('-report_date')
+    rows = list(
+        base_qs.select_related('barangay', 'submitted_by', 'validated_by').order_by('-report_date')
+    )
+    report_ids = [r.id for r in rows]
+    latest_assessments = {}
+    if report_ids:
+        for ra in RiskAssessment.objects.filter(report_id__in=report_ids).order_by('report_id', '-created_at'):
+            if ra.report_id not in latest_assessments:
+                latest_assessments[ra.report_id] = ra
+
+    def _officer_name(user):
+        if not user:
+            return ''
+        return f'{user.first_name} {user.last_name}'.strip()
+
+    def _confirmed_by_name(admin):
+        if not admin:
+            return ''
+        name = f'{admin.first_name} {admin.last_name}'.strip()
+        return f'{name} (Admin)' if name else 'System Administrator (Admin)'
+
+    def _risk_display(assessment, report):
+        score = None
+        if assessment and assessment.anomaly_score is not None:
+            score = float(assessment.anomaly_score)
+            if score < 0:
+                score = max(0.0, min(1.0, (0.5 - score)))
+        elif assessment and assessment.risk_score is not None:
+            score = float(assessment.risk_score)
+            if score > 1.5:
+                score = score / 100.0
+        elif report.ml_anomaly_score is not None:
+            raw = float(report.ml_anomaly_score)
+            score = max(0.0, min(1.0, (0.5 - raw))) if raw <= 0.5 else min(1.0, raw)
+
+        level = ''
+        if assessment and assessment.risk_level:
+            level = assessment.risk_level.title()
+            if level.lower() == 'Low':
+                level = 'Moderate'
+        else:
+            classif = (report.case_classification or 'suspected').lower()
+            level = {'confirmed': 'Critical', 'probable': 'High', 'suspected': 'Moderate'}.get(classif, 'Moderate')
+
+        if score is not None:
+            return f'{score:.2f} — {level} Risk', score, level
+        return f'{level} Risk', None, level
+
+    def _recommendations_text(mitigation, recommended_action):
+        if recommended_action:
+            return recommended_action
+        if mitigation and mitigation.get('steps'):
+            parts = [s.get('action_text', '') for s in mitigation['steps'] if s.get('action_text')]
+            if parts:
+                return ' '.join(parts[:3])
+        return (
+            'Inspect standing water and conduct localized vector control within the 25m radius.'
+        )
 
     cases = []
     for r in rows:
@@ -234,20 +291,53 @@ def api_cases(request):
         weight = weight_map.get(r.case_classification, 0.25)
         heat_intensity = min(1.0, weight * (r.case_count / 3))
         mitigation = mitigation_suggestions_for_report(r)
+        assessment = latest_assessments.get(r.id)
+        risk_line, risk_score, risk_level = _risk_display(assessment, r)
+        officer = r.submitted_by
+        contact = ''
+        if officer:
+            contact = officer.contact_number or officer.email or ''
+        status_norm = (r.status or '').strip()
+        classif_norm = (r.case_classification or '').strip().lower()
+        confirmed_by = _confirmed_by_name(r.validated_by)
+        is_confirmed = (
+            status_norm == 'Confirmed'
+            or classif_norm == 'confirmed'
+            or bool(confirmed_by)
+        )
+        confirmed_date = (
+            r.confirmed_at.strftime('%Y-%m-%d') if r.confirmed_at else ''
+        )
+        onset = r.date_of_onset.strftime('%Y-%m-%d') if r.date_of_onset else ''
+        disease_label = (r.suspected_disease or r.syndrome_type or '').strip() or '—'
         cases.append({
             'id':                  r.id,
             'latitude':            float(r.latitude),
             'longitude':           float(r.longitude),
             'syndrome_type':       r.syndrome_type,
+            'suspected_disease':   disease_label,
             'status':              r.status,
             'case_count':          r.case_count,
             'case_classification': r.case_classification,
             'validation_status':   r.validation_status,
             'report_date':         r.report_date.strftime('%Y-%m-%d') if r.report_date else '',
+            'date_of_onset':       onset,
             'barangay_name':       r.barangay.barangay_name if r.barangay else 'Unknown',
             'heat_intensity':      heat_intensity,
             'epidemic_threshold_status': r.epidemic_threshold_status or '',
             'mitigation_suggestions': mitigation,
+            'officer_name':        _officer_name(officer),
+            'officer_contact':     contact,
+            'risk_score_line':     risk_line,
+            'risk_score':          risk_score,
+            'risk_level':          risk_level,
+            'recommendations':     _recommendations_text(
+                mitigation,
+                assessment.recommended_action if assessment else None,
+            ),
+            'confirmed_by':          confirmed_by,
+            'confirmed_date':      confirmed_date,
+            'is_confirmed':        is_confirmed,
         })
 
     return JsonResponse({'ok': True, 'cases': cases})
