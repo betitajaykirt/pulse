@@ -935,6 +935,48 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
+  function mapPopupDiseaseLine(c) {
+
+    var status = (c.status || '').trim();
+
+    if (status === 'Confirmed') {
+
+      var confirmedName = c.confirmed_disease || c.syndrome_type || c.suspected_disease || 'Unknown';
+
+      return confirmedName + ' (Lab Confirmed)';
+
+    }
+
+    if (status === 'Probable' || status === 'Suspected') {
+
+      if (c.ml_predicted_disease && c.ml_confidence_high) {
+
+        return c.ml_predicted_disease + ' (Probable - ML Suggested)';
+
+      }
+
+      return 'Inconclusive Syndromic Pattern';
+
+    }
+
+    if (c.ml_predicted_disease) {
+
+      return c.ml_predicted_disease;
+
+    }
+
+    if (c.suspected_disease || c.syndrome_type) {
+
+      return c.suspected_disease || c.syndrome_type;
+
+    }
+
+    return 'Inconclusive Syndromic Pattern';
+
+  }
+
+
+
   function buildCasePopup(c) {
 
     var isPending = c.validation_status === 'pending';
@@ -944,6 +986,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var classLabel = mapPopupClassificationLabel(c);
 
     var riskBadgeClass = mapPopupRiskBadgeClass(c);
+
+    var caseStatus = (c.status || '').trim();
 
     var displayDate = c.date_of_onset || c.report_date || '—';
 
@@ -967,7 +1011,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     html += '<div class="map-case-popup__section">';
 
-    html += '<div class="map-case-popup__row"><strong>Disease:</strong> ' + escapeMapPopupHtml(c.suspected_disease || c.syndrome_type) + '</div>';
+    html += '<div class="map-case-popup__row"><strong>Disease:</strong> ' + escapeMapPopupHtml(mapPopupDiseaseLine(c)) + '</div>';
 
     html += '<div class="map-case-popup__row"><strong>Barangay:</strong> ' + escapeMapPopupHtml(c.barangay_name) + '</div>';
 
@@ -1009,17 +1053,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
     html += '<div class="map-case-popup__row"><strong>Contact:</strong> ' + escapeMapPopupHtml(c.officer_contact || 'Not available') + '</div>';
 
-    if (c.is_confirmed && c.confirmed_by) {
+    if (caseStatus === 'Confirmed') {
 
-        html += '<div class="map-case-popup__row"><strong>Confirmed By:</strong> ' + escapeMapPopupHtml(c.confirmed_by) + '</div>';
-
-      }
-
-      if (c.is_confirmed && c.confirmed_date) {
+      if (c.confirmed_date) {
 
         html += '<div class="map-case-popup__row"><strong>Confirmed Date:</strong> ' + escapeMapPopupHtml(c.confirmed_date) + '</div>';
 
       }
+
+      html += '<div class="map-case-popup__row"><strong>Confirmed By:</strong> ' + escapeMapPopupHtml(c.confirmed_by || 'System Administrator') + '</div>';
+
+    }
 
     html += '</div>';
 

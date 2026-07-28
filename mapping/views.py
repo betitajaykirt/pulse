@@ -24,6 +24,52 @@ THRESHOLD_RISK_MAP = {
     'NORMAL': 'low',
 }
 
+_INCONCLUSIVE_DISEASE_LABELS = frozenset({
+    'inconclusive syndromic pattern',
+    'insufficient data for prediction',
+    'undetermined',
+    '',
+})
+
+
+def _is_inconclusive_disease_label(label):
+    return (label or '').strip().lower() in _INCONCLUSIVE_DISEASE_LABELS
+
+
+def _ml_predicted_disease(report):
+    for candidate in (report.suspected_disease, report.syndrome_type):
+        if candidate and not _is_inconclusive_disease_label(candidate):
+            return candidate.strip()
+    return ''
+
+
+def _confirmed_disease_name(report):
+    for candidate in (report.syndrome_type, report.suspected_disease):
+        if candidate and not _is_inconclusive_disease_label(candidate):
+            return candidate.strip()
+    return ''
+
+
+def _ml_confidence_high(report, ml_predicted):
+    if not ml_predicted:
+        return False
+    if (report.case_classification or '').lower() == 'probable':
+        return True
+    if report.suspected_disease and not _is_inconclusive_disease_label(report.suspected_disease):
+        return True
+    return False
+
+
+def _canonical_disease_for_actions(report, status_norm, ml_predicted, confirmed_name):
+    if status_norm == 'Confirmed' and confirmed_name:
+        return confirmed_name
+    if ml_predicted:
+        return ml_predicted
+    for candidate in (report.suspected_disease, report.syndrome_type):
+        if candidate and not _is_inconclusive_disease_label(candidate):
+            return candidate.strip()
+    return 'the reported illness'
+
 
 def _barangay_epidemic_summary(barangay_ids):
     """Return worst epidemic threshold status per barangay for map indicators."""
@@ -238,9 +284,9 @@ def api_cases(request):
 
     def _confirmed_by_name(admin):
         if not admin:
-            return ''
+            return 'System Administrator'
         name = f'{admin.first_name} {admin.last_name}'.strip()
-        return f'{name} (Admin)' if name else 'System Administrator (Admin)'
+        return name or 'System Administrator'
 
     def _risk_display(assessment, report):
         score = None
@@ -269,16 +315,24 @@ def api_cases(request):
             return f'{score:.2f} — {level} Risk', score, level
         return f'{level} Risk', None, level
 
-    def _recommendations_text(mitigation, recommended_action):
+    def _recommendations_text(mitigation, recommended_action, disease_name):
+        disease_name = (disease_name or 'the reported illness').strip()
+        intro = f'Initiate {disease_name} vector control protocols.'
+        fallback = (
+            f'{intro} Inspect standing water and conduct localized vector control within the 25m radius.'
+        )
         if recommended_action:
-            return recommended_action
+            if disease_name.lower() in recommended_action.lower():
+                return recommended_action
+            return f'{intro} {recommended_action}'
         if mitigation and mitigation.get('steps'):
             parts = [s.get('action_text', '') for s in mitigation['steps'] if s.get('action_text')]
             if parts:
-                return ' '.join(parts[:3])
-        return (
-            'Inspect standing water and conduct localized vector control within the 25m radius.'
-        )
+                base = ' '.join(parts[:3])
+                if disease_name.lower() in base.lower():
+                    return base
+                return f'{intro} {base}'
+        return fallback
 
     cases = []
     for r in rows:
@@ -303,19 +357,27 @@ def api_cases(request):
         is_confirmed = (
             status_norm == 'Confirmed'
             or classif_norm == 'confirmed'
-            or bool(confirmed_by)
+            or bool(r.validated_by)
         )
         confirmed_date = (
             r.confirmed_at.strftime('%Y-%m-%d') if r.confirmed_at else ''
         )
         onset = r.date_of_onset.strftime('%Y-%m-%d') if r.date_of_onset else ''
-        disease_label = (r.suspected_disease or r.syndrome_type or '').strip() or '—'
+        ml_predicted = _ml_predicted_disease(r)
+        confirmed_disease = _confirmed_disease_name(r) if status_norm == 'Confirmed' else ''
+        ml_high = _ml_confidence_high(r, ml_predicted)
+        action_disease = _canonical_disease_for_actions(
+            r, status_norm, ml_predicted, confirmed_disease,
+        )
         cases.append({
             'id':                  r.id,
             'latitude':            float(r.latitude),
             'longitude':           float(r.longitude),
             'syndrome_type':       r.syndrome_type,
-            'suspected_disease':   disease_label,
+            'suspected_disease':   (r.suspected_disease or '').strip(),
+            'confirmed_disease':   confirmed_disease,
+            'ml_predicted_disease': ml_predicted,
+            'ml_confidence_high':  ml_high,
             'status':              r.status,
             'case_count':          r.case_count,
             'case_classification': r.case_classification,
@@ -334,6 +396,7 @@ def api_cases(request):
             'recommendations':     _recommendations_text(
                 mitigation,
                 assessment.recommended_action if assessment else None,
+                action_disease,
             ),
             'confirmed_by':          confirmed_by,
             'confirmed_date':      confirmed_date,
