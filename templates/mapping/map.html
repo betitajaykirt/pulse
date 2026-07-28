@@ -335,12 +335,69 @@ document.addEventListener('DOMContentLoaded', function () {
 
   var clusterSvgRenderer = L.svg({ pane: 'cluster-pane', padding: 0.5 });
 
-  var CLUSTER_CIRCLE_PATH = Object.freeze({
-    color: '#dc2626',
-    fillColor: '#ef4444',
-    fillOpacity: 0.4,
-    weight: 3,
-  });
+  var CLASSIF_RANK = { confirmed: 3, probable: 2, suspected: 1 };
+
+  function classificationRadiusStyle(classification) {
+
+    var level = classification || 'suspected';
+
+    if (level === 'confirmed') {
+
+      return { color: '#a855f7', fillColor: '#d8b4fe', fillOpacity: 0.35, weight: 2 };
+
+    }
+
+    if (level === 'probable') {
+
+      return { color: '#ef4444', fillColor: '#fca5a5', fillOpacity: 0.35, weight: 2 };
+
+    }
+
+    return { color: '#f59e0b', fillColor: '#fde68a', fillOpacity: 0.35, weight: 2 };
+
+  }
+
+  function casePinAppearance(c) {
+
+    var isPending = c.validation_status === 'pending';
+
+    var classification = c.case_classification || 'suspected';
+
+    var fillColor = classification === 'confirmed' ? '#a855f7'
+
+      : classification === 'probable' ? '#ef4444' : '#f59e0b';
+
+    var radius = classification === 'confirmed' ? 10
+
+      : classification === 'probable' ? 8 : 6;
+
+    return {
+
+      isPending: isPending,
+
+      fillColor: fillColor,
+
+      radius: radius,
+
+      classification: classification,
+
+    };
+
+  }
+
+  function worstCaseClassification(cases) {
+
+    if (!cases || !cases.length) return 'suspected';
+
+    return cases.reduce(function (best, c) {
+
+      var cl = c.case_classification || 'suspected';
+
+      return (CLASSIF_RANK[cl] || 0) > (CLASSIF_RANK[best] || 0) ? cl : best;
+
+    }, cases[0].case_classification || 'suspected');
+
+  }
 
 
 
@@ -408,6 +465,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
       var lng = cluster.lng;
 
+      var radiusStyle = classificationRadiusStyle(worstCaseClassification(cluster.cases));
+
       console.log('Rendering 25m circle at:', lat, lng, 'Total clusters:', clusterModels.length);
 
 
@@ -416,13 +475,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
         radius: 25,
 
-        color: '#dc2626',
+        color: radiusStyle.color,
 
-        fillColor: '#ef4444',
+        fillColor: radiusStyle.fillColor,
 
-        fillOpacity: 0.4,
+        fillOpacity: radiusStyle.fillOpacity,
 
-        weight: 3,
+        weight: radiusStyle.weight,
 
         pane: 'cluster-pane',
 
@@ -924,34 +983,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Leaflet L.circle uses radius in meters (geographic), not screen pixels.
     const CLUSTER_RADIUS_M = 25;
-
-
-
-    function casePinAppearance(c) {
-
-      var isPending = c.validation_status === 'pending';
-
-      var classification = c.case_classification || 'suspected';
-
-      var fillColor = classification === 'confirmed' ? '#7c3aed'
-
-        : classification === 'probable' ? '#ef4444' : '#f59e0b';
-
-      var radius = classification === 'confirmed' ? 10
-
-        : classification === 'probable' ? 8 : 6;
-
-      return {
-
-        isPending: isPending,
-
-        fillColor: fillColor,
-
-        radius: radius,
-
-      };
-
-    }
 
 
 
