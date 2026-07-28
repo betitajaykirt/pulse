@@ -264,24 +264,31 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
+  var MAP_ZOOM = Object.freeze({ min: 1, max: 20 });
+  var TILE_ZOOM = Object.freeze({ maxNative: 18, max: 20 });
+
   var map = L.map('map', {
     preferCanvas: false,
     zoomControl: true,
     attributionControl: true,
+    minZoom: MAP_ZOOM.min,
+    maxZoom: MAP_ZOOM.max,
   }).setView([10.5389, 122.8366], 13);
 
   var MAP_VIEW = Object.freeze({ center: [10.5389, 122.8366], zoom: 13 });
 
   var streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    maxZoom: 19,
+    maxNativeZoom: TILE_ZOOM.maxNative,
+    maxZoom: TILE_ZOOM.max,
   });
 
   var satelliteLayer = L.tileLayer(
     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     {
       attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
-      maxZoom: 19,
+      maxNativeZoom: TILE_ZOOM.maxNative,
+      maxZoom: TILE_ZOOM.max,
     }
   );
 
@@ -782,6 +789,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const CLASSIF_RANK = { confirmed: 3, probable: 2, suspected: 1 };
 
+    // Leaflet L.circle uses radius in meters (geographic), not screen pixels.
     const CLUSTER_RADIUS_M = 25;
 
 
@@ -1044,6 +1052,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
           interactive: false,
 
+          bubblingMouseEvents: false,
+
           fillColor: clusterAppearance.fillColor,
 
           color: clusterAppearance.fillColor,
@@ -1055,6 +1065,8 @@ document.addEventListener('DOMContentLoaded', function () {
           fillOpacity: anyPending ? 0.08 : 0.18,
 
           dashArray: anyPending ? '6 4' : null,
+
+          smoothFactor: 1,
 
         })
 
