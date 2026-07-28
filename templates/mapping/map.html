@@ -268,7 +268,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var TILE_ZOOM = Object.freeze({ maxNative: 18, max: 20 });
 
   var map = L.map('map', {
-    preferCanvas: false,
+    preferCanvas: true,
     zoomControl: true,
     attributionControl: true,
     minZoom: MAP_ZOOM.min,
@@ -324,6 +324,36 @@ document.addEventListener('DOMContentLoaded', function () {
     map.getPane('casePinsPane').style.zIndex = 450;
 
     map.getPane('casePinsPane').style.pointerEvents = 'auto';
+
+  }
+
+  var casePinsRenderer = L.canvas({ pane: 'casePinsPane', padding: 0.5 });
+
+
+
+  function isValidLatLng(lat, lng) {
+
+    return Number.isFinite(lat) && Number.isFinite(lng)
+
+      && lat >= -90 && lat <= 90
+
+      && lng >= -180 && lng <= 180;
+
+  }
+
+
+
+  function normalizeLatLngPair(coords) {
+
+    if (!coords || coords.length < 2) return null;
+
+    var lat = parseFloat(coords[0]);
+
+    var lng = parseFloat(coords[1]);
+
+    if (!isValidLatLng(lat, lng)) return null;
+
+    return [lat, lng];
 
   }
 
@@ -846,13 +876,55 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
+    function addClusterRadiusCircle(centerLatLng, pathOptions, tooltipHtml) {
+
+      var ll = normalizeLatLngPair(centerLatLng);
+
+      if (!ll) return null;
+
+
+
+      return L.circle(ll, {
+
+        pane: 'casePinsPane',
+
+        renderer: casePinsRenderer,
+
+        radius: 25,
+
+        interactive: false,
+
+        bubblingMouseEvents: false,
+
+        color: pathOptions.color,
+
+        fillColor: pathOptions.fillColor,
+
+        fillOpacity: pathOptions.fillOpacity,
+
+        weight: pathOptions.weight,
+
+        opacity: pathOptions.opacity,
+
+        dashArray: pathOptions.dashArray || null,
+
+      })
+
+        .bindTooltip(tooltipHtml, { sticky: true, direction: 'top', className: 'hotspot-tip' })
+
+        .addTo(casePinsLayer);
+
+    }
+
+
+
     function addCasePin(c) {
 
       var lat = parseFloat(c.latitude);
 
       var lon = parseFloat(c.longitude);
 
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+      if (!isValidLatLng(lat, lon)) return;
 
       var ll = [lat, lon];
 
@@ -992,11 +1064,41 @@ document.addEventListener('DOMContentLoaded', function () {
 
         });
 
-        var centroid = validCount
+        var centroidLat = validCount ? (sumLat / validCount) : NaN;
 
-          ? [sumLat / validCount, sumLon / validCount]
+        var centroidLng = validCount ? (sumLon / validCount) : NaN;
 
-          : [parseFloat(group[0].latitude), parseFloat(group[0].longitude)];
+        var centroid = isValidLatLng(centroidLat, centroidLng)
+
+          ? [centroidLat, centroidLng]
+
+          : null;
+
+
+
+        if (!centroid) {
+
+          for (var g = 0; g < group.length; g++) {
+
+            var fallbackLat = parseFloat(group[g].latitude);
+
+            var fallbackLng = parseFloat(group[g].longitude);
+
+            if (isValidLatLng(fallbackLat, fallbackLng)) {
+
+              centroid = [fallbackLat, fallbackLng];
+
+              break;
+
+            }
+
+          }
+
+        }
+
+
+
+        if (!centroid) return null;
 
         return { cases: group, centroid: centroid };
 
@@ -1006,7 +1108,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
-    const clusters = buildProximityClusters(caseList, CLUSTER_RADIUS_M);
+    const clusters = buildProximityClusters(caseList, CLUSTER_RADIUS_M).filter(Boolean);
 
 
 
@@ -1016,11 +1118,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
       var first = group[0];
 
-      var ll = cluster.centroid;
+      var ll = normalizeLatLngPair(cluster.centroid);
 
 
 
-      if (group.length >= 2) {
+      if (group.length >= 2 && ll) {
 
         var worst = group.reduce(function (best, c) {
 
@@ -1034,6 +1136,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         var totalCasesInGroup = group.reduce(function (s, c) { return s + c.case_count; }, 0);
 
+        var strokeColor = clusterAppearance.fillColor || '#ef4444';
+
 
 
         var clusterTooltip = '<b>' + group.length + ' reports in 25m cluster</b><br>';
@@ -1044,35 +1148,21 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
-        L.circle(ll, {
+        addClusterRadiusCircle(ll, {
 
-          pane: 'casePinsPane',
+          color: strokeColor,
 
-          radius: CLUSTER_RADIUS_M,
+          fillColor: strokeColor,
 
-          interactive: false,
-
-          bubblingMouseEvents: false,
-
-          fillColor: clusterAppearance.fillColor,
-
-          color: clusterAppearance.fillColor,
+          fillOpacity: anyPending ? 0.15 : 0.25,
 
           weight: anyPending ? 1 : 2,
 
           opacity: anyPending ? 0.35 : 0.6,
 
-          fillOpacity: anyPending ? 0.08 : 0.18,
-
           dashArray: anyPending ? '6 4' : null,
 
-          smoothFactor: 1,
-
-        })
-
-          .bindTooltip(clusterTooltip, { sticky: true, direction: 'top', className: 'hotspot-tip' })
-
-          .addTo(casePinsLayer);
+        }, clusterTooltip);
 
 
 
