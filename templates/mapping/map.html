@@ -307,7 +307,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* ── Custom panes for correct z-stacking ─────────────────────── */
 
-  /* Stacking order: Tiles → Heatmap (340) → Boundaries (350) → Pins (450) → Cluster circles (700) */
+  /* Stacking order: Tiles → Heatmap (340) → Boundaries (350) → Cluster circles (650) → Pins (750) */
 
   if (!map.getPane('heatmapPane')) {
 
@@ -317,20 +317,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
   }
 
-  if (!map.getPane('casePinsPane')) {
-
-    map.createPane('casePinsPane');
-
-    map.getPane('casePinsPane').style.zIndex = 450;
-
-    map.getPane('casePinsPane').style.pointerEvents = 'auto';
-
-  }
-
   if (!map.getPane('cluster-pane')) {
     map.createPane('cluster-pane');
-    map.getPane('cluster-pane').style.zIndex = '700';
+    map.getPane('cluster-pane').style.zIndex = '650';
     map.getPane('cluster-pane').style.pointerEvents = 'none';
+  }
+
+  if (!map.getPane('pins-pane')) {
+    map.createPane('pins-pane');
+    map.getPane('pins-pane').style.zIndex = '750';
+    map.getPane('pins-pane').style.pointerEvents = 'auto';
   }
 
   var clusterSvgRenderer = L.svg({ pane: 'cluster-pane', padding: 0.5 });
@@ -1028,7 +1024,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
       L.circleMarker(ll, {
 
-        pane: 'casePinsPane',
+        pane: 'pins-pane',
 
         radius: appearance.radius,
 
@@ -1224,7 +1220,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         L.marker(ll, {
 
-          pane: 'casePinsPane',
+          pane: 'pins-pane',
 
           interactive: false,
 
