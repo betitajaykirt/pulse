@@ -763,59 +763,223 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const CLASSIF_RANK = { confirmed: 3, probable: 2, suspected: 1 };
 
-    const clusters = [];
+    const CLUSTER_RADIUS_M = 25;
 
-    caseList.forEach(function (c) {
 
-      var cLat = parseFloat(c.latitude);
 
-      var cLon = parseFloat(c.longitude);
+    function casePinAppearance(c) {
 
-      var added = false;
+      var isPending = c.validation_status === 'pending';
 
-      for (var i = 0; i < clusters.length; i++) {
+      var classification = c.case_classification || 'suspected';
 
-        var cluster = clusters[i];
+      var fillColor = classification === 'confirmed' ? '#7c3aed'
 
-        var dist = L.latLng(cLat, cLon).distanceTo(L.latLng(cluster.centroid[0], cluster.centroid[1]));
+        : classification === 'probable' ? '#ef4444' : '#f59e0b';
 
-        if (dist <= 25) {
+      var radius = classification === 'confirmed' ? 10
 
-          cluster.cases.push(c);
+        : classification === 'probable' ? 8 : 6;
 
-          var sumLat = 0, sumLon = 0;
+      return {
 
-          cluster.cases.forEach(function (cc) {
+        isPending: isPending,
 
-            sumLat += parseFloat(cc.latitude);
+        fillColor: fillColor,
 
-            sumLon += parseFloat(cc.longitude);
+        radius: radius,
 
-          });
+      };
 
-          cluster.centroid = [sumLat / cluster.cases.length, sumLon / cluster.cases.length];
+    }
 
-          added = true;
 
-          break;
+
+    function buildCaseTooltip(c) {
+
+      var appearance = casePinAppearance(c);
+
+      var html = '<b>Syndromic report</b><br>';
+
+      html += 'Cases: <b>' + (c.case_count || 0) + '</b><br>';
+
+      html += 'Classification: <b>' + (c.case_classification || 'suspected').toUpperCase() + '</b><br>';
+
+      html += 'Barangay: ' + (c.barangay_name || '—');
+
+      if (appearance.isPending) {
+
+        html += '<br><span style="color:#f59e0b;font-size:.75rem;font-weight:600;">Pending validation</span>';
+
+      }
+
+      return html;
+
+    }
+
+
+
+    function addCasePin(c) {
+
+      var lat = parseFloat(c.latitude);
+
+      var lon = parseFloat(c.longitude);
+
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+      var ll = [lat, lon];
+
+      var appearance = casePinAppearance(c);
+
+      var popupHtml = buildCasePopup(c);
+
+
+
+      L.circleMarker(ll, {
+
+        pane: 'casePinsPane',
+
+        radius: appearance.radius,
+
+        fillColor: appearance.fillColor,
+
+        color: '#fff',
+
+        weight: 2,
+
+        fillOpacity: appearance.isPending ? 0.5 : 0.9,
+
+        opacity: 1,
+
+      })
+
+        .bindTooltip(buildCaseTooltip(c), { sticky: true, direction: 'top', className: 'hotspot-tip' })
+
+        .bindPopup(popupHtml, { maxWidth: 380, className: 'map-case-popup-wrap' })
+
+        .addTo(casePinsLayer);
+
+    }
+
+
+
+    function buildProximityClusters(cases, thresholdM) {
+
+      if (!cases.length) return [];
+
+      var parent = cases.map(function (_, idx) { return idx; });
+
+
+
+      function find(idx) {
+
+        while (parent[idx] !== idx) {
+
+          parent[idx] = parent[parent[idx]];
+
+          idx = parent[idx];
+
+        }
+
+        return idx;
+
+      }
+
+
+
+      function union(a, b) {
+
+        var rootA = find(a);
+
+        var rootB = find(b);
+
+        if (rootA !== rootB) parent[rootB] = rootA;
+
+      }
+
+
+
+      for (var i = 0; i < cases.length; i++) {
+
+        var latA = parseFloat(cases[i].latitude);
+
+        var lonA = parseFloat(cases[i].longitude);
+
+        if (!Number.isFinite(latA) || !Number.isFinite(lonA)) continue;
+
+        for (var j = i + 1; j < cases.length; j++) {
+
+          var latB = parseFloat(cases[j].latitude);
+
+          var lonB = parseFloat(cases[j].longitude);
+
+          if (!Number.isFinite(latB) || !Number.isFinite(lonB)) continue;
+
+          var dist = L.latLng(latA, lonA).distanceTo(L.latLng(latB, lonB));
+
+          if (dist <= thresholdM) union(i, j);
 
         }
 
       }
 
-      if (!added) {
 
-        clusters.push({
 
-          cases: [c],
+      var groups = {};
 
-          centroid: [cLat, cLon]
+      cases.forEach(function (c, idx) {
+
+        var root = find(idx);
+
+        if (!groups[root]) groups[root] = [];
+
+        groups[root].push(c);
+
+      });
+
+
+
+      return Object.keys(groups).map(function (key) {
+
+        var group = groups[key];
+
+        var sumLat = 0;
+
+        var sumLon = 0;
+
+        var validCount = 0;
+
+        group.forEach(function (c) {
+
+          var lat = parseFloat(c.latitude);
+
+          var lon = parseFloat(c.longitude);
+
+          if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+          sumLat += lat;
+
+          sumLon += lon;
+
+          validCount += 1;
 
         });
 
-      }
+        var centroid = validCount
 
-    });
+          ? [sumLat / validCount, sumLon / validCount]
+
+          : [parseFloat(group[0].latitude), parseFloat(group[0].longitude)];
+
+        return { cases: group, centroid: centroid };
+
+      });
+
+    }
+
+
+
+    const clusters = buildProximityClusters(caseList, CLUSTER_RADIUS_M);
 
 
 
@@ -829,111 +993,57 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
-      var worst = group.reduce(function (best, c) {
+      if (group.length >= 2) {
 
-        return (CLASSIF_RANK[c.case_classification] || 0) > (CLASSIF_RANK[best.case_classification] || 0) ? c : best;
+        var worst = group.reduce(function (best, c) {
 
-      }, first);
+          return (CLASSIF_RANK[c.case_classification] || 0) > (CLASSIF_RANK[best.case_classification] || 0) ? c : best;
 
-      var pc = worst.case_classification === 'confirmed' ? '#7c3aed'
+        }, first);
 
-             : worst.case_classification === 'probable'  ? '#ef4444' : '#f59e0b';
+        var clusterAppearance = casePinAppearance(worst);
 
-      var ps = worst.case_classification === 'confirmed' ? 10
+        var anyPending = group.some(function (c) { return c.validation_status === 'pending'; });
 
-             : worst.case_classification === 'probable'  ? 8 : 6;
-
-
-
-      var anyPending = group.some(function (c) { return c.validation_status === 'pending'; });
-
-      var totalCasesInGroup = group.reduce(function (s, c) { return s + c.case_count; }, 0);
+        var totalCasesInGroup = group.reduce(function (s, c) { return s + c.case_count; }, 0);
 
 
 
-      var tooltipHtml = '<b>' + (group.length > 1 ? group.length + ' reports' : 'Syndromic report') + '</b><br>';
+        var clusterTooltip = '<b>' + group.length + ' reports in 25m cluster</b><br>';
 
-      tooltipHtml += 'Total cases: <b>' + totalCasesInGroup + '</b><br>';
+        clusterTooltip += 'Total cases: <b>' + totalCasesInGroup + '</b><br>';
 
-      tooltipHtml += 'Classification: <b>' + worst.case_classification.toUpperCase() + '</b><br>';
-
-      tooltipHtml += 'Barangay: ' + first.barangay_name;
-
-      if (anyPending) tooltipHtml += '<br><span style="color:#f59e0b;font-size:.75rem;font-weight:600;">Contains pending reports</span>';
+        clusterTooltip += 'Barangay: ' + (first.barangay_name || '—');
 
 
 
-      var popupHtml, popupClass;
+        L.circle(ll, {
 
-      if (group.length === 1) {
+          pane: 'casePinsPane',
 
-        popupHtml = buildCasePopup(first);
+          radius: CLUSTER_RADIUS_M,
 
-        popupClass = 'map-case-popup-wrap';
+          interactive: false,
 
-      } else {
+          fillColor: clusterAppearance.fillColor,
 
-        popupHtml = buildClusterPopup(group);
+          color: clusterAppearance.fillColor,
 
-        popupClass = 'map-cluster-popup-wrap';
+          weight: anyPending ? 1 : 2,
 
-      }
+          opacity: anyPending ? 0.35 : 0.6,
 
+          fillOpacity: anyPending ? 0.08 : 0.18,
 
+          dashArray: anyPending ? '6 4' : null,
 
-      var hotspotR = 25;
+        })
 
-      L.circle(ll, {
+          .bindTooltip(clusterTooltip, { sticky: true, direction: 'top', className: 'hotspot-tip' })
 
-        pane: 'casePinsPane',
-
-        radius: hotspotR,
-
-        fillColor: pc,
-
-        color: pc,
-
-        weight: anyPending ? 1 : 2,
-
-        opacity: anyPending ? 0.35 : 0.6,
-
-        fillOpacity: anyPending ? 0.08 : 0.18,
-
-        dashArray: anyPending ? '6 4' : null
-
-      })
-
-        .bindTooltip(tooltipHtml, { sticky: true, direction: 'top', className: 'hotspot-tip' })
-
-        .addTo(casePinsLayer);
+          .addTo(casePinsLayer);
 
 
-
-      L.circleMarker(ll, {
-
-        pane: 'casePinsPane',
-
-        radius: group.length > 1 ? Math.min(ps + 3, 14) : ps,
-
-        fillColor: pc,
-
-        color: '#fff',
-
-        weight: 2,
-
-        fillOpacity: anyPending ? 0.5 : 0.9,
-
-      })
-
-        .bindTooltip(tooltipHtml, { sticky: true, direction: 'top', className: 'hotspot-tip' })
-
-        .bindPopup(popupHtml, { maxWidth: 380, className: popupClass })
-
-        .addTo(casePinsLayer);
-
-
-
-      if (group.length > 1) {
 
         L.marker(ll, {
 
@@ -956,6 +1066,14 @@ document.addEventListener('DOMContentLoaded', function () {
         }).addTo(casePinsLayer);
 
       }
+
+
+
+      group.forEach(function (c) {
+
+        addCasePin(c);
+
+      });
 
     });
 
