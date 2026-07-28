@@ -307,7 +307,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* ── Custom panes for correct z-stacking ─────────────────────── */
 
-  /* Stacking order: Tiles → Heatmap (340) → Boundaries (350) → Pins (450) → Cluster circles (650) */
+  /* Stacking order: Tiles → Heatmap (340) → Boundaries (350) → Pins (450) → Cluster circles (700) */
 
   if (!map.getPane('heatmapPane')) {
 
@@ -328,13 +328,9 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   if (!map.getPane('cluster-pane')) {
-
     map.createPane('cluster-pane');
-
-    map.getPane('cluster-pane').style.zIndex = 650;
-
+    map.getPane('cluster-pane').style.zIndex = '700';
     map.getPane('cluster-pane').style.pointerEvents = 'none';
-
   }
 
   var clusterSvgRenderer = L.svg({ pane: 'cluster-pane', padding: 0.5 });
@@ -342,7 +338,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var CLUSTER_CIRCLE_PATH = Object.freeze({
     color: '#dc2626',
     fillColor: '#ef4444',
-    fillOpacity: 0.4,
+    fillOpacity: 0.5,
     weight: 3,
   });
 
@@ -408,33 +404,45 @@ document.addEventListener('DOMContentLoaded', function () {
 
       if (!isValidLatLng(cluster.lat, cluster.lng)) return;
 
+      var lat = cluster.lat;
+
+      var lng = cluster.lng;
+
+      console.log('Rendering 25m circle at:', lat, lng, 'Total clusters:', clusterModels.length);
 
 
-      L.circle([cluster.lat, cluster.lng], {
 
-        pane: 'cluster-pane',
-
-        renderer: clusterSvgRenderer,
+      L.circle([lat, lng], {
 
         radius: 25,
 
+        color: '#dc2626',
+
+        fillColor: '#ef4444',
+
+        fillOpacity: 0.5,
+
+        weight: 3,
+
+        pane: 'cluster-pane',
+
         interactive: false,
 
+        renderer: clusterSvgRenderer,
+
         bubblingMouseEvents: false,
-
-        color: CLUSTER_CIRCLE_PATH.color,
-
-        fillColor: CLUSTER_CIRCLE_PATH.fillColor,
-
-        fillOpacity: CLUSTER_CIRCLE_PATH.fillOpacity,
-
-        weight: CLUSTER_CIRCLE_PATH.weight,
 
         opacity: 1,
 
       }).addTo(clusterCirclesLayer);
 
     });
+
+    if (clusterCirclesLayer.getLayers().length) {
+
+      clusterCirclesLayer.bringToFront();
+
+    }
 
   }
 
