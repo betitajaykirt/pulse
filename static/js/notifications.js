@@ -1,8 +1,7 @@
 (function() {
     const NOTIFICATIONS_API_URL = '/dashboard/api/notifications/';
-    const POLL_INTERVAL = 15000; // 15 seconds
-    
-    // Keep track of queued IDs in runtime only so they don't double-queue on polling
+    const POLL_INTERVAL = 15000;
+
     let notifiedIds = new Set();
     let modalQueue = [];
     let isModalActive = false;
@@ -15,7 +14,6 @@
 
     if (!bellBtn) return;
 
-    // Toggle dropdown
     bellBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const isExpanded = bellBtn.getAttribute('aria-expanded') === 'true';
@@ -23,7 +21,6 @@
         dropdown.classList.toggle('show');
     });
 
-    // Close dropdown on click outside
     document.addEventListener('click', (e) => {
         if (!bellBtn.contains(e.target) && !dropdown.contains(e.target)) {
             bellBtn.setAttribute('aria-expanded', 'false');
@@ -31,71 +28,137 @@
         }
     });
 
+    function escapeHtml(value) {
+        if (value == null) return '';
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
     function getSeverityClass(severity) {
-        const s = severity.toLowerCase();
+        const s = (severity || '').toLowerCase();
         if (s.includes('critical') || s.includes('outbreak')) return 'critical';
         if (s.includes('high') || s.includes('probable')) return 'high';
         return 'moderate';
     }
 
+    function getAlertTitle(notif) {
+        const s = (notif.severity_level || '').toLowerCase();
+        if (s.includes('critical')) return 'CRITICAL OUTBREAK ALERT';
+        if (s.includes('high')) return 'HIGH RISK ANOMALY DETECTED';
+        return 'MODERATE SURVEILLANCE ALERT';
+    }
+
+    function formatRiskScoreLine(notif) {
+        const parts = [];
+        if (notif.final_risk_score != null) {
+            parts.push(`Risk Score: ${Number(notif.final_risk_score).toFixed(2)}`);
+        }
+        if (notif.anomaly_score != null) {
+            parts.push(`Anomaly: ${Number(notif.anomaly_score).toFixed(2)}`);
+        }
+        const label = (notif.severity_level || 'Moderate').replace(/_/g, ' ');
+        if (!parts.length) {
+            return `${label} — Surveillance alert`;
+        }
+        return `${parts.join(' · ')} — ${label}`;
+    }
+
+    function formatLocation(notif) {
+        const barangay = notif.barangay_name ? `Barangay ${notif.barangay_name}` : 'Barangay —';
+        const street = (notif.street_address || '').trim();
+        return street ? `${barangay}, ${street}` : barangay;
+    }
+
+    function formatOfficer(notif) {
+        if (notif.officer_name) {
+            return notif.officer_name;
+        }
+        return 'Unassigned / pending routing';
+    }
+
+    function formatContact(notif) {
+        if (notif.officer_contact) {
+            return notif.officer_contact;
+        }
+        if (notif.officer_email) {
+            return notif.officer_email;
+        }
+        return 'No contact on file';
+    }
+
     function createToastUI(notif) {
         const severityClass = getSeverityClass(notif.severity_level);
         const toast = document.createElement('div');
-        toast.className = `toast toast-${severityClass}`;
-        
-        toast.innerHTML = `
-            <div class="toast-header" style="padding: 16px; font-size: 1.1rem;">
-                <span class="toast-badge" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">${notif.severity_level.toUpperCase()} OUTBREAK ALERT</span>
-                <button class="toast-close">&times;</button>
-            </div>
-            <div class="toast-body" style="padding: 20px;">
-                <h4 style="font-size: 1.25rem; margin-bottom: 12px;">${notif.disease} Alert - ${notif.barangay_name}</h4>
-                <p style="font-size: 1.05rem;"><strong>${notif.spatial_metric || 'Spatial risk detected'}</strong></p>
-                <p style="font-size: 1rem; margin-bottom: 20px;">${notif.temporal_metric || 'Recent surge detected'}</p>
-                
-                ${modalQueue.length > 0 ? `<div style="font-size: 0.85rem; color: #666; margin-bottom: 16px;">+ ${modalQueue.length} more unread alert(s) queued</div>` : ''}
+        toast.className = `toast toast-${severityClass} pulse-alert-card`;
 
-                <div class="toast-actions" style="display: flex; gap: 12px; justify-content: flex-end;">
-                    <button class="btn btn-secondary toast-dismiss-btn" style="padding: 0.6rem 1.2rem;">Dismiss</button>
-                    <a href="/dashboard/alerts/" class="btn btn-primary" style="padding: 0.6rem 1.2rem;">View Details</a>
+        const contactTel = (notif.officer_contact || '').replace(/\D/g, '');
+        const contactHref = contactTel ? `tel:${contactTel}` : (notif.officer_email ? `mailto:${notif.officer_email}` : '#');
+        const mapUrl = notif.map_url || `/map/?barangay=${encodeURIComponent(notif.barangay_name || '')}`;
+        const queuedNote = modalQueue.length > 0
+            ? `<p class="pulse-alert-card__queue">+ ${modalQueue.length} more unread alert(s) queued</p>`
+            : '';
+
+        toast.innerHTML = `
+            <div class="toast-header pulse-alert-card__header">
+                <div>
+                    <span class="toast-badge pulse-alert-card__classification">${escapeHtml(getAlertTitle(notif))}</span>
+                    <h3 class="pulse-alert-card__title">${escapeHtml(notif.disease || 'Syndromic')} surveillance event</h3>
+                </div>
+                <button type="button" class="toast-close" aria-label="Close alert">&times;</button>
+            </div>
+            <div class="toast-body pulse-alert-card__body">
+                <div class="pulse-alert-risk-badge pulse-alert-risk-badge--${severityClass}">
+                    ${escapeHtml(formatRiskScoreLine(notif))}
+                </div>
+                <dl class="pulse-alert-card__meta">
+                    <div><dt>Status</dt><dd>${escapeHtml(notif.case_status || 'Active')}</dd></div>
+                    <div><dt>Disease</dt><dd>${escapeHtml(notif.disease || '—')}</dd></div>
+                    <div><dt>Location</dt><dd>${escapeHtml(formatLocation(notif))}</dd></div>
+                    <div><dt>Officer</dt><dd>${escapeHtml(formatOfficer(notif))}</dd></div>
+                    <div><dt>Contact</dt><dd>${escapeHtml(formatContact(notif))}</dd></div>
+                </dl>
+                <div class="pulse-alert-card__recommendations">
+                    <strong>Recommended actions</strong>
+                    <p>${escapeHtml(notif.recommendations || 'Review case details and coordinate barangay response.')}</p>
+                </div>
+                ${queuedNote}
+                <div class="toast-actions pulse-alert-card__actions">
+                    <button type="button" class="btn btn-secondary toast-dismiss-btn">Acknowledge</button>
+                    ${contactTel || notif.officer_email ? `<a href="${escapeHtml(contactHref)}" class="btn btn-outline pulse-alert-card__contact-btn">Contact Officer</a>` : ''}
+                    <a href="${escapeHtml(mapUrl)}" class="btn btn-primary pulse-alert-card__map-btn">View on Map</a>
                 </div>
             </div>
         `;
 
         toastContainer.appendChild(toast);
-        
-        // Trigger animation
         setTimeout(() => toast.classList.add('show'), 10);
 
-        const closeHandler = () => {
+        const acknowledge = () => {
             markAsRead(notif.id).finally(() => {
                 removeToast(toast);
                 setTimeout(showNextModal, 300);
             });
         };
 
-        const viewDetailsHandler = (e) => {
-            e.preventDefault();
-            markAsRead(notif.id).finally(() => {
-                window.location.href = '/dashboard/alerts/';
-            });
-        };
-
-        toast.querySelector('.toast-close').addEventListener('click', closeHandler);
-        toast.querySelector('.toast-dismiss-btn').addEventListener('click', closeHandler);
-        toast.querySelector('a.btn-primary').addEventListener('click', viewDetailsHandler);
+        toast.querySelector('.toast-close').addEventListener('click', acknowledge);
+        toast.querySelector('.toast-dismiss-btn').addEventListener('click', acknowledge);
+        toast.querySelector('.pulse-alert-card__map-btn').addEventListener('click', () => {
+            markAsRead(notif.id);
+        });
     }
 
     function queueToast(notif) {
         modalQueue.push(notif);
-        // Sort highest severity first
         modalQueue.sort((a, b) => {
             const sA = getSeverityClass(a.severity_level);
             const sB = getSeverityClass(b.severity_level);
-            const weight = { 'critical': 3, 'high': 2, 'moderate': 1 };
+            const weight = { critical: 3, high: 2, moderate: 1 };
             return (weight[sB] || 0) - (weight[sA] || 0);
         });
-        
+
         if (!isModalActive) {
             showNextModal();
         }
@@ -123,14 +186,14 @@
         const item = document.createElement('div');
         item.className = `notification-item ${notif.is_read ? 'read' : 'unread'}`;
         item.dataset.id = notif.id;
-        
+
         item.innerHTML = `
             <div class="notification-item-icon bg-${severityClass}">
                 <i data-lucide="alert-triangle" class="lucide-icon lucide-icon--sm"></i>
             </div>
             <div class="notification-item-content">
-                <div class="notification-item-title">${notif.disease} in ${notif.barangay_name}</div>
-                <div class="notification-item-desc">${notif.spatial_metric || ''}</div>
+                <div class="notification-item-title">${escapeHtml(notif.disease)} in ${escapeHtml(notif.barangay_name)}</div>
+                <div class="notification-item-desc">${escapeHtml(formatRiskScoreLine(notif))}</div>
                 <div class="notification-item-time">${new Date(notif.created_at).toLocaleString()}</div>
             </div>
         `;
@@ -139,7 +202,7 @@
             if (!notif.is_read) {
                 markAsRead(notif.id, item);
             }
-            window.location.href = '/dashboard/alerts/';
+            window.location.href = notif.map_url || '/dashboard/alerts/';
         });
 
         return item;
@@ -159,8 +222,7 @@
                 itemElement.classList.remove('unread');
                 itemElement.classList.add('read');
             }
-            
-            // Decrease badge
+
             let currentCount = parseInt(badge.textContent) || 0;
             if (currentCount > 0) {
                 currentCount--;
@@ -177,9 +239,8 @@
             const res = await fetch(NOTIFICATIONS_API_URL);
             if (!res.ok) return;
             const data = await res.json();
-            
+
             if (data.ok) {
-                // Update Badge
                 if (data.unread_count > 0) {
                     badge.textContent = data.unread_count;
                     badge.style.display = 'flex';
@@ -187,40 +248,30 @@
                     badge.style.display = 'none';
                 }
 
-                // Update List
                 if (data.notifications.length === 0) {
                     listContainer.innerHTML = '<div class="notification-empty">No new alerts</div>';
                 } else {
                     listContainer.innerHTML = '';
                     data.notifications.forEach(notif => {
                         listContainer.appendChild(renderDropdownItem(notif));
-                        
-                        // Show toast if new
+
                         if (!notifiedIds.has(notif.id) && !notif.is_read) {
                             queueToast(notif);
                         }
                         notifiedIds.add(notif.id);
                     });
-                    
-                    // Note: We deliberately do NOT persist to localStorage.
-                    // If they refresh without dismissing, it will pop up again because is_read is false in the DB!
-                    
-                    // Re-initialize lucide icons for new elements
+
                     if (window.lucide) {
                         window.lucide.createIcons();
                     }
                 }
-
             }
         } catch (err) {
             console.error('Failed to fetch notifications:', err);
         }
     }
 
-    // Initial fetch
     fetchNotifications();
-    
-    // Poll
     setInterval(fetchNotifications, POLL_INTERVAL);
 
 })();

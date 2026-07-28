@@ -531,6 +531,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
   setTimeout(refreshMapSize, 500);
 
+  setTimeout(applyUrlCoordinateFocus, 600);
+
 
 
   let casePinsLayer = L.layerGroup().addTo(map);
@@ -627,6 +629,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var params = new URLSearchParams(window.location.search);
 
+    applyUrlCoordinateFocus();
+
     var barangayParam = params.get('barangay');
 
     if (!barangayParam || !boundaryApi) return;
@@ -656,6 +660,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
     boundaryApi.selectBarangay(barangayParam, { silent: true });
+
+  }
+
+
+
+  function applyUrlCoordinateFocus() {
+
+    var params = new URLSearchParams(window.location.search);
+
+    var lat = parseFloat(params.get('lat'));
+
+    var lng = parseFloat(params.get('lng'));
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+    map.setView([lat, lng], Math.max(map.getZoom(), 17));
 
   }
 

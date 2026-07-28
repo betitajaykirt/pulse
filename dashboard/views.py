@@ -1,6 +1,8 @@
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
+from django.urls import reverse
+from urllib.parse import urlencode
 from accounts.auth_utils import login_required
 from myapp.audit_utils import display_name_for_audit_log, display_name_for_system_log
 from myapp.models import (
@@ -221,11 +223,12 @@ def outbreak_thresholds_view(request):
 @require_GET
 def api_notifications(request):
     from dashboard.models import AppNotification, AppNotificationRead
-    
+    from myapp.models import RiskAssessment
+
     role = request.session.get('role')
     user_id = request.session.get('user_id')
     user_type = request.session.get('user_type', role)
-    
+
     if is_city_wide_role(role):
         notifications = AppNotification.objects.order_by('-created_at')[:20]
     elif role in BARANGAY_SCOPED_ROLES:
@@ -247,13 +250,72 @@ def api_notifications(request):
         user_type=user_type
     ).values_list('notification_id', flat=True))
 
-    data = []
-    unread_count = 0
-    for notif in notifications_list:
-        is_read = notif.id in read_notification_ids
-        if not is_read:
-            unread_count += 1
-        data.append({
+    def _notification_recommendations(notif, report=None):
+        if report:
+            assessment = RiskAssessment.objects.filter(report_id=report.id).order_by('-created_at').first()
+            if assessment and assessment.recommended_action:
+                return assessment.recommended_action
+        disease = notif.disease or 'the case'
+        sev = (notif.severity_level or '').lower()
+        if 'critical' in sev:
+            return (
+                f'Initiate 25m vector inspection for {disease}, check and eliminate standing water, '
+                'isolate probable cases, and notify the city health center immediately.'
+            )
+        if 'high' in sev:
+            return (
+                f'Conduct targeted 25m vector inspection, verify breeding sites, escalate to the '
+                f'surveillance officer, and update the {disease} line list.'
+            )
+        return (
+            f'Review syndromic indicators, document environmental risks, and schedule barangay '
+            f'follow-up for {disease}.'
+        )
+
+    def _resolve_context_report(notif):
+        qs = SurveillanceReport.objects.select_related('submitted_by', 'barangay').filter(
+            barangay__barangay_name__iexact=notif.barangay_name,
+        ).order_by('-report_date')
+        if notif.disease:
+            by_disease = qs.filter(syndrome_type__icontains=notif.disease.split()[0])
+            report = by_disease.first()
+            if report:
+                return report
+        return qs.first()
+
+    def _serialize_notification(notif, is_read):
+        report = _resolve_context_report(notif)
+        officer_name = ''
+        officer_contact = ''
+        officer_email = ''
+        case_status = 'Active'
+        street_address = ''
+        latitude = None
+        longitude = None
+
+        if report:
+            case_status = report.status or report.case_classification or 'Active'
+            street_address = (report.detailed_address or '').strip()
+            if report.latitude is not None:
+                latitude = float(report.latitude)
+            if report.longitude is not None:
+                longitude = float(report.longitude)
+            if report.submitted_by_id:
+                officer = report.submitted_by
+                officer_name = f'{officer.first_name} {officer.last_name}'.strip()
+                officer_contact = officer.contact_number or ''
+                officer_email = officer.email or ''
+
+        map_params = {'barangay': notif.barangay_name}
+        if latitude is not None and longitude is not None:
+            map_params['lat'] = latitude
+            map_params['lng'] = longitude
+        map_url = reverse('map_view') + '?' + urlencode(map_params)
+
+        final_risk = float(notif.final_risk_score) if notif.final_risk_score is not None else None
+        anomaly = float(notif.anomaly_score) if notif.anomaly_score is not None else None
+
+        return {
             'id': notif.id,
             'disease': notif.disease,
             'barangay_name': notif.barangay_name,
@@ -262,7 +324,26 @@ def api_notifications(request):
             'temporal_metric': notif.temporal_metric,
             'created_at': notif.created_at.isoformat(),
             'is_read': is_read,
-        })
+            'final_risk_score': final_risk,
+            'anomaly_score': anomaly,
+            'case_status': case_status,
+            'street_address': street_address,
+            'officer_name': officer_name,
+            'officer_contact': officer_contact,
+            'officer_email': officer_email,
+            'recommendations': _notification_recommendations(notif, report),
+            'latitude': latitude,
+            'longitude': longitude,
+            'map_url': map_url,
+        }
+
+    data = []
+    unread_count = 0
+    for notif in notifications_list:
+        is_read = notif.id in read_notification_ids
+        if not is_read:
+            unread_count += 1
+        data.append(_serialize_notification(notif, is_read))
 
     return JsonResponse({'ok': True, 'unread_count': unread_count, 'notifications': data})
 
