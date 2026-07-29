@@ -23,6 +23,7 @@ from myapp.barangay_scope import (
 from myapp.audit_utils import log_audit, log_system
 from .risk_service import evaluate_report_risk
 from .batch_service import save_batch_submission
+from .ml_display import predicted_disease_display
 from .threshold_service import process_confirmation_threshold_check
 from myapp.symptom_utils import build_symptom_groups_for_ui
 
@@ -124,7 +125,7 @@ def _process_batch_submission(request, locked_barangay=None):
         'report_ids': [r.id for r in reports],
         'message': (
             f'Successfully submitted {len(reports)} patient case(s). '
-            f'ML pipeline classified each as Probable pending lab confirmation.'
+            'ML predictions have been generated and logged into Case Monitoring.'
         ),
         'redirect': '/reports/my/',
     })
@@ -297,9 +298,13 @@ def _get_or_create_patient(barangay_id, full_name, sex, birthdate, address):
 def my_reports(request):
     uid = request.session['user_id']
     reports = SurveillanceReport.objects.filter(submitted_by_id=uid)
-    reports = barangay_queryset_filter(request, reports).select_related('barangay').annotate(
-        barangay_name=F('barangay__barangay_name')
-    ).order_by('-report_date')
+    reports = list(
+        barangay_queryset_filter(request, reports).select_related('barangay').annotate(
+            barangay_name=F('barangay__barangay_name')
+        ).order_by('-report_date')
+    )
+    for report in reports:
+        report.ml_prediction = predicted_disease_display(report)
     return render(request, 'reports/my_reports.html', {'reports': reports})
 
 
@@ -344,15 +349,19 @@ def case_records(request):
         )
         q &= Q(id__in=report_ids)
 
-    records = SurveillanceReport.objects.filter(q).select_related('barangay', 'submitted_by').annotate(
-        barangay_name=F('barangay__barangay_name'),
-        submitted_by_name=Concat(
-            F('submitted_by__first_name'),
-            Value(' '),
-            F('submitted_by__last_name'),
-            output_field=CharField()
-        )
-    ).order_by('-report_date')[:200]
+    records = list(
+        SurveillanceReport.objects.filter(q).select_related('barangay', 'submitted_by').annotate(
+            barangay_name=F('barangay__barangay_name'),
+            submitted_by_name=Concat(
+                F('submitted_by__first_name'),
+                Value(' '),
+                F('submitted_by__last_name'),
+                output_field=CharField()
+            )
+        ).order_by('-report_date')[:200]
+    )
+    for record in records:
+        record.ml_prediction = predicted_disease_display(record)
 
     if city_wide:
         barangays = Barangay.objects.all().order_by('barangay_name')

@@ -456,9 +456,69 @@ def train_and_classify(
     max_prob = float(proba[max_idx])
 
     if max_prob < confidence_threshold:
-        return low_confidence_label
+        disease_label = low_confidence_label
+    else:
+        disease_label = str(label_encoder.inverse_transform([max_idx])[0])
 
-    return str(label_encoder.inverse_transform([max_idx])[0])
+    return disease_label
+
+
+def train_and_classify_result(
+    train_data: pd.DataFrame,
+    incoming_patient: pd.DataFrame,
+    *,
+    random_state: int = 42,
+    confidence_threshold: float = DEFAULT_CLASSIFICATION_CONFIDENCE,
+    low_confidence_label: str = INCONCLUSIVE_SYNDROMIC_LABEL,
+) -> dict:
+    """
+    Like ``train_and_classify`` but returns the top Random Forest class,
+    final label (after confidence cutoff), and max class probability.
+    """
+    if train_data.empty:
+        raise ValueError("train_data must contain at least one labeled row.")
+    if TARGET_COLUMN not in train_data.columns:
+        raise ValueError(f"train_data must include a '{TARGET_COLUMN}' column.")
+
+    x_train = _prepare_feature_frame(train_data)
+    y_raw = train_data[TARGET_COLUMN].astype(str).str.strip()
+
+    label_encoder = LabelEncoder()
+    y_train = label_encoder.fit_transform(y_raw)
+
+    classifier = RandomForestClassifier(
+        n_estimators=300,
+        max_depth=None,
+        min_samples_leaf=2,
+        class_weight="balanced_subsample",
+        random_state=random_state,
+        n_jobs=-1,
+    )
+    classifier.fit(x_train, y_train)
+
+    if incoming_patient.empty:
+        return {
+            'disease_label': low_confidence_label,
+            'top_predicted_disease': '',
+            'classification_confidence': None,
+        }
+
+    x_infer = _prepare_feature_frame(incoming_patient.iloc[[0]])
+    proba = classifier.predict_proba(x_infer)[0]
+    max_idx = int(np.argmax(proba))
+    max_prob = float(proba[max_idx])
+    top_label = str(label_encoder.inverse_transform([max_idx])[0])
+
+    if max_prob < confidence_threshold:
+        disease_label = low_confidence_label
+    else:
+        disease_label = top_label
+
+    return {
+        'disease_label': disease_label,
+        'top_predicted_disease': top_label,
+        'classification_confidence': max_prob,
+    }
 
 
 # ---------------------------------------------------------------------------

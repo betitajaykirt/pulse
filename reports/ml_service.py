@@ -19,7 +19,7 @@ from ml_pipeline import (
     detect_anomalies,
     ensure_climate_columns,
     patient_case_to_feature_row,
-    train_and_classify,
+    train_and_classify_result,
 )
 from myapp.models import EnvironmentalData
 from reports.weather_service import FALLBACK_WEATHER
@@ -152,22 +152,31 @@ def analyze_patient_case(
 
     if symptom_count < MIN_SYMPTOMS_FOR_CLASSIFICATION:
         disease_label = INSUFFICIENT_DATA_LABEL
+        top_predicted = ''
+        classification_confidence = None
     else:
         try:
-            disease_label = train_and_classify(
+            clf = train_and_classify_result(
                 train_df,
                 incoming,
                 confidence_threshold=CLASSIFICATION_CONFIDENCE_THRESHOLD,
                 low_confidence_label=INCONCLUSIVE_SYNDROMIC_LABEL,
             )
+            disease_label = clf['disease_label']
+            top_predicted = clf.get('top_predicted_disease') or ''
+            classification_confidence = clf.get('classification_confidence')
         except Exception as exc:
             logger.exception('Random Forest classification failed: %s', exc)
             disease_label = 'Inconclusive Syndromic Pattern'
+            top_predicted = ''
+            classification_confidence = None
 
     return {
         'is_anomaly': is_anomaly,
         'anomaly_score': anomaly_score,
         'disease_label': disease_label,
+        'top_predicted_disease': top_predicted,
+        'classification_confidence': classification_confidence,
         'case_classification': _classification_from_label(disease_label),
         'symptom_count': symptom_count,
         'classification_confidence_threshold': CLASSIFICATION_CONFIDENCE_THRESHOLD,
@@ -196,6 +205,8 @@ def analyze_batch_cases(cases: List[dict], barangay_names: Optional[dict] = None
                 'is_anomaly': False,
                 'anomaly_score': 0.0,
                 'disease_label': 'Inconclusive Syndromic Pattern',
+                'top_predicted_disease': '',
+                'classification_confidence': None,
                 'case_classification': 'unassigned',
                 'symptom_count': _count_reported_symptoms(symptoms),
             })

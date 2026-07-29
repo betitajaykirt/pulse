@@ -91,7 +91,7 @@
     <div class="pulse-table-wrap table-wrapper">
       <table class="pulse-table">
         <thead>
-          <tr><th>#</th><th>Patient</th><th>Barangay</th><th>Disease</th><th>Onset</th><th>Reporter</th><th>Case Status</th><th>Validation</th><th>Actions</th></tr>
+          <tr><th>#</th><th>Patient</th><th>Barangay</th><th>Predicted Disease</th><th>Onset</th><th>Reporter</th><th>Status</th><th>Validation</th><th>Actions</th></tr>
         </thead>
         <tbody>
         {% if not records %}
@@ -111,10 +111,17 @@
               <strong>{{ r.patient_name|default:"Unknown Resident" }}</strong>
             </td>
             <td data-label="Barangay">{{ r.barangay_name|default:"—" }}</td>
-            <td data-label="Disease">{{ r.syndrome_type }}</td>
+            <td data-label="Predicted Disease">
+              <strong>{{ r.ml_prediction.primary }}</strong>
+              {% if r.ml_prediction.is_lab_confirmed %}
+                <div class="um-muted" style="font-size:.75rem;margin-top:.15rem;">Lab confirmed</div>
+              {% elif r.ml_prediction.confidence_pct %}
+                <div class="um-muted" style="font-size:.75rem;margin-top:.15rem;">{{ r.ml_prediction.confidence_pct }}% confidence</div>
+              {% endif %}
+            </td>
             <td data-label="Onset">{{ r.date_of_onset|default:"—" }}</td>
             <td data-label="Reporter">{{ r.submitted_by_name|default:"—" }}</td>
-            <td data-label="Case Status">
+            <td data-label="Status">
               <span class="pill-badge {% if r.status == 'Unclassified' or r.status == 'Pending ML Analysis' %}badge-muted{% elif r.status == 'Suspected' %}badge-suspected{% elif r.status == 'Confirmed' %}badge-confirmed{% elif r.status == 'Discarded' %}badge-discarded{% elif r.status == 'Probable' %}badge-probable{% else %}badge-muted{% endif %}">
                 {{ r.status }}
               </span>

@@ -37,7 +37,7 @@ def format_symptoms_for_remarks(symptoms):
 
 
 def build_remarks(purok_street, symptoms, age=None, sex=None, disease_label=None, is_anomaly=False,
-                  patient_name=None, detailed_address=None):
+                  patient_name=None, detailed_address=None, ml_top_prediction=None, ml_confidence=None):
 
     parts = []
 
@@ -64,6 +64,14 @@ def build_remarks(purok_street, symptoms, age=None, sex=None, disease_label=None
     if disease_label:
 
         parts.append(f'ML Classification: {disease_label}')
+
+    if ml_top_prediction:
+
+        parts.append(f'ML Top Prediction: {ml_top_prediction}')
+
+    if ml_confidence is not None:
+
+        parts.append(f'ML Confidence: {float(ml_confidence) * 100:.1f}%')
 
     if is_anomaly:
 
@@ -342,6 +350,10 @@ def save_batch_submission(*, payload, submitted_by_id, locked_barangay=None):
             patient_name=demographics['patient_name'],
 
             detailed_address=demographics['detailed_address'] or purok,
+
+            ml_top_prediction=ml.get('top_predicted_disease') or '',
+
+            ml_confidence=ml.get('classification_confidence'),
 
         )
 

@@ -15,6 +15,11 @@ from myapp.barangay_scope import (
     is_barangay_scoped_role,
 )
 from myapp.mitigation_utils import mitigation_suggestions_for_report
+from reports.ml_display import (
+    ml_top_prediction_for_report,
+    parse_ml_confidence,
+    predicted_disease_display,
+)
 
 
 THRESHOLD_RISK_MAP = {
@@ -363,7 +368,9 @@ def api_cases(request):
             r.confirmed_at.strftime('%Y-%m-%d') if r.confirmed_at else ''
         )
         onset = r.date_of_onset.strftime('%Y-%m-%d') if r.date_of_onset else ''
-        ml_predicted = _ml_predicted_disease(r)
+        ml_predicted = ml_top_prediction_for_report(r) or _ml_predicted_disease(r)
+        ml_confidence = parse_ml_confidence(r.remarks or '')
+        ml_display = predicted_disease_display(r)
         confirmed_disease = _confirmed_disease_name(r) if status_norm == 'Confirmed' else ''
         ml_high = _ml_confidence_high(r, ml_predicted)
         action_disease = _canonical_disease_for_actions(
@@ -371,12 +378,16 @@ def api_cases(request):
         )
         cases.append({
             'id':                  r.id,
+            'patient_name':        (r.patient_name or '').strip() or 'Unknown Resident',
             'latitude':            float(r.latitude),
             'longitude':           float(r.longitude),
             'syndrome_type':       r.syndrome_type,
             'suspected_disease':   (r.suspected_disease or '').strip(),
             'confirmed_disease':   confirmed_disease,
             'ml_predicted_disease': ml_predicted,
+            'ml_top_predicted_disease': ml_top_prediction_for_report(r) or ml_predicted,
+            'ml_classification_confidence': ml_confidence,
+            'ml_confidence_pct':   ml_display.get('confidence_pct'),
             'ml_confidence_high':  ml_high,
             'status':              r.status,
             'case_count':          r.case_count,

@@ -24,7 +24,7 @@
       <table class="pulse-table">
         <thead>
           <tr>
-            <th>#</th><th>Patient</th><th>Barangay</th><th>Syndrome</th><th>Cases</th>
+            <th>#</th><th>Patient</th><th>Barangay</th><th>Predicted Disease</th><th>Cases</th>
             <th>Classification</th><th>Date of Onset</th><th>Status</th><th>Submitted</th>
           </tr>
         </thead>
@@ -44,7 +44,14 @@
             <td data-label="#"><span class="um-id">{{ r.id }}</span></td>
             <td data-label="Patient"><strong>{{ r.patient_name|default:"Unknown Resident" }}</strong></td>
             <td data-label="Barangay">{{ r.barangay_name|default:"—" }}</td>
-            <td data-label="Syndrome">{{ r.syndrome_type }}</td>
+            <td data-label="Predicted Disease">
+              <strong>{{ r.ml_prediction.primary }}</strong>
+              {% if r.ml_prediction.is_lab_confirmed %}
+                <div class="um-muted" style="font-size:.75rem;margin-top:.15rem;">Lab confirmed</div>
+              {% elif r.ml_prediction.confidence_pct %}
+                <div class="um-muted" style="font-size:.75rem;margin-top:.15rem;">{{ r.ml_prediction.confidence_pct }}% confidence</div>
+              {% endif %}
+            </td>
             <td data-label="Cases"><strong>{{ r.case_count }}</strong></td>
             <td data-label="Classification">
               <span class="pill-badge {% if r.case_classification == 'confirmed' %}badge-danger{% elif r.case_classification == 'probable' %}badge-probable{% else %}badge-info{% endif %}">
@@ -53,8 +60,8 @@
             </td>
             <td data-label="Onset">{{ r.date_of_onset|default:"—" }}</td>
             <td data-label="Status">
-              <span class="pill-badge {% if r.validation_status == 'validated' %}badge-active{% elif r.validation_status == 'rejected' %}badge-inactive{% else %}badge-muted{% endif %}">
-                {{ r.validation_status|title }}
+              <span class="pill-badge {% if r.status == 'Confirmed' %}badge-confirmed{% elif r.status == 'Probable' %}badge-probable{% elif r.status == 'Suspected' %}badge-suspected{% else %}badge-muted{% endif %}">
+                {{ r.status|default:"—" }}
               </span>
             </td>
             <td data-label="Submitted"><span class="um-date">{{ r.report_date|date:"M d, Y H:i" }}</span></td>

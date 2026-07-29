@@ -947,21 +947,37 @@ document.addEventListener('DOMContentLoaded', function () {
 
     }
 
-    if (status === 'Probable' || status === 'Suspected') {
+    var top = c.ml_top_predicted_disease || c.ml_predicted_disease;
 
-      if (c.ml_predicted_disease && c.ml_confidence_high) {
+    var confPct = c.ml_confidence_pct;
 
-        return c.ml_predicted_disease + ' (Probable - ML Suggested)';
+    if (confPct == null && c.ml_classification_confidence != null) {
 
-      }
-
-      return 'Inconclusive Syndromic Pattern';
+      confPct = Math.round(c.ml_classification_confidence * 1000) / 10;
 
     }
 
-    if (c.ml_predicted_disease) {
+    if (top) {
 
-      return c.ml_predicted_disease;
+      var line = top;
+
+      if (confPct != null) {
+
+        line += ' (' + confPct + '% ML confidence)';
+
+      } else if (status === 'Probable' || status === 'Suspected') {
+
+        line += ' (ML Suggested)';
+
+      }
+
+      return line;
+
+    }
+
+    if (status === 'Probable' || status === 'Suspected') {
+
+      return 'Inconclusive Syndromic Pattern';
 
     }
 
@@ -1011,7 +1027,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     html += '<div class="map-case-popup__section">';
 
-    html += '<div class="map-case-popup__row"><strong>Disease:</strong> ' + escapeMapPopupHtml(mapPopupDiseaseLine(c)) + '</div>';
+    if (c.patient_name) {
+
+      html += '<div class="map-case-popup__row"><strong>Patient:</strong> ' + escapeMapPopupHtml(c.patient_name) + '</div>';
+
+    }
+
+    html += '<div class="map-case-popup__row"><strong>ML Predicted Disease:</strong> ' + escapeMapPopupHtml(mapPopupDiseaseLine(c)) + '</div>';
 
     html += '<div class="map-case-popup__row"><strong>Barangay:</strong> ' + escapeMapPopupHtml(c.barangay_name) + '</div>';
 
