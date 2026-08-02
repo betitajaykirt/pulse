@@ -905,6 +905,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (cl === 'probable') return 'probable';
 
+    if (cl === 'unassigned') return 'unassigned';
+
     return 'suspected';
 
   }
@@ -913,29 +915,69 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function mapPopupClassificationLabel(c) {
 
-    var raw = (c.case_classification || c.status || 'Suspected').toString();
+    var raw = (c.case_classification || c.status || 'Suspected').toString().replace(/_/g, ' ').trim();
 
-    return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
-
-  }
-
-
-
-  function mapPopupRiskBadgeClass(c) {
-
-    var level = (c.risk_level || '').toLowerCase();
-
-    if (level.includes('critical') || mapPopupClassificationKey(c) === 'confirmed') return 'critical';
-
-    if (level.includes('high') || mapPopupClassificationKey(c) === 'probable') return 'high';
-
-    return 'moderate';
+    return raw.toUpperCase();
 
   }
 
 
 
-  function mapPopupDiseaseLine(c) {
+  function formatRiskMetric(value) {
+
+    if (value == null || value === '') return '0.00';
+
+    var n = Number(value);
+
+    if (isNaN(n)) return '0.00';
+
+    if (n > 1.5) return (n / 100).toFixed(2);
+
+    return n.toFixed(2);
+
+  }
+
+
+
+  function buildRiskFactorGrid(c) {
+
+    var metrics = [
+
+      { label: 'FINAL', value: c.final_score != null ? c.final_score : c.risk_score },
+
+      { label: 'ANOMALY', value: c.anomaly_score },
+
+      { label: 'TEMPORAL', value: c.temporal_score },
+
+      { label: 'SPATIAL', value: c.spatial_score },
+
+      { label: 'ENVIRONMENTAL', value: c.environmental_score },
+
+    ];
+
+    var html = '<div class="map-case-popup__risk-grid" role="list" aria-label="Risk factor breakdown">';
+
+    metrics.forEach(function (metric) {
+
+      html += '<div class="map-case-popup__risk-pill" role="listitem">';
+
+      html += '<span class="map-case-popup__risk-pill-label">' + metric.label + '</span>';
+
+      html += '<span class="map-case-popup__risk-pill-value">' + formatRiskMetric(metric.value) + '</span>';
+
+      html += '</div>';
+
+    });
+
+    html += '</div>';
+
+    return html;
+
+  }
+
+
+
+  function mapPopupMlDiseaseDisplay(c) {
 
     var status = (c.status || '').trim();
 
@@ -943,7 +985,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
       var confirmedName = c.confirmed_disease || c.syndrome_type || c.suspected_disease || 'Unknown';
 
-      return confirmedName + ' (Lab Confirmed)';
+      return escapeMapPopupHtml(confirmedName) + ' <span class="map-case-popup__ml-tag">(Lab Confirmed)</span>';
 
     }
 
@@ -959,15 +1001,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (top) {
 
-      var line = top;
+      var line = escapeMapPopupHtml(top);
 
       if (confPct != null) {
 
-        line += ' (' + confPct + '% ML confidence)';
+        return line + ' <span class="map-case-popup__ml-tag">(' + confPct + '% ML confidence)</span>';
 
-      } else if (status === 'Probable' || status === 'Suspected') {
+      }
 
-        line += ' (ML Suggested)';
+      if (status === 'Probable' || status === 'Suspected') {
+
+        return line + ' <span class="map-case-popup__ml-tag">(ML Suggested)</span>';
 
       }
 
@@ -983,7 +1027,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (c.suspected_disease || c.syndrome_type) {
 
-      return c.suspected_disease || c.syndrome_type;
+      return escapeMapPopupHtml(c.suspected_disease || c.syndrome_type);
 
     }
 
@@ -1001,13 +1045,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var classLabel = mapPopupClassificationLabel(c);
 
-    var riskBadgeClass = mapPopupRiskBadgeClass(c);
-
     var caseStatus = (c.status || '').trim();
 
-    var displayDate = c.date_of_onset || c.report_date || '—';
-
-    var dateLabel = c.date_of_onset ? 'Onset Date' : 'Report Date';
+    var onsetDate = c.date_of_onset || c.report_date || '—';
 
     var html = '<div class="map-case-popup">';
 
@@ -1017,7 +1057,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (isPending) {
 
-      html += ' <span class="map-case-popup__pending">Pending validation</span>';
+      html += '<span class="map-case-popup__pending">Pending validation</span>';
 
     }
 
@@ -1025,65 +1065,55 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
-    html += '<div class="map-case-popup__section">';
+    html += '<div class="map-case-popup__section map-case-popup__section--details">';
 
-    if (c.patient_name) {
+    html += '<div class="map-case-popup__row"><strong>Patient:</strong> ' + escapeMapPopupHtml(c.patient_name || 'Unknown Resident') + '</div>';
 
-      html += '<div class="map-case-popup__row"><strong>Patient:</strong> ' + escapeMapPopupHtml(c.patient_name) + '</div>';
-
-    }
-
-    html += '<div class="map-case-popup__row"><strong>ML Predicted Disease:</strong> ' + escapeMapPopupHtml(mapPopupDiseaseLine(c)) + '</div>';
+    html += '<div class="map-case-popup__row map-case-popup__row--disease"><strong>ML Predicted Disease:</strong> ' + mapPopupMlDiseaseDisplay(c) + '</div>';
 
     html += '<div class="map-case-popup__row"><strong>Barangay:</strong> ' + escapeMapPopupHtml(c.barangay_name) + '</div>';
 
     html += '<div class="map-case-popup__row"><strong>Cases:</strong> ' + escapeMapPopupHtml(c.case_count) + '</div>';
 
-    html += '<div class="map-case-popup__row"><strong>' + dateLabel + ':</strong> ' + escapeMapPopupHtml(displayDate) + '</div>';
+    html += '<div class="map-case-popup__row"><strong>Onset Date:</strong> ' + escapeMapPopupHtml(onsetDate) + '</div>';
 
-    if (c.status) {
-
-      html += '<div class="map-case-popup__row"><strong>Status:</strong> ' + escapeMapPopupHtml(c.status) + '</div>';
-
-    }
+    html += '<div class="map-case-popup__row"><strong>Status:</strong> ' + escapeMapPopupHtml(caseStatus || '—') + '</div>';
 
     html += '</div>';
 
 
 
-    html += '<div class="map-case-popup__section map-case-popup__section--divider">';
+    html += '<div class="map-case-popup__section map-case-popup__section--divider map-case-popup__officer-grid">';
 
-    html += '<div class="map-case-popup__risk map-case-popup__risk--' + riskBadgeClass + '">';
+    html += '<div class="map-case-popup__officer-item"><span class="map-case-popup__officer-label">Officer in Charge</span><span class="map-case-popup__officer-value">' + escapeMapPopupHtml(c.officer_name || 'Not recorded') + '</span></div>';
 
-    html += '<strong>Risk Score:</strong> ' + escapeMapPopupHtml(c.risk_score_line || 'Under review');
-
-    html += '</div>';
-
-    if (c.epidemic_threshold_status) {
-
-      html += '<div class="map-case-popup__row"><strong>Threshold:</strong> ' + escapeMapPopupHtml(c.epidemic_threshold_status.replace(/_/g, ' ')) + '</div>';
-
-    }
-
-    html += '</div>';
-
-
-
-    html += '<div class="map-case-popup__section map-case-popup__section--divider">';
-
-    html += '<div class="map-case-popup__row"><strong>Officer in Charge:</strong> ' + escapeMapPopupHtml(c.officer_name || 'Not recorded') + '</div>';
-
-    html += '<div class="map-case-popup__row"><strong>Contact:</strong> ' + escapeMapPopupHtml(c.officer_contact || 'Not available') + '</div>';
+    html += '<div class="map-case-popup__officer-item"><span class="map-case-popup__officer-label">Contact</span><span class="map-case-popup__officer-value">' + escapeMapPopupHtml(c.officer_contact || 'Not available') + '</span></div>';
 
     if (caseStatus === 'Confirmed') {
 
       if (c.confirmed_date) {
 
-        html += '<div class="map-case-popup__row"><strong>Confirmed Date:</strong> ' + escapeMapPopupHtml(c.confirmed_date) + '</div>';
+        html += '<div class="map-case-popup__officer-item map-case-popup__officer-item--full"><span class="map-case-popup__officer-label">Confirmed Date</span><span class="map-case-popup__officer-value">' + escapeMapPopupHtml(c.confirmed_date) + '</span></div>';
 
       }
 
-      html += '<div class="map-case-popup__row"><strong>Confirmed By:</strong> ' + escapeMapPopupHtml(c.confirmed_by || 'System Administrator') + '</div>';
+      html += '<div class="map-case-popup__officer-item map-case-popup__officer-item--full"><span class="map-case-popup__officer-label">Confirmed By</span><span class="map-case-popup__officer-value">' + escapeMapPopupHtml(c.confirmed_by || 'System Administrator') + '</span></div>';
+
+    }
+
+    html += '</div>';
+
+
+
+    html += '<div class="map-case-popup__section map-case-popup__section--divider map-case-popup__risk-section">';
+
+    html += '<div class="map-case-popup__risk-heading">Risk Factors</div>';
+
+    html += buildRiskFactorGrid(c);
+
+    if (c.epidemic_threshold_status) {
+
+      html += '<div class="map-case-popup__threshold"><strong>Threshold:</strong> ' + escapeMapPopupHtml(c.epidemic_threshold_status.replace(/_/g, ' ')) + '</div>';
 
     }
 
@@ -1093,9 +1123,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
     html += '<div class="map-case-popup__section map-case-popup__section--divider map-case-popup__recommendations">';
 
+    html += '<div class="map-case-popup__rec-head">';
+
+    html += '<svg class="map-case-popup__rec-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26A7 7 0 0 0 12 2z"/></svg>';
+
     html += '<strong>Recommendations</strong>';
 
-    html += '<p>' + escapeMapPopupHtml(c.recommendations) + '</p>';
+    html += '</div>';
+
+    html += '<p class="map-case-popup__rec-text">' + escapeMapPopupHtml(c.recommendations) + '</p>';
 
     html += '</div>';
 
@@ -1244,7 +1280,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         .bindTooltip(buildCaseTooltip(c), { sticky: true, direction: 'top', className: 'hotspot-tip' })
 
-        .bindPopup(popupHtml, { maxWidth: 380, className: 'map-case-popup-wrap' })
+        .bindPopup(popupHtml, { maxWidth: 480, minWidth: 420, className: 'map-case-popup-wrap' })
 
         .addTo(casePinsLayer);
 

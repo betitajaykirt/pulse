@@ -2242,57 +2242,110 @@ tbody tr:last-child td { border-bottom: none; }
 }
 .hotspot-tip::before { border-top-color: var(--text); }
 
-.map-case-popup-wrap .leaflet-popup-content { margin: 0; }
+.map-case-popup-wrap .leaflet-popup-content { margin: 0; width: auto !important; min-width: 420px; max-width: 480px; }
 .map-case-popup-wrap .leaflet-popup-content-wrapper {
-  border-radius: var(--radius-md); padding: 0; overflow: hidden;
+  border-radius: 12px; padding: 0; overflow: hidden;
+  min-width: 420px; max-width: 480px; width: auto !important;
+  box-shadow: 0 12px 32px -16px rgba(15, 76, 129, 0.18);
 }
 .map-case-popup {
-  font-size: .82rem; line-height: 1.45; color: var(--text); min-width: 280px; max-width: 340px;
+  font-size: .82rem; line-height: 1.45; color: var(--text);
+  min-width: 420px; max-width: 480px; width: 100%; box-sizing: border-box;
 }
 .map-case-popup__header {
-  padding: .75rem 1rem .5rem;
+  padding: 16px 16px 10px;
   display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .5rem;
 }
 .map-case-popup__badge {
   display: inline-block;
-  font-size: .72rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
-  padding: .25rem .55rem; border-radius: 999px;
+  font-size: .68rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  padding: .3rem .6rem; border-radius: 999px;
 }
 .map-case-popup__badge--confirmed { background: rgba(168, 85, 247, 0.15); color: #7c3aed; }
 .map-case-popup__badge--probable { background: rgba(239, 68, 68, 0.12); color: #dc2626; }
 .map-case-popup__badge--suspected { background: rgba(245, 158, 11, 0.16); color: #b45309; }
+.map-case-popup__badge--unassigned { background: rgba(100, 116, 139, 0.14); color: #475569; }
 .map-case-popup__title {
   padding: .75rem 1rem .35rem; font-size: .9rem;
 }
 .map-case-popup__pending { color: #f59e0b; font-size: .72rem; font-weight: 600; }
 .map-case-popup__section {
-  padding: .55rem 1rem;
+  padding: 12px 16px;
 }
+.map-case-popup__section--details { padding-top: 4px; }
 .map-case-popup__section--divider {
   border-top: 1px solid var(--border-light);
 }
 .map-case-popup__row {
-  margin-bottom: .28rem; font-size: .78rem; color: var(--text);
+  margin-bottom: .35rem; font-size: .8rem; color: var(--text);
 }
+.map-case-popup__row:last-child { margin-bottom: 0; }
 .map-case-popup__row strong { color: #334155; font-weight: 700; }
+.map-case-popup__row--disease { line-height: 1.5; }
+.map-case-popup__ml-tag {
+  color: #64748b; font-weight: 600; font-size: .76rem;
+}
+.map-case-popup__officer-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: .65rem 1rem;
+}
+.map-case-popup__officer-item {
+  display: flex; flex-direction: column; gap: .15rem; min-width: 0;
+}
+.map-case-popup__officer-item--full { grid-column: 1 / -1; }
+.map-case-popup__officer-label {
+  font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #64748b;
+}
+.map-case-popup__officer-value {
+  font-size: .8rem; font-weight: 600; color: #1e293b; word-break: break-word;
+}
+.map-case-popup__risk-section { padding-top: 14px; padding-bottom: 14px; }
+.map-case-popup__risk-heading {
+  font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: #64748b; margin-bottom: .55rem;
+}
+.map-case-popup__risk-grid {
+  display: flex; gap: 8px; width: 100%; overflow-x: auto;
+  padding-bottom: 2px; scrollbar-width: none;
+}
+.map-case-popup__risk-grid::-webkit-scrollbar { display: none; }
+.map-case-popup__risk-pill {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 8px 6px; background: #f1f5f9; border-radius: 12px; text-align: center;
+  flex: 0 0 72px; min-width: 72px; box-sizing: border-box;
+}
+.map-case-popup__risk-pill:nth-child(5) { flex-basis: 96px; min-width: 96px; }
+.map-case-popup__risk-pill-label {
+  font-size: 10px; font-weight: 600; color: #64748b; line-height: 1.1;
+  margin-bottom: 4px; display: block; width: 100%;
+}
+.map-case-popup__risk-pill-value {
+  font-size: 14px; font-weight: 700; color: #1e293b; margin: 0;
+}
+.map-case-popup__threshold {
+  margin-top: .55rem; font-size: .74rem; color: #64748b;
+}
 .map-case-popup__risk {
   font-size: .78rem; font-weight: 600; padding: .4rem .55rem; border-radius: 8px; margin-bottom: .35rem;
 }
 .map-case-popup__risk--critical { background: rgba(124, 58, 237, 0.1); color: #6d28d9; }
 .map-case-popup__risk--high { background: rgba(239, 68, 68, 0.1); color: #b91c1c; }
 .map-case-popup__risk--moderate { background: rgba(245, 158, 11, 0.12); color: #b45309; }
-.map-case-popup__recommendations strong {
-  display: block; font-size: .7rem; text-transform: uppercase; letter-spacing: .04em;
-  color: var(--primary); margin-bottom: .25rem;
+.map-case-popup__recommendations { padding-bottom: 16px; }
+.map-case-popup__rec-head {
+  display: flex; align-items: center; gap: .4rem; margin-bottom: .4rem;
 }
-.map-case-popup__recommendations p {
-  margin: 0; font-size: .76rem; line-height: 1.4; color: var(--muted);
+.map-case-popup__rec-head strong {
+  font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--primary);
+}
+.map-case-popup__rec-icon { color: var(--primary); flex-shrink: 0; }
+.map-case-popup__rec-text {
+  margin: 0; font-size: .78rem; line-height: 1.5; color: var(--muted);
 }
 .map-case-popup__meta {
   padding: 0 1rem .75rem; color: var(--muted); font-size: .78rem;
 }
 .map-case-popup__meta div { margin-bottom: .2rem; }
-.map-cluster-popup__case .map-case-popup { min-width: 0; max-width: none; }
+.map-cluster-popup__case .map-case-popup { min-width: 0; max-width: none; width: 100%; }
 .map-cluster-popup__case {
   border-bottom: 1px solid var(--border-light);
 }
@@ -2663,12 +2716,13 @@ tbody tr:last-child td { border-bottom: none; }
 }
 
 /* ── Cluster / aggregated popup ─────────────────────────────────── */
-.map-cluster-popup-wrap .leaflet-popup-content { margin: 0; }
+.map-cluster-popup-wrap .leaflet-popup-content { margin: 0; width: auto !important; min-width: 420px; max-width: 480px; }
 .map-cluster-popup-wrap .leaflet-popup-content-wrapper {
-  border-radius: var(--radius-md); padding: 0; overflow: hidden;
+  border-radius: 12px; padding: 0; overflow: hidden;
+  min-width: 420px; max-width: 480px; width: auto !important;
 }
 .map-cluster-popup {
-  font-size: .82rem; line-height: 1.45; color: var(--text); min-width: 280px;
+  font-size: .82rem; line-height: 1.45; color: var(--text); min-width: 420px; max-width: 480px;
 }
 .map-cluster-popup__header {
   padding: .75rem 1rem; font-size: .82rem; font-weight: 700;
