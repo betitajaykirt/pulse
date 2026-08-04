@@ -130,6 +130,41 @@ def _recommended_action(risk_level, syndrome_type):
     return actions.get(risk_level, actions['low'])
 
 
+def _create_risk_analysis_bridge(
+    report,
+    *,
+    risk_score,
+    anomaly_score,
+    risk_level,
+    algorithm_used='aptas-engine-v1',
+):
+    """
+  Create legacy ``ml_ai_predictions`` + ``risk_analysis`` rows required by
+    ``alerts.analysis_id`` FK (must reference ``risk_analysis.analysis_id``).
+    """
+    now_ts = timezone.now()
+    disease_type = (
+        report.syndrome_type
+        or getattr(report, 'suspected_disease', None)
+        or 'Unknown'
+    )
+    prediction = MlAiPrediction.objects.create(
+        disease_type=disease_type,
+        risk_score=float(risk_score),
+        prediction_probability=float(anomaly_score),
+        severity_level=str(risk_level),
+        algorithm_used=algorithm_used,
+        prediction_date=now_ts,
+    )
+    analysis = RiskAnalysis.objects.create(
+        risk_score=float(risk_score),
+        anomaly_flag=str(risk_level).lower() == 'critical',
+        analysis_date=now_ts,
+        prediction=prediction,
+    )
+    return analysis
+
+
 
 
 
@@ -144,7 +179,13 @@ def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level
         f'{report.syndrome_type} alert in {barangay.barangay_name}'
     )
 
-
+    analysis = _create_risk_analysis_bridge(
+        report,
+        risk_score=assessment.risk_score,
+        anomaly_score=assessment.anomaly_score,
+        risk_level=alert_level,
+        algorithm_used=assessment.model_version or 'aptas-engine-v1',
+    )
 
     alert = Alert.objects.create(
 
@@ -156,7 +197,7 @@ def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level
 
         alert_type=report.syndrome_type,
 
-        analysis_id=assessment.id,
+        analysis_id=analysis.id,
 
     )
 
@@ -255,21 +296,13 @@ def trigger_threshold_outbreak_alert(*, report_id, threshold_result):
     )
 
     # Bridge to legacy schema: alerts.analysis_id FK → risk_analysis.analysis_id
-    # which in turn FK → ml_ai_predictions.prediction_id.
     now_ts = timezone.now()
-    prediction = MlAiPrediction.objects.create(
-        disease_type=report.syndrome_type or 'Unknown',
-        risk_score=float(risk_score),
-        prediction_probability=float(anomaly_score),
-        severity_level=risk_level,
+    analysis = _create_risk_analysis_bridge(
+        report,
+        risk_score=risk_score,
+        anomaly_score=anomaly_score,
+        risk_level=risk_level,
         algorithm_used='pidsr-threshold-v1',
-        prediction_date=now_ts,
-    )
-    analysis = RiskAnalysis.objects.create(
-        risk_score=float(risk_score),
-        anomaly_flag=(risk_level == 'critical'),
-        analysis_date=now_ts,
-        prediction=prediction,
     )
 
     alert = Alert.objects.create(

@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from reports.models import BarangayRiskLog
-from myapp.models import Alert, NotificationLog, RiskAssessment
+from reports.risk_service import _create_risk_analysis_bridge
 
 class Command(BaseCommand):
     help = 'Synchronizes existing active BarangayRiskLogs into the Alerts table'
@@ -20,22 +20,24 @@ class Command(BaseCommand):
             ).exists()
             
             if not alert_exists:
-                from myapp.models import Barangay, SurveillanceReport
-                fallback_report = SurveillanceReport.objects.first()
+                from myapp.models import Barangay, SurveillanceReport, Alert, NotificationLog
                 barangay_obj = Barangay.objects.filter(barangay_name__iexact=log.barangay).first()
+                fallback_report = SurveillanceReport.objects.filter(
+                    barangay_id=barangay_obj.id if barangay_obj else None,
+                ).first() or SurveillanceReport.objects.first()
                 
-                # Create a pseudo RiskAssessment to satisfy the analysis_id constraint
-                assessment = RiskAssessment.objects.create(
-                    report_id=fallback_report.id if fallback_report else 1,
-                    barangay_id=barangay_obj.id if barangay_obj else 1,
-                    anomaly_score=log.anomaly_score,
+                if not fallback_report:
+                    self.stdout.write(self.style.WARNING(
+                        f'Skipped {log.barangay} — no surveillance report for bridge row.'
+                    ))
+                    continue
+
+                analysis = _create_risk_analysis_bridge(
+                    fallback_report,
                     risk_score=log.final_risk_score / 100.0,
+                    anomaly_score=log.anomaly_score,
                     risk_level=log.risk_level.lower(),
-                    model_version='aptas-engine-v1-retroactive',
-                    evaluation_status='completed',
-                    evaluated_at=log.created_at,
-                    recommended_action='Retroactively synced from existing APTAS active signal',
-                    created_at=log.created_at
+                    algorithm_used='aptas-engine-v1-retroactive',
                 )
                 
                 alert_level = log.risk_level.lower()
@@ -45,7 +47,7 @@ class Command(BaseCommand):
                     alert_date=log.created_at,
                     status='active',
                     alert_type=log.syndrome,
-                    analysis_id=assessment.id
+                    analysis_id=analysis.id
                 )
                 
                 summary = f'APTAS RISK: {log.syndrome} at {alert_level.title()} level in {log.barangay}'
