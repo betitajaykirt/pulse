@@ -471,6 +471,15 @@ def save_batch_submission(*, payload, submitted_by_id, locked_barangay=None):
 
 
 
+    if created_reports:
+        from reports.aptas_service import recalculate_aptas_for_barangay
+        recalculate_aptas_for_barangay(
+            created_reports[0].barangay_id,
+            trigger_report_id=created_reports[-1].id,
+        )
+
+
+
     # Update session summary with dominant ML label
 
     if created_reports:

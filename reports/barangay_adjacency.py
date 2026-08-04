@@ -44,6 +44,11 @@ def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * radius_km * math.asin(math.sqrt(a))
 
 
+def haversine_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Great-circle distance between two WGS84 points in meters."""
+    return _haversine_km(lat1, lon1, lat2, lon2) * 1000.0
+
+
 def _outer_ring(geometry: dict) -> list | None:
     geom_type = geometry.get('type')
     coords = geometry.get('coordinates')

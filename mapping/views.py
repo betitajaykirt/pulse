@@ -335,10 +335,12 @@ def api_cases(request):
         elif report.ml_anomaly_score is not None:
             raw_anomaly = float(report.ml_anomaly_score)
 
-        cache_key = (barangay.lower(), syndrome.lower(), round(raw_anomaly or 0.0, 4))
+        cache_key = (barangay.lower(), syndrome.lower(), report.id, round(raw_anomaly or 0.0, 4))
         if cache_key not in cache:
             try:
-                cache[cache_key] = compute_aptas_breakdown(barangay, syndrome, raw_anomaly)
+                cache[cache_key] = compute_aptas_breakdown(
+                    barangay, syndrome, raw_anomaly, report=report,
+                )
             except (ValueError, TypeError):
                 anomaly = normalize_anomaly_score(raw_anomaly)
                 cache[cache_key] = {

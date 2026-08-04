@@ -33,9 +33,10 @@ def _persist_aptas_risk_log(report, raw_anomaly_score, force_activate=False):
     try:
         return compute_and_log_barangay_risk(
             report.barangay.barangay_name,
-            report.syndrome_type,
+            report.syndrome_type or report.suspected_disease,
             raw_anomaly_score,
             force_activate=force_activate,
+            report=report,
         )
     except Exception as exc:
         logger.exception('APTAS risk log failed for report %s: %s', report.id, exc)

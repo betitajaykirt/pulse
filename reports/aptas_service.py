@@ -7,10 +7,15 @@ import statistics
 from datetime import timedelta
 from typing import Any, Dict, Optional
 
+from django.db.models import Q
 from django.utils import timezone
 
 from myapp.models import EnvironmentalData, SurveillanceReport
-from reports.barangay_adjacency import canonical_barangay_name, get_neighboring_barangays
+from reports.barangay_adjacency import (
+    canonical_barangay_name,
+    get_neighboring_barangays,
+    haversine_meters,
+)
 from reports.models import BarangayRiskLog
 from reports.weather_service import DATA_SOURCE, FALLBACK_WEATHER
 
@@ -34,6 +39,21 @@ RISK_LEVEL_THRESHOLDS = (
 # Stability circuit-breaker — both gates must pass before dashboard alerting.
 CIRCUIT_BREAKER_MIN_RISK_SCORE = 60.0
 CIRCUIT_BREAKER_MIN_ANOMALY = 0.50
+
+ACTIVE_SURVEILLANCE_STATUSES = ('Probable', 'Confirmed', 'Suspected')
+
+INCONCLUSIVE_SYNDROME_LABELS = frozenset({
+    'inconclusive syndromic pattern',
+    'insufficient data for prediction',
+    'undetermined',
+    '',
+})
+
+SPATIAL_CLUSTER_RADIUS_M = 500.0
+SPATIAL_NEARBY_CASE_CAP = 3
+TEMPORAL_WINDOW_DAYS = 7
+TEMPORAL_BASELINE_WEEKS = 4
+SPATIAL_ACTIVITY_WINDOW_DAYS = 30
 
 
 def get_aptas_dashboard_context(*, barangay_name=None, limit=12):
@@ -106,35 +126,146 @@ def _local_today():
     return timezone.localdate()
 
 
-def _syndrome_report_count(barangay_name: str, syndrome_name: str, start, end) -> int:
-    return SurveillanceReport.objects.filter(
-        barangay__barangay_name__iexact=barangay_name,
-        syndrome_type__iexact=syndrome_name,
-        report_date__date__gte=start,
-        report_date__date__lte=end,
-    ).exclude(status='Closed').count()
+def _coerce_date(value):
+    if value is None:
+        return _local_today()
+    if hasattr(value, 'date') and not isinstance(value, type(_local_today())):
+        try:
+            if timezone.is_aware(value):
+                return timezone.localtime(value).date()
+        except (TypeError, ValueError):
+            pass
+        return value.date()
+    return value
 
 
-def compute_temporal_score(barangay_name: str, syndrome_name: str) -> float:
+def _is_trackable_syndrome(syndrome_name: str) -> bool:
+    return (syndrome_name or '').strip().lower() not in INCONCLUSIVE_SYNDROME_LABELS
+
+
+def _syndrome_match_q(syndrome_name: str) -> Q:
+    syndrome = (syndrome_name or '').strip()
+    if not _is_trackable_syndrome(syndrome):
+        return Q()
+    return (
+        Q(syndrome_type__icontains=syndrome)
+        | Q(suspected_disease__icontains=syndrome)
+        | Q(syndrome_type__iexact=syndrome)
+        | Q(suspected_disease__iexact=syndrome)
+    )
+
+
+def _active_reports_qs(
+    barangay_name: str,
+    syndrome_name: str | None = None,
+    *,
+    reference_date=None,
+    activity_window_days: int | None = SPATIAL_ACTIVITY_WINDOW_DAYS,
+):
+    barangay = canonical_barangay_name(barangay_name)
+    qs = SurveillanceReport.objects.filter(
+        barangay__barangay_name__iexact=barangay,
+        status__in=ACTIVE_SURVEILLANCE_STATUSES,
+    )
+    syndrome_q = _syndrome_match_q(syndrome_name or '')
+    if syndrome_q:
+        qs = qs.filter(syndrome_q)
+    if activity_window_days:
+        ref = _coerce_date(reference_date)
+        start = ref - timedelta(days=activity_window_days)
+        qs = qs.filter(
+            Q(date_of_onset__gte=start, date_of_onset__lte=ref)
+            | Q(
+                date_of_onset__isnull=True,
+                report_date__date__gte=start,
+                report_date__date__lte=ref,
+            )
+        )
+    return qs
+
+
+def _count_reports_in_date_window(
+    barangay_name: str,
+    syndrome_name: str,
+    start,
+    end,
+    *,
+    exclude_report_id=None,
+) -> int:
+    qs = _active_reports_qs(
+        barangay_name,
+        syndrome_name,
+        reference_date=end,
+        activity_window_days=None,
+    )
+    qs = qs.filter(
+        Q(date_of_onset__gte=start, date_of_onset__lte=end)
+        | Q(
+            date_of_onset__isnull=True,
+            report_date__date__gte=start,
+            report_date__date__lte=end,
+        )
+    )
+    if exclude_report_id:
+        qs = qs.exclude(id=exclude_report_id)
+    return qs.count()
+
+
+def _syndrome_report_count(
+    barangay_name: str,
+    syndrome_name: str,
+    start,
+    end,
+    *,
+    exclude_report_id=None,
+) -> int:
+    return _count_reports_in_date_window(
+        barangay_name,
+        syndrome_name,
+        start,
+        end,
+        exclude_report_id=exclude_report_id,
+    )
+
+
+def compute_temporal_score(
+    barangay_name: str,
+    syndrome_name: str,
+    *,
+    reference_date=None,
+    exclude_report_id=None,
+) -> float:
     """
     T = min(1, max(0, (x_7 - mu_28) / (3 * sigma_28))) with zero-variance safeguard.
 
-    ``mu_28`` and ``sigma_28`` are the mean and population std-dev of weekly case
-    counts across the 28-day baseline immediately before the current 7-day window.
+    Uses ``date_of_onset`` (fallback ``report_date``) and counts Probable, Confirmed,
+    and Suspected cases relative to the case reference date (not only "today").
     """
-    today = _local_today()
-    week_start = today - timedelta(days=6)
+    ref = _coerce_date(reference_date)
+    week_start = ref - timedelta(days=TEMPORAL_WINDOW_DAYS - 1)
     baseline_end = week_start - timedelta(days=1)
-    baseline_start = baseline_end - timedelta(days=27)
+    baseline_start = baseline_end - timedelta(days=(TEMPORAL_BASELINE_WEEKS * 7) - 1)
 
-    x_7 = _syndrome_report_count(barangay_name, syndrome_name, week_start, today)
+    x_7 = _syndrome_report_count(
+        barangay_name,
+        syndrome_name,
+        week_start,
+        ref,
+        exclude_report_id=exclude_report_id,
+    )
 
     weekly_counts = []
-    for week_index in range(4):
+    for week_index in range(TEMPORAL_BASELINE_WEEKS):
         window_start = baseline_start + timedelta(days=week_index * 7)
         window_end = window_start + timedelta(days=6)
         weekly_counts.append(
-            _syndrome_report_count(barangay_name, syndrome_name, window_start, window_end)
+            _syndrome_report_count(
+                barangay_name,
+                syndrome_name,
+                window_start,
+                window_end,
+                exclude_report_id=exclude_report_id,
+            )
         )
 
     mu_28 = statistics.mean(weekly_counts) if weekly_counts else 0.0
@@ -202,15 +333,20 @@ def compute_environmental_score(reference_dt=None) -> float:
     return (0.40 * r_norm) + (0.30 * h_norm) + (0.30 * w_norm)
 
 
-def _neighbor_has_elevated_activity(neighbor_name: str, syndrome_name: str) -> bool:
-    today = _local_today()
-    week_start = today - timedelta(days=6)
-    return _syndrome_report_count(neighbor_name, syndrome_name, week_start, today) > 0
+def _neighbor_has_elevated_activity(neighbor_name: str, syndrome_name: str, *, reference_date=None) -> bool:
+    ref = _coerce_date(reference_date)
+    week_start = ref - timedelta(days=TEMPORAL_WINDOW_DAYS - 1)
+    return _syndrome_report_count(neighbor_name, syndrome_name, week_start, ref) > 0
 
 
-def compute_spatial_score(barangay_name: str, syndrome_name: str) -> float:
+def compute_spatial_score(
+    barangay_name: str,
+    syndrome_name: str,
+    *,
+    reference_date=None,
+) -> float:
     """
-    S = elevated neighbors / total adjacent neighbors (0.0 when none found).
+    Regional score: elevated adjacent barangays / total adjacent neighbors.
     """
     neighbors = get_neighboring_barangays(barangay_name)
     if not neighbors:
@@ -218,9 +354,85 @@ def compute_spatial_score(barangay_name: str, syndrome_name: str) -> float:
 
     elevated = sum(
         1 for neighbor in neighbors
-        if _neighbor_has_elevated_activity(neighbor, syndrome_name)
+        if _neighbor_has_elevated_activity(
+            neighbor,
+            syndrome_name,
+            reference_date=reference_date,
+        )
     )
     return elevated / len(neighbors)
+
+
+def compute_spatial_score_for_report(
+    report,
+    syndrome_name: str,
+    *,
+    radius_m: float = SPATIAL_CLUSTER_RADIUS_M,
+) -> float:
+    """
+    Case-level spatial score using Haversine proximity within ``radius_m`` meters
+    in the same barangay, blended with adjacent-barangay regional activity.
+    """
+    if not report or not report.barangay_id:
+        return 0.0
+
+    barangay = canonical_barangay_name(report.barangay.barangay_name)
+    syndrome = (syndrome_name or report.syndrome_type or report.suspected_disease or '').strip()
+    track_syndrome = syndrome if _is_trackable_syndrome(syndrome) else None
+    ref = report.date_of_onset or (
+        report.report_date.date() if report.report_date else _local_today()
+    )
+
+    local_score = 0.0
+    try:
+        lat = float(report.latitude)
+        lng = float(report.longitude)
+    except (TypeError, ValueError):
+        lat = lng = None
+
+    if lat is not None and lng is not None:
+        nearby = 0
+        candidates = _active_reports_qs(
+            barangay,
+            track_syndrome,
+            reference_date=ref,
+        ).exclude(id=report.id).filter(
+            latitude__isnull=False,
+            longitude__isnull=False,
+        )
+        for other in candidates.only('id', 'latitude', 'longitude'):
+            try:
+                dist_m = haversine_meters(
+                    lat,
+                    lng,
+                    float(other.latitude),
+                    float(other.longitude),
+                )
+            except (TypeError, ValueError):
+                continue
+            if dist_m <= radius_m:
+                nearby += 1
+        if nearby:
+            local_score = min(1.0, nearby / SPATIAL_NEARBY_CASE_CAP)
+    else:
+        week_start = _coerce_date(ref) - timedelta(days=TEMPORAL_WINDOW_DAYS - 1)
+        count = _count_reports_in_date_window(
+            barangay,
+            syndrome,
+            week_start,
+            _coerce_date(ref),
+            exclude_report_id=report.id,
+        )
+        local_score = min(1.0, count / 5.0) if count else 0.0
+
+    regional_score = compute_spatial_score(
+        barangay,
+        syndrome,
+        reference_date=ref,
+    )
+    if local_score <= 0 and regional_score <= 0:
+        return 0.0
+    return min(1.0, (0.75 * local_score) + (0.25 * regional_score))
 
 
 def classify_risk_level(final_risk_score: float) -> str:
@@ -269,6 +481,7 @@ def compute_and_log_barangay_risk(
     *,
     deactivate_previous: bool = True,
     force_activate: bool = False,
+    report=None,
 ) -> BarangayRiskLog:
     """
     Run the APTAS multi-variate formula and persist a ``BarangayRiskLog`` row.
@@ -281,9 +494,22 @@ def compute_and_log_barangay_risk(
         raise ValueError('barangay_name and syndrome_name are required for APTAS scoring.')
 
     anomaly = normalize_anomaly_score(raw_anomaly_score)
-    temporal = compute_temporal_score(barangay, syndrome)
+    ref_date = None
+    if report is not None:
+        ref_date = report.date_of_onset or (
+            report.report_date.date() if report.report_date else None
+        )
+    temporal = compute_temporal_score(
+        barangay,
+        syndrome,
+        reference_date=ref_date,
+        exclude_report_id=getattr(report, 'id', None),
+    )
     environmental = compute_environmental_score()
-    spatial = compute_spatial_score(barangay, syndrome)
+    if report is not None:
+        spatial = compute_spatial_score_for_report(report, syndrome)
+    else:
+        spatial = compute_spatial_score(barangay, syndrome, reference_date=ref_date)
     final_score = compute_final_risk_score(anomaly, temporal, environmental, spatial)
     risk_level = classify_risk_level(final_score)
     is_active = should_activate_aptas_alert(final_score, anomaly, force_activate=force_activate)
@@ -319,14 +545,31 @@ def compute_aptas_breakdown(
     barangay_name: str,
     syndrome_name: str,
     raw_anomaly_score,
+    *,
+    report=None,
 ) -> Dict[str, Any]:
     """Return component scores without writing to the database (for tests / debugging)."""
     barangay = canonical_barangay_name(barangay_name)
     syndrome = (syndrome_name or '').strip()
     anomaly = normalize_anomaly_score(raw_anomaly_score)
-    temporal = compute_temporal_score(barangay, syndrome)
+    ref_date = None
+    exclude_report_id = None
+    if report is not None:
+        ref_date = report.date_of_onset or (
+            report.report_date.date() if report.report_date else None
+        )
+        exclude_report_id = report.id
+    temporal = compute_temporal_score(
+        barangay,
+        syndrome,
+        reference_date=ref_date,
+        exclude_report_id=exclude_report_id,
+    )
     environmental = compute_environmental_score()
-    spatial = compute_spatial_score(barangay, syndrome)
+    if report is not None:
+        spatial = compute_spatial_score_for_report(report, syndrome)
+    else:
+        spatial = compute_spatial_score(barangay, syndrome, reference_date=ref_date)
     final_score = compute_final_risk_score(anomaly, temporal, environmental, spatial)
     return {
         'barangay': barangay,
@@ -339,6 +582,74 @@ def compute_aptas_breakdown(
         'risk_level': classify_risk_level(final_score),
         'is_active_alert': should_activate_aptas_alert(final_score, anomaly),
     }
+
+
+def _raw_anomaly_for_report(report) -> float:
+    if report.ml_anomaly_score is not None:
+        return float(report.ml_anomaly_score)
+    if report.is_anomaly:
+        return -0.45
+    return 0.25
+
+
+def recalculate_aptas_for_barangay(barangay, *, trigger_report_id=None) -> list[BarangayRiskLog]:
+    """
+    Recompute APTAS logs for active syndromes in a barangay.
+
+    Called after batch submission and case confirmation so neighbor records refresh.
+    """
+    from myapp.models import Barangay
+
+    if isinstance(barangay, int):
+        barangay = Barangay.objects.filter(id=barangay).first()
+    if not barangay:
+        return []
+
+    logs: list[BarangayRiskLog] = []
+    processed_syndromes: set[str] = set()
+
+    if trigger_report_id:
+        trigger = SurveillanceReport.objects.filter(
+            id=trigger_report_id,
+            barangay_id=barangay.id,
+        ).select_related('barangay').first()
+        if trigger:
+            syndrome = (trigger.syndrome_type or trigger.suspected_disease or '').strip()
+            if _is_trackable_syndrome(syndrome):
+                processed_syndromes.add(syndrome.casefold())
+                logs.append(
+                    compute_and_log_barangay_risk(
+                        barangay.barangay_name,
+                        syndrome,
+                        _raw_anomaly_for_report(trigger),
+                        report=trigger,
+                    )
+                )
+
+    siblings = (
+        SurveillanceReport.objects.filter(
+            barangay_id=barangay.id,
+            status__in=ACTIVE_SURVEILLANCE_STATUSES,
+        )
+        .select_related('barangay')
+        .order_by('-report_date')[:40]
+    )
+    for sibling in siblings:
+        syndrome = (sibling.syndrome_type or sibling.suspected_disease or '').strip()
+        key = syndrome.casefold()
+        if not _is_trackable_syndrome(syndrome) or key in processed_syndromes:
+            continue
+        processed_syndromes.add(key)
+        logs.append(
+            compute_and_log_barangay_risk(
+                barangay.barangay_name,
+                syndrome,
+                _raw_anomaly_for_report(sibling),
+                report=sibling,
+            )
+        )
+
+    return logs
 
 
 def get_barangay_risk_map_matrix() -> Dict[str, Dict[str, Any]]:

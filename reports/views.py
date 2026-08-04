@@ -481,6 +481,9 @@ def _perform_case_confirmation(
         actor_id=actor_id,
     )
 
+    from reports.aptas_service import recalculate_aptas_for_barangay
+    recalculate_aptas_for_barangay(report.barangay_id, trigger_report_id=report.id)
+
     log_audit(
         actor_id=actor_id,
         actor_type=actor_type,
