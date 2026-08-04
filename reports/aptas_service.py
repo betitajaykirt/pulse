@@ -7,10 +7,12 @@ import statistics
 from datetime import timedelta
 from typing import Any, Dict, Optional
 
+from urllib.parse import urlencode
+
 from django.db.models import Q
 from django.utils import timezone
 
-from myapp.models import EnvironmentalData, SurveillanceReport
+from myapp.models import BarangayEpidemicStatus, EnvironmentalData, OutbreakThresholdLog, SurveillanceReport
 from reports.barangay_adjacency import (
     canonical_barangay_name,
     get_neighboring_barangays,
@@ -56,8 +58,107 @@ TEMPORAL_BASELINE_WEEKS = 4
 SPATIAL_ACTIVITY_WINDOW_DAYS = 30
 
 
+SPATIAL_ACTIVITY_WINDOW_DAYS = 30
+
+PIDSR_THRESHOLD_STATUSES = (
+    'PROBABLE_OUTBREAK',
+    'OUTBREAK_CONFIRMED',
+    'CRITICAL_OUTBREAK',
+)
+
+PIDSR_STATUS_RISK_LEVEL = {
+    'PROBABLE_OUTBREAK': 'High',
+    'OUTBREAK_CONFIRMED': 'Critical',
+    'CRITICAL_OUTBREAK': 'Critical',
+}
+
+PIDSR_STATUS_HEADLINE = {
+    'PROBABLE_OUTBREAK': 'PROBABLE OUTBREAK DETECTED',
+    'OUTBREAK_CONFIRMED': 'OUTBREAK CONFIRMED',
+    'CRITICAL_OUTBREAK': 'CRITICAL OUTBREAK DETECTED',
+}
+
+
+def _aptas_ml_log_to_card(log: BarangayRiskLog) -> Dict[str, Any]:
+    return {
+        'alert_source': 'aptas_ml',
+        'is_pidsr_threshold': False,
+        'risk_level': log.risk_level,
+        'barangay': log.barangay,
+        'syndrome': log.syndrome,
+        'final_risk_score': log.final_risk_score,
+        'anomaly_score': log.anomaly_score,
+        'temporal_score': log.temporal_score,
+        'spatial_score': log.spatial_score,
+        'environmental_score': log.environmental_score,
+        'created_at': log.created_at,
+        'is_active_alert': log.is_active_alert,
+    }
+
+
+def _latest_threshold_window_days(barangay_id: int, disease_label: str) -> int:
+    latest_log = (
+        OutbreakThresholdLog.objects.filter(
+            barangay_id=barangay_id,
+            disease_label=disease_label,
+        )
+        .order_by('-created_at')
+        .first()
+    )
+    if latest_log and latest_log.time_window_days:
+        return int(latest_log.time_window_days)
+    return TEMPORAL_WINDOW_DAYS
+
+
+def get_pidsr_threshold_alert_cards(*, barangay_name: str | None = None) -> list[Dict[str, Any]]:
+    """Build early-warning cards from active PIDSR threshold epidemic statuses."""
+    qs = BarangayEpidemicStatus.objects.filter(
+        threshold_status__in=PIDSR_THRESHOLD_STATUSES,
+    ).select_related('barangay').order_by('-evaluated_at')
+
+    if barangay_name:
+        qs = qs.filter(barangay__barangay_name__iexact=canonical_barangay_name(barangay_name))
+
+    cards: list[Dict[str, Any]] = []
+    for row in qs:
+        status = (row.threshold_status or '').strip()
+        risk_level = PIDSR_STATUS_RISK_LEVEL.get(status, 'High')
+        headline = PIDSR_STATUS_HEADLINE.get(status, 'THRESHOLD ALERT')
+        brgy_name = row.barangay.barangay_name if row.barangay else ''
+        disease = row.disease_label or 'Unknown disease'
+        window_days = _latest_threshold_window_days(row.barangay_id, disease)
+        case_word = 'case' if row.confirmed_count == 1 else 'cases'
+        summary = (
+            f'{row.confirmed_count} confirmed {case_word} within {window_days} days'
+        )
+        map_url = f'/map/?{urlencode({"barangay": brgy_name})}' if brgy_name else '/map/'
+
+        cards.append({
+            'alert_source': 'pidsr_threshold',
+            'is_pidsr_threshold': True,
+            'risk_level': risk_level,
+            'barangay': brgy_name,
+            'syndrome': disease,
+            'threshold_status': status,
+            'threshold_status_display': status.replace('_', ' ').title(),
+            'threshold_headline': f'{headline} — {disease} ({brgy_name})',
+            'threshold_summary': summary,
+            'confirmed_count': row.confirmed_count,
+            'time_window_days': window_days,
+            'map_url': map_url,
+            'created_at': row.evaluated_at,
+            'is_active_alert': True,
+            'final_risk_score': 100.0 if risk_level == 'Critical' else 75.0,
+            'anomaly_score': 0.95 if risk_level == 'Critical' else 0.75,
+            'temporal_score': min(1.0, row.confirmed_count / max(window_days, 1)),
+            'spatial_score': 0.0,
+            'environmental_score': 0.0,
+        })
+    return cards
+
+
 def get_aptas_dashboard_context(*, barangay_name=None, limit=12):
-    """Build template context for APTAS alert cards."""
+    """Build template context for APTAS alert cards (ML signals + PIDSR thresholds)."""
     base_qs = BarangayRiskLog.objects.all()
     if barangay_name:
         base_qs = base_qs.filter(barangay__iexact=barangay_name)
@@ -66,14 +167,40 @@ def get_aptas_dashboard_context(*, barangay_name=None, limit=12):
         '-final_risk_score', '-created_at',
     )
 
+    pidsr_cards = get_pidsr_threshold_alert_cards(barangay_name=barangay_name)
+    pidsr_keys = {
+        (c['barangay'].casefold(), c['syndrome'].casefold())
+        for c in pidsr_cards
+    }
+
+    ml_cards = [
+        _aptas_ml_log_to_card(log)
+        for log in active_qs
+        if (log.barangay.casefold(), log.syndrome.casefold()) not in pidsr_keys
+    ]
+
+    def _sort_key(card: Dict[str, Any]):
+        level_rank = {'Critical': 0, 'High': 1, 'Moderate': 2, 'Low': 3}.get(card['risk_level'], 4)
+        pidsr_rank = 0 if card.get('is_pidsr_threshold') else 1
+        return (pidsr_rank, level_rank, -float(card.get('final_risk_score') or 0))
+
+    merged_alerts = sorted(pidsr_cards + ml_cards, key=_sort_key)[:limit]
+
+    critical_count = sum(1 for c in pidsr_cards + ml_cards if c['risk_level'] == 'Critical')
+    high_count = sum(1 for c in pidsr_cards + ml_cards if c['risk_level'] == 'High')
+    moderate_count = sum(1 for c in ml_cards if c['risk_level'] == 'Moderate')
+    low_count = sum(1 for c in ml_cards if c['risk_level'] == 'Low')
+    active_count = len(pidsr_cards) + active_qs.count()
+
     return {
-        'aptas_alerts': list(active_qs[:limit]),
-        'aptas_alert_count': active_qs.count(),
+        'aptas_alerts': merged_alerts,
+        'aptas_pidsr_alerts': pidsr_cards,
+        'aptas_alert_count': active_count,
         'aptas_risk_counts': {
-            'critical': active_qs.filter(risk_level='Critical').count(),
-            'high': active_qs.filter(risk_level='High').count(),
-            'moderate': active_qs.filter(risk_level='Moderate').count(),
-            'low': active_qs.filter(risk_level='Low').count(),
+            'critical': critical_count,
+            'high': high_count,
+            'moderate': moderate_count,
+            'low': low_count,
         },
         'aptas_latest_logs': list(base_qs.order_by('-created_at')[:limit]),
     }

@@ -179,6 +179,45 @@ def api_analytics_data(request):
     return JsonResponse({'ok': True, **payload})
 
 
+@require_GET
+@login_required
+def api_alerts_aptas(request):
+    """Merged APTAS ML + PIDSR threshold alerts feed."""
+    role = request.session.get('role')
+    barangay_filter = resolve_aptas_barangay_filter(
+        role, request.session.get('user_id'), {},
+    )
+    ctx = get_aptas_dashboard_context(barangay_name=barangay_filter)
+    alerts = []
+    for card in ctx['aptas_alerts']:
+        alerts.append({
+            'source': card.get('alert_source'),
+            'is_pidsr_threshold': card.get('is_pidsr_threshold', False),
+            'risk_level': card.get('risk_level'),
+            'barangay': card.get('barangay'),
+            'syndrome': card.get('syndrome'),
+            'final_risk_score': card.get('final_risk_score'),
+            'anomaly_score': card.get('anomaly_score'),
+            'temporal_score': card.get('temporal_score'),
+            'spatial_score': card.get('spatial_score'),
+            'environmental_score': card.get('environmental_score'),
+            'threshold_status': card.get('threshold_status'),
+            'threshold_headline': card.get('threshold_headline'),
+            'threshold_summary': card.get('threshold_summary'),
+            'confirmed_count': card.get('confirmed_count'),
+            'time_window_days': card.get('time_window_days'),
+            'map_url': card.get('map_url'),
+            'is_active_alert': card.get('is_active_alert', False),
+            'created_at': card.get('created_at').isoformat() if card.get('created_at') else None,
+        })
+    return JsonResponse({
+        'ok': True,
+        'alerts': alerts,
+        'counts': ctx['aptas_risk_counts'],
+        'active_count': ctx['aptas_alert_count'],
+    })
+
+
 @role_required('admin', 'super_admin')
 def outbreak_thresholds_view(request):
     from myapp.models import OutbreakThreshold
