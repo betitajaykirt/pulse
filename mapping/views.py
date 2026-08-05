@@ -21,6 +21,11 @@ from reports.ml_display import (
     predicted_disease_display,
 )
 from reports.aptas_service import compute_aptas_breakdown, normalize_anomaly_score
+from reports.disease_category_data import (
+    DISEASE_CATEGORY_CHOICES,
+    VALID_DISEASE_CATEGORIES,
+    filter_surveillance_reports_by_disease_category,
+)
 
 
 THRESHOLD_RISK_MAP = {
