@@ -42,7 +42,47 @@
               <td colspan="6">
                 <div class="pulse-empty">
                   <i data-lucide="bell-off" class="lucide-icon"></i>
-                  <p>No alerts recorded yet. Alerts will appear here when the risk pipeline triggers them.</p>
+                  <p>No active alerts right now. Resolved alerts appear in the history section below.</p>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="dash-section">
+    <h3 class="dash-section__title">Alert History</h3>
+    <div class="pulse-panel pulse-table-panel">
+      <div class="pulse-table-panel__head">
+        <h3>Resolved Alerts</h3>
+        <span class="pulse-count-badge">{{ alert_history|length }} record{{ alert_history|length|pluralize }}</span>
+      </div>
+      <div class="pulse-table-wrap table-wrapper">
+        <table class="pulse-table">
+          <thead>
+            <tr>
+              <th>ID</th><th>Date</th><th>Type</th><th>Level</th><th>Status</th><th>Analysis ID</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for alert in alert_history %}
+            <tr class="pulse-table__row">
+              <td data-label="ID"><span class="um-id">#{{ alert.id }}</span></td>
+              <td data-label="Date"><span class="um-date">{{ alert.alert_date|date:"M d, Y H:i" }}</span></td>
+              <td data-label="Type">{{ alert.alert_type }}</td>
+              <td data-label="Level"><span class="pill-badge badge-{{ alert.alert_level }}">{{ alert.alert_level|title }}</span></td>
+              <td data-label="Status"><span class="pill-badge badge-{{ alert.status }}">{{ alert.status|title }}</span></td>
+              <td data-label="Analysis ID">{{ alert.analysis_id }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6">
+                <div class="pulse-empty">
+                  <i data-lucide="archive" class="lucide-icon"></i>
+                  <p>No resolved alerts yet.</p>
                 </div>
               </td>
             </tr>

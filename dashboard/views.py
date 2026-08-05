@@ -115,9 +115,8 @@ def alerts_inbox_view(request):
     role = request.session.get('role')
     if is_city_wide_role(role):
         alerts = Alert.objects.filter(status='active').order_by('-alert_date')[:50]
-        notifications = NotificationLog.objects.select_related('alert').filter(
-            alert__status='active',
-        ).order_by('-sent_at')[:50]
+        alert_history = Alert.objects.filter(status='resolved').order_by('-alert_date')[:50]
+        notifications = NotificationLog.objects.select_related('alert').order_by('-sent_at')[:50]
     elif role in BARANGAY_SCOPED_ROLES:
         user = User.objects.filter(id=request.session.get('user_id')).first()
         barangay = resolve_user_barangay(user)
@@ -125,19 +124,22 @@ def alerts_inbox_view(request):
             notifications = NotificationLog.objects.select_related('alert').filter(
                 recipient_role=role,
                 message_summary__icontains=barangay.barangay_name,
-                alert__status='active',
             ).order_by('-sent_at')[:50]
-            alert_ids = [n.alert_id for n in notifications]
+            alert_ids = {n.alert_id for n in notifications}
             alerts = Alert.objects.filter(id__in=alert_ids, status='active').order_by('-alert_date')[:50]
+            alert_history = Alert.objects.filter(id__in=alert_ids, status='resolved').order_by('-alert_date')[:50]
         else:
             alerts = Alert.objects.none()
+            alert_history = Alert.objects.none()
             notifications = NotificationLog.objects.none()
     else:
         alerts = Alert.objects.none()
+        alert_history = Alert.objects.none()
         notifications = NotificationLog.objects.none()
 
     ctx = {
         'alerts': alerts,
+        'alert_history': alert_history,
         'notifications': notifications,
     }
 
