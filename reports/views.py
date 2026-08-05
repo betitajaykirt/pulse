@@ -645,10 +645,18 @@ def close_case(request, report_id):
         new_remarks = f"Closing Notes: {notes}"
         update_fields['remarks'] = f"{existing} | {new_remarks}".strip(" | ") if existing else new_remarks
 
-    SurveillanceReport.objects.filter(id=report.id).update(**update_fields)
-    
     actor_id = request.session.get('user_id')
     actor_type = request.session.get('user_type', 'admin')
+
+    SurveillanceReport.objects.filter(id=report.id).update(**update_fields)
+
+    from reports.case_state_service import handle_case_state_change
+    handle_case_state_change(
+        barangay_id=report.barangay_id,
+        syndrome=(report.syndrome_type or report.suspected_disease or '').strip(),
+        trigger_report_id=report.id,
+        actor_id=actor_id,
+    )
     
     log_audit(
         actor_id=actor_id,

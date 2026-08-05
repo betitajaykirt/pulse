@@ -60,7 +60,7 @@ INSTALLED_APPS = [
     'accounts',
     'dashboard',
     'users',
-    'reports',
+    'reports.apps.ReportsConfig',
     'mapping',
 ]
 

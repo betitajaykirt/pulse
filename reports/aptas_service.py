@@ -678,6 +678,18 @@ def compute_aptas_breakdown(
     """Return component scores without writing to the database (for tests / debugging)."""
     barangay = canonical_barangay_name(barangay_name)
     syndrome = (syndrome_name or '').strip()
+    if _active_reports_qs(barangay, syndrome).count() == 0:
+        return {
+            'barangay': barangay,
+            'syndrome': syndrome,
+            'anomaly_score': 0.0,
+            'temporal_score': 0.0,
+            'environmental_score': 0.0,
+            'spatial_score': 0.0,
+            'final_risk_score': 0.0,
+            'risk_level': 'Low',
+            'is_active_alert': False,
+        }
     anomaly = normalize_anomaly_score(raw_anomaly_score)
     ref_date = None
     exclude_report_id = None
@@ -719,7 +731,45 @@ def _raw_anomaly_for_report(report) -> float:
     return 0.25
 
 
-def recalculate_aptas_for_barangay(barangay, *, trigger_report_id=None) -> list[BarangayRiskLog]:
+def reset_aptas_risk_for_barangay_syndrome(barangay_name: str, syndrome_name: str) -> BarangayRiskLog | None:
+    """
+    Deactivate APTAS alerts and persist a zero-score breakdown for a barangay/syndrome.
+
+    Used when no active surveillance cases remain after closure or deletion.
+    """
+    barangay = canonical_barangay_name(barangay_name)
+    syndrome = (syndrome_name or '').strip()
+    if not barangay or not syndrome or not _is_trackable_syndrome(syndrome):
+        return None
+
+    BarangayRiskLog.objects.filter(
+        barangay__iexact=barangay,
+        syndrome__iexact=syndrome,
+        is_active_alert=True,
+    ).update(is_active_alert=False)
+
+    log = BarangayRiskLog.objects.create(
+        barangay=barangay,
+        syndrome=syndrome,
+        anomaly_score=0.0,
+        temporal_score=0.0,
+        environmental_score=0.0,
+        spatial_score=0.0,
+        final_risk_score=0.0,
+        risk_level='Low',
+        is_active_alert=False,
+        created_at=timezone.now(),
+    )
+    logger.info('APTAS risk reset to zero for %s / %s', barangay, syndrome)
+    return log
+
+
+def recalculate_aptas_for_barangay(
+    barangay,
+    *,
+    trigger_report_id=None,
+    syndrome_hints: list[str] | None = None,
+) -> list[BarangayRiskLog]:
     """
     Recompute APTAS logs for active syndromes in a barangay.
 
@@ -734,6 +784,21 @@ def recalculate_aptas_for_barangay(barangay, *, trigger_report_id=None) -> list[
 
     logs: list[BarangayRiskLog] = []
     processed_syndromes: set[str] = set()
+    syndrome_labels: dict[str, str] = {}
+
+    def _register_syndrome(label: str) -> None:
+        if _is_trackable_syndrome(label):
+            syndrome_labels[label.casefold()] = label
+
+    if syndrome_hints:
+        for hint in syndrome_hints:
+            _register_syndrome((hint or '').strip())
+
+    for label in BarangayRiskLog.objects.filter(
+        barangay__iexact=barangay.barangay_name,
+        is_active_alert=True,
+    ).values_list('syndrome', flat=True):
+        _register_syndrome(label)
 
     if trigger_report_id:
         trigger = SurveillanceReport.objects.filter(
@@ -742,16 +807,33 @@ def recalculate_aptas_for_barangay(barangay, *, trigger_report_id=None) -> list[
         ).select_related('barangay').first()
         if trigger:
             syndrome = (trigger.syndrome_type or trigger.suspected_disease or '').strip()
-            if _is_trackable_syndrome(syndrome):
-                processed_syndromes.add(syndrome.casefold())
-                logs.append(
-                    compute_and_log_barangay_risk(
+            _register_syndrome(syndrome)
+            key = syndrome.casefold()
+            if _is_trackable_syndrome(syndrome) and key not in processed_syndromes:
+                if _active_reports_qs(barangay.barangay_name, syndrome).count() == 0:
+                    reset_log = reset_aptas_risk_for_barangay_syndrome(
                         barangay.barangay_name,
                         syndrome,
-                        _raw_anomaly_for_report(trigger),
-                        report=trigger,
                     )
-                )
+                    if reset_log:
+                        logs.append(reset_log)
+                    processed_syndromes.add(key)
+                else:
+                    anchor = (
+                        _active_reports_qs(barangay.barangay_name, syndrome)
+                        .order_by('-report_date')
+                        .first()
+                    )
+                    if anchor:
+                        processed_syndromes.add(key)
+                        logs.append(
+                            compute_and_log_barangay_risk(
+                                barangay.barangay_name,
+                                syndrome,
+                                _raw_anomaly_for_report(anchor),
+                                report=anchor,
+                            )
+                        )
 
     siblings = (
         SurveillanceReport.objects.filter(
@@ -767,6 +849,7 @@ def recalculate_aptas_for_barangay(barangay, *, trigger_report_id=None) -> list[
         if not _is_trackable_syndrome(syndrome) or key in processed_syndromes:
             continue
         processed_syndromes.add(key)
+        _register_syndrome(syndrome)
         logs.append(
             compute_and_log_barangay_risk(
                 barangay.barangay_name,
@@ -775,6 +858,15 @@ def recalculate_aptas_for_barangay(barangay, *, trigger_report_id=None) -> list[
                 report=sibling,
             )
         )
+
+    for key, label in syndrome_labels.items():
+        if key in processed_syndromes:
+            continue
+        if _active_reports_qs(barangay.barangay_name, label).count() == 0:
+            reset_log = reset_aptas_risk_for_barangay_syndrome(barangay.barangay_name, label)
+            if reset_log:
+                logs.append(reset_log)
+            processed_syndromes.add(key)
 
     return logs
 
