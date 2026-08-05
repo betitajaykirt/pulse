@@ -4,12 +4,17 @@ PIDSR disease → category mapping and default threshold seed data.
 
 # Maps ML / syndrome labels to PIDSR surveillance category levels
 DISEASE_PIDSR_CATEGORY = {
+    'Dengue Fever': 'Category 2',
     'Dengue': 'Category 2',
-    'Respiratory Illness': 'Category 2',
     'Leptospirosis': 'Category 2',
-    'Acute Gastroenteritis': 'Category 2',
+    'Typhoid Fever': 'Category 2',
+    'Anthrax': 'Category 1',
+    'Meningococcal Disease': 'Category 2',
+    'Diarrheal Disease': 'Category 2',
     'Hand, Foot, and Mouth Disease': 'Category 2',
     'Hand, Foot and Mouth Disease (HFMD)': 'Category 2',
+    'Respiratory Illness': 'Category 2',
+    'Acute Gastroenteritis': 'Category 2',
     'Cholera': 'Category 1',
     'Polio': 'Category 1',
     'Rabies': 'Category 1',

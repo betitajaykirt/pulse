@@ -1,62 +1,10 @@
 """Canonical PIDSR symptom seed data — maps ML codes to syndromic groups A–E."""
 
-from myapp.models import PIDSR_SYMPTOM_LABELS
-
-# Stable ML/API identifier → syndromic group letter
-SYMPTOM_CODE_TO_GROUP = {
-    # Group A: Systemic & Constitutional
-    'fever_high': 'A',
-    'fever_low': 'A',
-    'fever_step_ladder': 'A',
-    'chills': 'A',
-    'headache': 'A',
-    'body_ache': 'A',
-    'calf_tenderness': 'A',
-    'fatigue': 'A',
-    'limb_weakness': 'A',
-    'body_spasms': 'A',
-    # Group B: Respiratory & ENT
-    'cough_dry': 'B',
-    'cough_paroxysms': 'B',
-    'inspiratory_whoop': 'B',
-    'sore_throat': 'B',
-    'runny_nose': 'B',
-    'conjunctivitis': 'B',
-    'conjunctival_suffusion': 'B',
-    'dyspnea': 'B',
-    'throat_pseudomembrane': 'B',
-    'bull_neck': 'B',
-    # Group C: Gastrointestinal & Hepatic
-    'diarrhea_watery': 'C',
-    'diarrhea_bloody': 'C',
-    'vomiting': 'C',
-    'post_tussive_vomiting': 'C',
-    'abdominal_cramps': 'C',
-    'jaundice': 'C',
-    'dark_urine': 'C',
-    # Group D: Dermatological & Specialized Triggers
-    'mouth_sores': 'D',
-    'hand_foot_blisters': 'D',
-    'maculopapular_rash': 'D',
-    'petechiae_bleeding': 'D',
-    'black_eschar': 'D',
-    'hydrophobia': 'D',
-    # Group E: Contextual Exposure
-    'animal_bite': 'E',
-    'floodwater_exposure': 'E',
-    'endemic_travel': 'E',
-    'poultry_exposure': 'E',
-    'post_vaccine': 'E',
-    'neonatal_suck_failure': 'E',
-}
-
-SYNDROMIC_GROUP_TITLES = {
-    'A': 'Systemic & Constitutional',
-    'B': 'Respiratory & ENT',
-    'C': 'Gastrointestinal & Hepatic',
-    'D': 'Dermatological & Specialized Triggers',
-    'E': 'Contextual Exposure Checkboxes (ML Features)',
-}
+from reports.pidsr_schema import (
+    PIDSR_SYMPTOM_LABELS,
+    SYMPTOM_CODE_TO_GROUP,
+    SYNDROMIC_GROUP_TITLES,
+)
 
 
 def seed_all_symptoms(verbose=True):
@@ -84,6 +32,13 @@ def seed_all_symptoms(verbose=True):
             updated += 1
 
     if verbose:
-        print(f'Symptom seed complete: {created} created, {updated} updated '
-              f'({Symptom.objects.count()} total).')
+        print(
+            f'Symptom seed complete: {created} created, {updated} updated '
+            f'({Symptom.objects.count()} total).'
+        )
+
+    from reports.pidsr_schema import PIDSR_SYMPTOM_CODES
+    removed, _ = Symptom.objects.exclude(code__in=PIDSR_SYMPTOM_CODES).delete()
+    if verbose and removed:
+        print(f'Removed {removed} legacy symptom catalog row(s).')
     return created, updated

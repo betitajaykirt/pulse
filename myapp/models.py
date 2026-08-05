@@ -282,66 +282,15 @@ class SurveillanceSession(models.Model):
 
 
 # ── PIDSR syndromic symptom codes (ML feature set) ───────────────
-
-PIDSR_SYMPTOM_CODES = frozenset({
-    # Group A: Systemic & Constitutional
-    'fever_high', 'fever_low', 'fever_step_ladder', 'chills', 'headache',
-    'body_ache', 'calf_tenderness', 'fatigue', 'limb_weakness', 'body_spasms',
-    # Group B: Respiratory & ENT
-    'cough_dry', 'cough_paroxysms', 'inspiratory_whoop', 'sore_throat', 'runny_nose',
-    'conjunctivitis', 'conjunctival_suffusion', 'dyspnea', 'throat_pseudomembrane', 'bull_neck',
-    # Group C: Gastrointestinal & Systemic Indicators
-    'diarrhea_watery', 'diarrhea_bloody', 'vomiting', 'post_tussive_vomiting',
-    'abdominal_cramps', 'jaundice', 'dark_urine',
-    # Group D: Dermatological & Specialized Triggers
-    'mouth_sores', 'hand_foot_blisters', 'maculopapular_rash', 'petechiae_bleeding',
-    'black_eschar', 'hydrophobia',
-    # Group E: Contextual Exposure
-    'animal_bite', 'floodwater_exposure', 'endemic_travel', 'poultry_exposure',
-    'post_vaccine', 'neonatal_suck_failure',
-})
-
-PIDSR_SYMPTOM_LABELS = {
-    'fever_high': 'High Fever (≥38°C)',
-    'fever_low': 'Low-grade Fever',
-    'fever_step_ladder': 'Prolonged Step-Ladder Fever',
-    'chills': 'Chills or Rigors',
-    'headache': 'Severe Headache',
-    'body_ache': 'Generalized Muscle/Joint/Bone Pain',
-    'calf_tenderness': 'Intense Calf Muscle Tenderness',
-    'fatigue': 'Extreme Fatigue / Exhaustion',
-    'limb_weakness': 'Sudden Limb Weakness or Floppy Muscles',
-    'body_spasms': 'Generalized Body Spasms or Muscle Rigidity',
-    'cough_dry': 'Persistent Dry Cough',
-    'cough_paroxysms': 'Severe Productive / Fits of Coughing',
-    'inspiratory_whoop': 'Loud High-Pitched Sound on Breathing In',
-    'sore_throat': 'Acute Sore Throat',
-    'runny_nose': 'Runny Nose / Coryza',
-    'conjunctivitis': 'Bloodshot, Watery Red Eyes',
-    'conjunctival_suffusion': 'Red Eyes WITHOUT Pus/Discharge',
-    'dyspnea': 'Shortness of Breath / Difficulty Breathing',
-    'throat_pseudomembrane': 'Adherent Grayish-White Membrane in Throat',
-    'bull_neck': 'Massive Swelling of the Neck ("Bull Neck")',
-    'diarrhea_watery': 'Profuse Watery Diarrhea / Rice-Water Stools',
-    'diarrhea_bloody': 'Visible Blood in Loose Stools',
-    'vomiting': 'Persistent Nausea or Vomiting',
-    'post_tussive_vomiting': 'Vomiting Immediately After Coughing',
-    'abdominal_cramps': 'Severe Abdominal Cramps or Bloating',
-    'jaundice': 'Jaundice / Yellow Skin or Eyes',
-    'dark_urine': 'Dark, Tea-Colored Urine',
-    'mouth_sores': 'Painful Mouth Ulcers / Tongue Sores',
-    'hand_foot_blisters': 'Small Blisters on Palms of Hands / Soles of Feet',
-    'maculopapular_rash': 'Generalized Red, Flat Rash Spreading Downwards',
-    'petechiae_bleeding': 'Tiny Purple Skin Dots / Spontaneous Nosebleeds',
-    'black_eschar': 'Distinct Skin Ulcer with a Black Center',
-    'hydrophobia': 'Hydrophobia (Muscle Spasms When Swallowing Water)',
-    'animal_bite': 'History of Animal Bite/Scratch',
-    'floodwater_exposure': 'History of Wading in Floodwaters or Mud',
-    'endemic_travel': 'Recent Travel to Jungle/Mountainous Area',
-    'poultry_exposure': 'Exposure to Sick or Dead Poultry/Birds',
-    'post_vaccine': 'Symptoms Started Within 30 Days of Receiving a Vaccine',
-    'neonatal_suck_failure': 'Normal Crying/Sucking for First 2 Days of Life, then Stopped',
-}
+from reports.pidsr_schema import (  # noqa: E402
+    DISEASE_LABELS as PIDSR_DISEASE_LABELS,
+    LEGACY_SYMPTOM_CODE_MAP,
+    PIDSR_SYMPTOM_CODES,
+    PIDSR_SYMPTOM_LABELS,
+    SYMPTOM_CATEGORY_CODES,
+    SYMPTOM_CATEGORY_GROUP_MAP,
+    normalize_symptom_codes,
+)
 
 DEFAULT_SYNDROME_TYPE = 'Inconclusive Syndromic Pattern'
 DEFAULT_INTAKE_STATUS = 'Unclassified'
@@ -349,47 +298,23 @@ DEFAULT_INTAKE_CLASSIFICATION = 'unassigned'
 
 SYMPTOM_CATEGORY_CHOICES = [
     ('', 'All Symptoms'),
-    ('systemic', 'Systemic / Fever-related'),
-    ('respiratory', 'Respiratory / ENT'),
-    ('gastrointestinal', 'Gastrointestinal / Hepatic'),
-    ('dermatological', 'Dermatological / Rash'),
+    ('systemic', 'Systemic'),
+    ('pain', 'Pain'),
+    ('gastrointestinal', 'Gastrointestinal (GI)'),
+    ('dermatological', 'Skin / Vascular'),
+    ('respiratory', 'Respiratory'),
+    ('neurological', 'Neurological'),
+    ('exposure', 'Exposure History (Group E)'),
 ]
 
-SYMPTOM_CATEGORY_CODES = {
-    'systemic': frozenset({
-        'fever_high', 'fever_low', 'fever_step_ladder', 'chills', 'headache',
-        'body_ache', 'calf_tenderness', 'fatigue', 'limb_weakness', 'body_spasms',
-    }),
-    'respiratory': frozenset({
-        'cough_dry', 'cough_paroxysms', 'inspiratory_whoop', 'sore_throat', 'runny_nose',
-        'conjunctivitis', 'conjunctival_suffusion', 'dyspnea', 'throat_pseudomembrane', 'bull_neck',
-    }),
-    'gastrointestinal': frozenset({
-        'diarrhea_watery', 'diarrhea_bloody', 'vomiting', 'post_tussive_vomiting',
-        'abdominal_cramps', 'jaundice', 'dark_urine',
-    }),
-    'dermatological': frozenset({
-        'mouth_sores', 'hand_foot_blisters', 'maculopapular_rash', 'petechiae_bleeding',
-        'black_eschar', 'hydrophobia',
-    }),
-}
-
-SYMPTOM_CATEGORY_GROUP_MAP = {
-    'systemic': ('A',),
-    'respiratory': ('B',),
-    'gastrointestinal': ('C',),
-    'dermatological': ('D',),
-}
-
-
-# ── Dynamic syndromic symptom catalog (admin-editable) ───────────
-
 SYNDROMIC_GROUP_CHOICES = [
-    ('A', 'Group A — Systemic & Constitutional'),
-    ('B', 'Group B — Respiratory & ENT'),
-    ('C', 'Group C — Gastrointestinal & Hepatic'),
-    ('D', 'Group D — Dermatological & Specialized Triggers'),
-    ('E', 'Group E — Contextual Exposure'),
+    ('A', 'Group A — Systemic'),
+    ('B', 'Group B — Pain'),
+    ('C', 'Group C — Gastrointestinal (GI)'),
+    ('D', 'Group D — Skin / Vascular'),
+    ('R', 'Group R — Respiratory'),
+    ('N', 'Group N — Neurological'),
+    ('E', 'Group E — Exposure History'),
 ]
 
 
@@ -600,20 +525,14 @@ class PatientCase(models.Model):
 
     @classmethod
     def normalize_symptoms(cls, symptoms):
-        """Validate and dedupe symptom code list from batch payload against DB catalog."""
+        """Validate and dedupe symptom code list from batch payload against PIDSR catalog."""
         if not isinstance(symptoms, (list, tuple)):
             raise ValueError('Symptoms must be a list of indicator codes.')
-        cleaned = []
-        seen = set()
         active_codes = set(Symptom.objects.values_list('code', flat=True))
-        for raw in symptoms:
-            code = str(raw).strip()
-            if not code or code in seen:
-                continue
+        cleaned = normalize_symptom_codes(symptoms)
+        for code in cleaned:
             if code not in active_codes and code not in PIDSR_SYMPTOM_CODES:
                 raise ValueError(f'Unknown symptom indicator: {code}')
-            cleaned.append(code)
-            seen.add(code)
         if not cleaned:
             raise ValueError('At least one symptom indicator is required.')
         return cleaned
