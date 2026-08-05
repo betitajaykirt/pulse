@@ -266,6 +266,36 @@ def _coerce_date(value):
     return value
 
 
+def _canonical_disease_key(label: str) -> str:
+    """Normalize disease labels for cluster matching (Dengue ≈ Dengue Fever)."""
+    from reports.pidsr_schema import normalize_disease_label
+
+    text = normalize_disease_label((label or '').strip()).lower()
+    for suffix in (' fever', ' disease', ' / severe enteroviral disease'):
+        if text.endswith(suffix):
+            text = text[: -len(suffix)].strip()
+    return text
+
+
+def _disease_match_terms(label: str) -> set[str]:
+    """Search terms used to find related reports in the same disease cluster."""
+    syndrome = (label or '').strip()
+    if not syndrome:
+        return set()
+
+    terms = {
+        syndrome.lower(),
+        _canonical_disease_key(syndrome),
+        syndrome,
+    }
+    compact = _canonical_disease_key(syndrome)
+    if compact and ' ' not in compact and ',' not in compact:
+        terms.add(compact)
+    if compact:
+        terms.add(compact.title())
+    return {t for t in terms if t and len(t) >= 3}
+
+
 def _is_trackable_syndrome(syndrome_name: str) -> bool:
     return (syndrome_name or '').strip().lower() not in INCONCLUSIVE_SYNDROME_LABELS
 
@@ -274,12 +304,25 @@ def _syndrome_match_q(syndrome_name: str) -> Q:
     syndrome = (syndrome_name or '').strip()
     if not _is_trackable_syndrome(syndrome):
         return Q()
-    return (
-        Q(syndrome_type__icontains=syndrome)
-        | Q(suspected_disease__icontains=syndrome)
-        | Q(syndrome_type__iexact=syndrome)
-        | Q(suspected_disease__iexact=syndrome)
-    )
+
+    terms = _disease_match_terms(syndrome)
+    if not terms:
+        return Q()
+
+    q = Q()
+    for term in terms:
+        q |= Q(syndrome_type__icontains=term)
+        q |= Q(suspected_disease__icontains=term)
+        q |= Q(remarks__icontains=f'ML Top Prediction: {term}')
+        q |= Q(remarks__icontains=f'ML Classification: {term}')
+    return q
+
+
+def _cluster_window_bounds(reference_date):
+    """Symmetric rolling window so co-emerging cases see each other on the map."""
+    ref = _coerce_date(reference_date)
+    half = max(1, TEMPORAL_WINDOW_DAYS // 2)
+    return ref - timedelta(days=half), ref + timedelta(days=half)
 
 
 def _active_reports_qs(
@@ -288,6 +331,7 @@ def _active_reports_qs(
     *,
     reference_date=None,
     activity_window_days: int | None = SPATIAL_ACTIVITY_WINDOW_DAYS,
+    forward_days: int = 0,
 ):
     barangay = canonical_barangay_name(barangay_name)
     qs = SurveillanceReport.objects.filter(
@@ -300,12 +344,13 @@ def _active_reports_qs(
     if activity_window_days:
         ref = _coerce_date(reference_date)
         start = ref - timedelta(days=activity_window_days)
+        end = ref + timedelta(days=forward_days)
         qs = qs.filter(
-            Q(date_of_onset__gte=start, date_of_onset__lte=ref)
+            Q(date_of_onset__gte=start, date_of_onset__lte=end)
             | Q(
                 date_of_onset__isnull=True,
                 report_date__date__gte=start,
-                report_date__date__lte=ref,
+                report_date__date__lte=end,
             )
         )
     return qs
@@ -361,15 +406,23 @@ def compute_temporal_score(
     *,
     reference_date=None,
     exclude_report_id=None,
+    cluster_mode: bool = False,
 ) -> float:
     """
     T = min(1, max(0, (x_7 - mu_28) / (3 * sigma_28))) with zero-variance safeguard.
 
     Uses ``date_of_onset`` (fallback ``report_date``) and counts Probable, Confirmed,
     and Suspected cases relative to the case reference date (not only "today").
+
+    When ``cluster_mode`` is True (per-pin map popups), uses a symmetric rolling window
+    so cases that emerge a few days apart still contribute to the same cluster signal.
     """
     ref = _coerce_date(reference_date)
-    week_start = ref - timedelta(days=TEMPORAL_WINDOW_DAYS - 1)
+    if cluster_mode:
+        week_start, week_end = _cluster_window_bounds(ref)
+    else:
+        week_start = ref - timedelta(days=TEMPORAL_WINDOW_DAYS - 1)
+        week_end = ref
     baseline_end = week_start - timedelta(days=1)
     baseline_start = baseline_end - timedelta(days=(TEMPORAL_BASELINE_WEEKS * 7) - 1)
 
@@ -377,7 +430,7 @@ def compute_temporal_score(
         barangay_name,
         syndrome_name,
         week_start,
-        ref,
+        week_end,
         exclude_report_id=exclude_report_id,
     )
 
@@ -523,6 +576,7 @@ def compute_spatial_score_for_report(
             barangay,
             track_syndrome,
             reference_date=ref,
+            forward_days=TEMPORAL_WINDOW_DAYS,
         ).exclude(id=report.id).filter(
             latitude__isnull=False,
             longitude__isnull=False,
@@ -631,6 +685,7 @@ def compute_and_log_barangay_risk(
         syndrome,
         reference_date=ref_date,
         exclude_report_id=getattr(report, 'id', None),
+        cluster_mode=report is not None,
     )
     environmental = compute_environmental_score()
     if report is not None:
@@ -703,6 +758,7 @@ def compute_aptas_breakdown(
         syndrome,
         reference_date=ref_date,
         exclude_report_id=exclude_report_id,
+        cluster_mode=report is not None,
     )
     environmental = compute_environmental_score()
     if report is not None:
