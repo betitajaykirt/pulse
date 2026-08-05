@@ -320,9 +320,16 @@ def case_records(request):
     case_status     = request.GET.get('case_status', '').strip()
     barangay        = request.GET.get('barangay', '').strip()
     symptom_category = request.GET.get('symptom_category', '').strip()
+    disease_category = request.GET.get('disease_category', '').strip()
     role            = request.session.get('role')
     city_wide       = is_city_wide_role(role)
     scoped_barangay = get_request_barangay(request)
+
+    from reports.disease_category_data import (
+        DISEASE_CATEGORY_CHOICES,
+        VALID_DISEASE_CATEGORIES,
+        filter_surveillance_reports_by_disease_category,
+    )
 
     q = Q()
     if search:
@@ -349,6 +356,14 @@ def case_records(request):
         )
         q &= Q(id__in=report_ids)
 
+    if disease_category:
+        if disease_category not in VALID_DISEASE_CATEGORIES:
+            disease_category = ''
+        else:
+            records_qs = SurveillanceReport.objects.filter(q)
+            records_qs = filter_surveillance_reports_by_disease_category(records_qs, disease_category)
+            q = Q(id__in=records_qs.values_list('id', flat=True))
+
     records = list(
         SurveillanceReport.objects.filter(q).select_related('barangay', 'submitted_by').annotate(
             barangay_name=F('barangay__barangay_name'),
@@ -374,11 +389,13 @@ def case_records(request):
         'records': records,
         'barangays': barangays,
         'symptom_category_choices': SYMPTOM_CATEGORY_CHOICES,
+        'disease_category_choices': DISEASE_CATEGORY_CHOICES,
         'search': search,
         'validation': validation,
         'case_status': case_status,
         'barangay': barangay,
         'symptom_category': symptom_category,
+        'disease_category': disease_category,
         'city_wide': city_wide,
         'can_confirm': role in ('admin', 'super_admin', 'health_officer'),
         'can_validate': False,

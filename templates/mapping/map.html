@@ -174,6 +174,16 @@
 
       {% endif %}
 
+      <select id="filter-disease-category" class="input-soft input-soft--plain" onchange="loadMapData(false)">
+
+        {% for value, label in disease_category_choices %}
+
+        <option value="{{ value }}">{% if not value %}{{ label }}{% else %}{{ label }}{% endif %}</option>
+
+        {% endfor %}
+
+      </select>
+
       <div class="map-layer-group">
 
         <button type="button" class="map-layer-btn active" id="btn-boundaries" onclick="toggleLayer('boundaries')">
@@ -1540,6 +1550,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const syndromeF = document.getElementById('filter-syndrome') ? document.getElementById('filter-syndrome').value : '';
 
+    const diseaseCategoryF = document.getElementById('filter-disease-category') ? document.getElementById('filter-disease-category').value : '';
+
     const classifF = document.getElementById('filter-classif') ? document.getElementById('filter-classif').value : '';
 
     const casesUrl = "{% url 'api_cases' %}";
@@ -1551,6 +1563,8 @@ document.addEventListener('DOMContentLoaded', function () {
     if (barangayF) params.set('barangay', barangayF);
 
     if (syndromeF) params.set('symptom_category', syndromeF);
+
+    if (diseaseCategoryF) params.set('disease_category', diseaseCategoryF);
 
     if (classifF) params.set('case_classification', classifF);
 

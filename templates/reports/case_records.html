@@ -22,11 +22,11 @@
         <button type="submit" class="nc-btn nc-btn--primary nc-btn--sm">Search</button>
       </div>
 
-      <details class="filter-drawer" {% if case_status or validation or barangay or symptom_category %}open{% endif %} style="margin-top:1rem;">
+      <details class="filter-drawer" {% if case_status or validation or barangay or symptom_category or disease_category %}open{% endif %} style="margin-top:1rem;">
         <summary>
           <i data-lucide="chevron-right" class="lucide-icon lucide-icon--xs filter-drawer__chevron"></i>
           Advanced Filters
-          {% if case_status or validation or barangay or symptom_category %}
+          {% if case_status or validation or barangay or symptom_category or disease_category %}
             <span class="pill-badge badge-info" style="margin-left:.35rem;">Active</span>
           {% endif %}
         </summary>
@@ -70,6 +70,14 @@
               <select name="symptom_category" class="input-soft input-soft--plain">
                 {% for value, label in symptom_category_choices %}
                   <option value="{{ value }}" {% if symptom_category == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Disease Category</label>
+              <select name="disease_category" class="input-soft input-soft--plain">
+                {% for value, label in disease_category_choices %}
+                  <option value="{{ value }}" {% if disease_category == value %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
               </select>
             </div>

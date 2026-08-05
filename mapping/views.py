@@ -138,6 +138,7 @@ def map_view(request):
             'city_wide':     is_city_wide_role(role),
             'barangay_scoped': is_barangay_scoped_role(role),
             'symptom_category_choices': SYMPTOM_CATEGORY_CHOICES,
+            'disease_category_choices': DISEASE_CATEGORY_CHOICES,
         })
     except Exception as e:
         return HttpResponse(f'<h1>Map Error</h1><pre>{e}</pre>', status=500)
@@ -229,6 +230,7 @@ def api_barangay_data(request):
 def api_cases(request):
     time_range = request.GET.get('time_range', '30')
     symptom_category = request.GET.get('symptom_category', '').strip()
+    disease_category = request.GET.get('disease_category', '').strip()
     barangay_name = request.GET.get('barangay', '').strip()
     case_classif = request.GET.get('case_classification', '').strip()
 
@@ -269,6 +271,11 @@ def api_cases(request):
             barangay_id=filter_barangay_id,
         )
         base_qs = base_qs.filter(id__in=report_ids)
+
+    if disease_category:
+        if disease_category not in VALID_DISEASE_CATEGORIES:
+            return JsonResponse({'ok': False, 'error': 'Invalid disease category filter.'}, status=400)
+        base_qs = filter_surveillance_reports_by_disease_category(base_qs, disease_category)
 
     if case_classif:
         base_qs = base_qs.filter(case_classification=case_classif)
