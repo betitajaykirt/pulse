@@ -739,7 +739,7 @@ def reset_aptas_risk_for_barangay_syndrome(barangay_name: str, syndrome_name: st
     """
     barangay = canonical_barangay_name(barangay_name)
     syndrome = (syndrome_name or '').strip()
-    if not barangay or not syndrome or not _is_trackable_syndrome(syndrome):
+    if not barangay or not syndrome:
         return None
 
     BarangayRiskLog.objects.filter(
@@ -876,12 +876,28 @@ def get_barangay_risk_map_matrix() -> Dict[str, Dict[str, Any]]:
     Latest APTAS score per barangay for choropleth map styling.
 
     Returns ``{barangay_name: {'score': float, 'level': str}}``.
+    Barangays with no open surveillance cases always return zero risk.
     """
+    from myapp.models import Barangay
+
     matrix: Dict[str, Dict[str, Any]] = {}
+    barangay_ids_by_name: Dict[str, int] = {}
+    for row in Barangay.objects.values('id', 'barangay_name'):
+        name = canonical_barangay_name(row['barangay_name'])
+        if name:
+            barangay_ids_by_name[name.casefold()] = row['id']
+
     logs = BarangayRiskLog.objects.order_by('-created_at')
     for log in logs:
         name = canonical_barangay_name(log.barangay)
         if not name or name in matrix:
+            continue
+        brgy_id = barangay_ids_by_name.get(name.casefold())
+        if brgy_id and not SurveillanceReport.objects.filter(
+            barangay_id=brgy_id,
+            status__in=ACTIVE_SURVEILLANCE_STATUSES,
+        ).exists():
+            matrix[name] = {'score': 0.0, 'level': 'Low'}
             continue
         matrix[name] = {
             'score': float(log.final_risk_score),
