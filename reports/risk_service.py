@@ -169,15 +169,38 @@ def _create_risk_analysis_bridge(
 
 
 def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level=None):
-    """Create a legacy-format alert row (pulse_db.alerts)."""
+    """Create a legacy-format alert row (pulse_db.alerts), or update if exists today."""
     if not alert_level:
         alert_level = 'critical' if is_anomaly else 'high'
-
+        
     summary = (
         f'APTAS RISK: {report.syndrome_type} at {alert_level.title()} level in {barangay.barangay_name}'
         if alert_level in ('high', 'critical') else
         f'{report.syndrome_type} alert in {barangay.barangay_name}'
     )
+
+    from dashboard.models import AppNotification
+    from django.utils import timezone
+    today = timezone.now().date()
+    
+    existing_notif = AppNotification.objects.filter(
+        disease=report.syndrome_type,
+        barangay_name=barangay.barangay_name,
+        created_at__date=today
+    ).order_by('-created_at').first()
+    
+    if existing_notif and existing_notif.alert_id:
+        alert = Alert.objects.filter(id=existing_notif.alert_id, status='active').first()
+        if alert:
+            if alert_level == 'critical' and alert.alert_level != 'critical':
+                alert.alert_level = 'critical'
+                alert.save(update_fields=['alert_level'])
+                existing_notif.severity_level = 'Critical'
+                
+            existing_notif.final_risk_score = assessment.risk_score
+            existing_notif.anomaly_score = assessment.anomaly_score
+            existing_notif.save(update_fields=['final_risk_score', 'anomaly_score', 'severity_level'])
+            return alert
 
     analysis = _create_risk_analysis_bridge(
         report,
@@ -188,42 +211,24 @@ def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level
     )
 
     alert = Alert.objects.create(
-
         alert_level=alert_level,
-
         alert_date=timezone.now(),
-
         status='active',
-
         alert_type=report.syndrome_type,
-
         analysis_id=analysis.id,
-
     )
 
-
-
     for role in (CITY_WIDE_ROLES | BARANGAY_SCOPED_ROLES):
-
         NotificationLog.objects.create(
-
             alert_id=alert.id,
-
             recipient_role=role,
-
             channel='dashboard',
-
             message_summary=summary,
-
             delivery_status='sent',
-
             sent_at=timezone.now(),
-
             created_at=timezone.now(),
-
         )
 
-    from dashboard.models import AppNotification
     AppNotification.objects.create(
         alert_id=alert.id,
         disease=report.syndrome_type,

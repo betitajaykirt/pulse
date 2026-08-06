@@ -23,6 +23,7 @@ from reports.pidsr_schema import (
     INCONCLUSIVE_SYNDROMIC_LABEL,
     SYNDROMIC_FEATURE_COLUMNS,
     normalize_symptom_codes,
+    normalize_disease_label,
 )
 
 CLIMATE_FEATURE_COLUMNS: Sequence[str] = ('temperature', 'humidity', 'rainfall')
@@ -213,7 +214,7 @@ def train_and_classify_result(
     sorted_indices = np.argsort(gated_proba)[::-1]
     max_idx = int(sorted_indices[0])
     max_prob = float(gated_proba[max_idx])
-    top_label = class_labels[max_idx]
+    top_label = normalize_disease_label(class_labels[max_idx])
 
     secondary_label = None
     secondary_prob = None
@@ -223,7 +224,7 @@ def train_and_classify_result(
         sec_idx = int(sorted_indices[1])
         sec_p = float(gated_proba[sec_idx])
         if sec_p >= 0.20 or (max_prob - sec_p) <= 0.20:
-            secondary_label = class_labels[sec_idx]
+            secondary_label = normalize_disease_label(class_labels[sec_idx])
             secondary_prob = sec_p
             has_multiple_probable = True
 
