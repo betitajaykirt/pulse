@@ -495,7 +495,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
-      var circle = L.circle([lat, lng], {
+      L.circle([lat, lng], {
 
         radius: 25,
 
@@ -509,7 +509,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         pane: 'cluster-pane',
 
-        interactive: cluster.caseCount >= 2,
+        interactive: false,
 
         renderer: clusterSvgRenderer,
 
@@ -517,15 +517,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         opacity: 1,
 
-      });
-
-      if (cluster.caseCount >= 2 && typeof buildClusterPopup === 'function') {
-
-        circle.bindPopup(buildClusterPopup(cluster.cases, cluster.clusterId), { maxWidth: 480, minWidth: 320, className: 'map-case-popup-wrap' });
-
-      }
-
-      circle.addTo(clusterCirclesLayer);
+      }).addTo(clusterCirclesLayer);
 
     });
 
@@ -1538,6 +1530,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
+      // Always render every individual case pin so each patient's
+      // exact location is visible inside the hotspot radius circle.
+      group.forEach(function (c) {
+
+        addCasePin(c);
+
+      });
+
+      // Add the cluster summary badge on top for multi-case clusters.
       if (clusterModel.caseCount >= 2 && ll) {
 
         var popupHtml = buildClusterPopup(group, clusterModel.clusterId);
@@ -1547,6 +1548,8 @@ document.addEventListener('DOMContentLoaded', function () {
           pane: 'pins-pane',
 
           interactive: true,
+
+          zIndexOffset: 1000,
 
           icon: L.divIcon({
 
@@ -1562,14 +1565,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         }).bindPopup(popupHtml, { maxWidth: 480, minWidth: 320, className: 'map-case-popup-wrap' })
           .addTo(casePinsLayer);
-
-      } else {
-
-        group.forEach(function (c) {
-
-          addCasePin(c);
-
-        });
 
       }
 
