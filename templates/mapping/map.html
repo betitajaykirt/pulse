@@ -1067,8 +1067,10 @@ document.addEventListener('DOMContentLoaded', function () {
     var html = '<div class="map-case-popup">';
 
     if (fromClusterId) {
-        html += '<button type="button" class="nc-btn nc-btn--soft nc-btn--sm" style="margin-bottom: 12px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px;" onclick="openClusterPopupContext(\'' + fromClusterId + '\')">';
+        html += '<div style="padding:10px 16px 8px;border-bottom:1px solid var(--border-light,#e2e8f0);">';
+        html += '<button type="button" class="nc-btn nc-btn--soft nc-btn--sm" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:6px 12px;" onclick="openClusterPopupContext(\'' + fromClusterId + '\')">';
         html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> Back to Cluster List</button>';
+        html += '</div>';
     }
 
     html += '<div class="map-case-popup__header">';
@@ -1172,7 +1174,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var clusterModel = window.clusterMap[clusterId];
     var ll = [clusterModel.lat, clusterModel.lng];
     var html = buildClusterPopup(clusterModel.cases, clusterId);
-    L.popup({ maxWidth: 480, minWidth: 320, className: 'map-case-popup-wrap' })
+    L.popup({ maxWidth: 440, minWidth: 400, autoPan: true, autoPanPadding: [20, 20], className: 'map-case-popup-wrap' })
       .setLatLng(ll)
       .setContent(html)
       .openOn(map);
@@ -1184,7 +1186,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!c) return;
     var html = buildCasePopup(c, clusterId);
     var ll = window.clusterMap[clusterId] ? [window.clusterMap[clusterId].lat, window.clusterMap[clusterId].lng] : [c.latitude, c.longitude];
-    L.popup({ maxWidth: 480, minWidth: 420, className: 'map-case-popup-wrap' })
+    L.popup({ maxWidth: 440, minWidth: 400, autoPan: true, autoPanPadding: [20, 20], className: 'map-case-popup-wrap' })
       .setLatLng(ll)
       .setContent(html)
       .openOn(map);
@@ -1211,36 +1213,63 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var shortId = clusterId ? clusterId.replace('cluster_', '') : Math.floor(Math.random()*100);
 
-    var html = '<div class="map-cluster-popup" style="padding:0;">';
-    html += '<div class="map-cluster-popup__header" style="background-color: var(--pulse-slate-800, #334155); padding: 16px; border-radius: 6px 6px 0 0;">';
-    html += '<div style="font-weight: 600; font-size: 1.1rem; color: #fff;">Cluster ' + shortId + ': ' + escapeMapPopupHtml(purokName) + ', Brgy. ' + escapeMapPopupHtml(barangayName) + '</div>';
-    html += '<div style="font-size: 0.85rem; color: var(--pulse-slate-300, #cbd5e1); margin-top: 4px;">Total Cases: ' + totalCases + ' | Status: ' + statusDisplay + '</div>';
+    var html = '<div class="map-cluster-popup">';
+
+    // ── Header ──
+    html += '<div class="map-cluster-popup__header">';
+    html += '<div class="map-cluster-popup__header-title">Cluster ' + shortId + ': ' + escapeMapPopupHtml(purokName) + ', Brgy. ' + escapeMapPopupHtml(barangayName) + '</div>';
+    html += '<div class="map-cluster-popup__header-meta">Total Cases: ' + totalCases + ' &nbsp;|&nbsp; ' + statusDisplay + '</div>';
     html += '</div>';
 
-    html += '<div class="map-cluster-popup__scroll" style="max-height: 12rem; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: #fff; border-radius: 0 0 6px 6px;">';
+    // ── Scrollable accordion list ──
+    html += '<div class="map-cluster-popup__scroll">';
 
-    cases.forEach(function (c) {
+    cases.forEach(function (c, idx) {
       var classKey = mapPopupClassificationKey(c);
       var classLabel = mapPopupClassificationLabel(c);
-      var onset = c.date_of_onset || c.report_date || '—';
-      
-      html += '<div class="map-cluster-popup__item" style="border: 1px solid var(--pulse-slate-200, #e2e8f0); padding: 12px; border-radius: 6px; position: relative;">';
-      html += '<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">';
-      html += '<strong style="font-size: 0.95rem;">' + escapeMapPopupHtml(c.patient_name || 'Unknown Resident') + '</strong>';
-      html += '<span class="map-case-popup__badge map-case-popup__badge--' + classKey + '" style="font-size: 0.7rem; padding: 2px 6px;">' + escapeMapPopupHtml(classLabel) + '</span>';
-      html += '</div>';
-      
-      html += '<div style="font-size: 0.85rem; color: var(--pulse-slate-600, #475569); margin-bottom: 2px;"><strong>Disease:</strong> ' + mapPopupMlDiseaseDisplay(c) + '</div>';
-      html += '<div style="font-size: 0.85rem; color: var(--pulse-slate-600, #475569); margin-bottom: 2px;"><strong>Onset:</strong> ' + escapeMapPopupHtml(onset) + '</div>';
+      var onset = c.date_of_onset || c.report_date || '\u2014';
+      var patientName = escapeMapPopupHtml(c.patient_name || 'Unknown Resident');
+
+      // Each patient is a collapsible <details> element (collapsed by default)
+      html += '<details class="cluster-accordion">';
+
+      // ── Accordion trigger (summary) ──
+      html += '<summary class="cluster-accordion__trigger">';
+      html += '<span class="cluster-accordion__trigger-left">';
+      html += '<span class="cluster-accordion__patient-name">' + patientName + '</span>';
+      html += '<span class="map-case-popup__badge map-case-popup__badge--' + classKey + '" style="font-size:.62rem;padding:2px 6px;">' + escapeMapPopupHtml(classLabel) + '</span>';
+      html += '</span>';
+      html += '<span class="cluster-accordion__caret">&#9660;</span>';
+      html += '</summary>';
+
+      // ── Accordion body (expanded content) ──
+      html += '<div class="cluster-accordion__body">';
+
+      html += '<div class="cluster-accordion__detail-row"><strong>Disease:</strong> ' + mapPopupMlDiseaseDisplay(c) + '</div>';
+      html += '<div class="cluster-accordion__detail-row"><strong>Onset Date:</strong> ' + escapeMapPopupHtml(onset) + '</div>';
+      html += '<div class="cluster-accordion__detail-row"><strong>Barangay:</strong> ' + escapeMapPopupHtml(c.barangay_name || '\u2014') + '</div>';
       if (c.purok) {
-          html += '<div style="font-size: 0.85rem; color: var(--pulse-slate-600, #475569); margin-bottom: 8px;"><strong>Purok:</strong> ' + escapeMapPopupHtml(c.purok) + '</div>';
+          html += '<div class="cluster-accordion__detail-row"><strong>Purok:</strong> ' + escapeMapPopupHtml(c.purok) + '</div>';
       }
-      
-      html += '<button type="button" class="nc-btn nc-btn--sm nc-btn--outline" style="width: 100%; justify-content: center; padding: 6px; margin-top: 4px;" onclick="showSingleCasePopup(' + c.id + ', \'' + clusterId + '\')">View Full Details</button>';
+      html += '<div class="cluster-accordion__detail-row"><strong>Status:</strong> ' + escapeMapPopupHtml((c.status || '').trim() || '\u2014') + '</div>';
+      html += '<div class="cluster-accordion__detail-row"><strong>Officer:</strong> ' + escapeMapPopupHtml(c.officer_name || 'Not recorded') + '</div>';
+
+      // Risk factor pills (compact)
+      if (c.final_score != null || c.anomaly_score != null) {
+          html += '<div style="margin-top:6px;">' + buildRiskFactorGrid(c) + '</div>';
+      }
+
+      // View Full Details action
+      html += '<div class="cluster-accordion__actions">';
+      html += '<button type="button" class="nc-btn nc-btn--sm nc-btn--outline" style="width:100%;justify-content:center;padding:6px;" onclick="showSingleCasePopup(' + c.id + ',\'' + clusterId + '\')">View Full Details</button>';
       html += '</div>';
+
+      html += '</div>'; // end body
+      html += '</details>'; // end accordion
     });
 
-    html += '</div></div>';
+    html += '</div>'; // end scroll
+    html += '</div>'; // end popup
 
     return html;
 
@@ -1350,7 +1379,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         .bindTooltip(buildCaseTooltip(c), { sticky: true, direction: 'top', className: 'hotspot-tip' })
 
-        .bindPopup(popupHtml, { maxWidth: 480, minWidth: 420, className: 'map-case-popup-wrap' })
+        .bindPopup(popupHtml, { maxWidth: 440, minWidth: 400, autoPan: true, autoPanPadding: [20, 20], className: 'map-case-popup-wrap' })
 
         .addTo(casePinsLayer);
 
@@ -1563,7 +1592,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
           }),
 
-        }).bindPopup(popupHtml, { maxWidth: 480, minWidth: 320, className: 'map-case-popup-wrap' })
+        }).bindPopup(popupHtml, { maxWidth: 440, minWidth: 400, autoPan: true, autoPanPadding: [20, 20], className: 'map-case-popup-wrap' })
           .addTo(casePinsLayer);
 
       }
