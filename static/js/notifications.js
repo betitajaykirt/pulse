@@ -101,15 +101,27 @@
             ? `<p class="pulse-alert-card__queue">+ ${modalQueue.length} more unread alert(s) queued</p>`
             : '';
 
+        const locationText = notif.purok ? `${escapeHtml(notif.barangay_name)} — ${escapeHtml(notif.purok)}` : escapeHtml(notif.barangay_name);
+        let badgeHtml = '';
+        if (notif.score_shift && notif.score_shift > 0) {
+            badgeHtml = `<span class="toast-badge" style="background:#fef2f2;color:#ef4444;margin-left:8px;">+${notif.score_shift.toFixed(2)} Risk Increase</span>`;
+        }
+
+        let subtitle = escapeHtml(notif.disease);
+        if (notif.purok) subtitle += ` • ${escapeHtml(notif.purok)}`;
+        if (notif.active_cases) subtitle += ` • ${notif.active_cases} Active Cases`;
+        if (notif.trigger_source) subtitle += ` • Triggered by ${escapeHtml(notif.trigger_source)}`;
+
         toast.innerHTML = `
             <div class="toast-header pulse-alert-card__header">
                 <div>
-                    <span class="toast-badge pulse-alert-card__classification">${escapeHtml(getAlertTitle(notif))}</span>
-                    <h3 class="pulse-alert-card__title">${escapeHtml(notif.disease || 'Syndromic')} surveillance event</h3>
+                    <span class="toast-badge pulse-alert-card__classification">${escapeHtml(getAlertTitle(notif))}</span>${badgeHtml}
+                    <h3 class="pulse-alert-card__title">${locationText}</h3>
                 </div>
                 <button type="button" class="toast-close" aria-label="Close alert">&times;</button>
             </div>
             <div class="toast-body pulse-alert-card__body">
+                <p>${subtitle}</p>
                 <div class="pulse-alert-risk-badge pulse-alert-risk-badge--${severityClass}">
                     ${escapeHtml(formatRiskScoreLine(notif))}
                 </div>
@@ -187,14 +199,26 @@
         item.className = `notification-item ${notif.is_read ? 'read' : 'unread'}`;
         item.dataset.id = notif.id;
 
+        const locationText = notif.purok ? `${escapeHtml(notif.barangay_name)} — ${escapeHtml(notif.purok)}` : escapeHtml(notif.barangay_name);
+        
+        let subtitle = escapeHtml(notif.disease);
+        if (notif.purok) subtitle += ` • ${escapeHtml(notif.purok)}`;
+        if (notif.active_cases) subtitle += ` • ${notif.active_cases} Active Cases`;
+        if (notif.trigger_source) subtitle += ` • Triggered by ${escapeHtml(notif.trigger_source)}`;
+
+        let badgeHtml = '';
+        if (notif.score_shift && notif.score_shift > 0) {
+            badgeHtml = `<span class="toast-badge" style="background:#fef2f2;color:#ef4444;margin-left:8px;">+${notif.score_shift.toFixed(2)} Risk Increase</span>`;
+        }
+
         item.innerHTML = `
             <div class="notification-item-icon bg-${severityClass}">
                 <i data-lucide="alert-triangle" class="lucide-icon lucide-icon--sm"></i>
             </div>
             <div class="notification-item-content">
-                <div class="notification-item-title">${escapeHtml(notif.disease)} in ${escapeHtml(notif.barangay_name)}</div>
-                <div class="notification-item-desc">${escapeHtml(formatRiskScoreLine(notif))}</div>
-                <div class="notification-item-time">${new Date(notif.created_at).toLocaleString()}</div>
+                <div class="notification-item-title">${locationText}${badgeHtml}</div>
+                <div class="notification-item-desc">${subtitle}</div>
+                <div class="notification-item-time">${notif.last_evaluated_at ? 'Last Evaluated: ' + new Date(notif.last_evaluated_at).toLocaleString() : new Date(notif.created_at).toLocaleString()}</div>
             </div>
         `;
 

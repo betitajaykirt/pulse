@@ -168,11 +168,21 @@ def _create_risk_analysis_bridge(
 
 
 
+def _get_purok_for_report(report):
+    patient_case = report.patient_case.first() if hasattr(report, 'patient_case') else None
+    if patient_case and patient_case.purok_street:
+        return patient_case.purok_street
+    if report.patient and report.patient.address:
+        return report.patient.address
+    return ""
+
 def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level=None):
     """Create a legacy-format alert row (pulse_db.alerts), or update if exists today."""
     if not alert_level:
         alert_level = 'critical' if is_anomaly else 'high'
         
+    purok = _get_purok_for_report(report)
+    
     summary = (
         f'APTAS RISK: {report.syndrome_type} at {alert_level.title()} level in {barangay.barangay_name}'
         if alert_level in ('high', 'critical') else
@@ -183,9 +193,16 @@ def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level
     from django.utils import timezone
     today = timezone.now().date()
     
+    active_cases = SurveillanceReport.objects.filter(
+        barangay_id=report.barangay_id,
+        syndrome_type=report.syndrome_type,
+        status__in=['Pending ML Analysis', 'Suspected', 'Probable', 'Confirmed']
+    ).count()
+    
     existing_notif = AppNotification.objects.filter(
         disease=report.syndrome_type,
         barangay_name=barangay.barangay_name,
+        purok=purok,
         created_at__date=today
     ).order_by('-created_at').first()
     
@@ -196,10 +213,18 @@ def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level
                 alert.alert_level = 'critical'
                 alert.save(update_fields=['alert_level'])
                 existing_notif.severity_level = 'Critical'
-                
+            
+            score_shift = float(assessment.risk_score) - float(existing_notif.final_risk_score or 0)
+            existing_notif.score_shift = score_shift
             existing_notif.final_risk_score = assessment.risk_score
             existing_notif.anomaly_score = assessment.anomaly_score
-            existing_notif.save(update_fields=['final_risk_score', 'anomaly_score', 'severity_level'])
+            existing_notif.active_cases = active_cases
+            existing_notif.trigger_source = 'New Confirmed Case' if is_anomaly else 'Spatial Cluster Spike'
+            existing_notif.last_evaluated_at = timezone.now()
+            existing_notif.save(update_fields=[
+                'final_risk_score', 'anomaly_score', 'severity_level', 
+                'score_shift', 'active_cases', 'trigger_source', 'last_evaluated_at'
+            ])
             return alert
 
     analysis = _create_risk_analysis_bridge(
@@ -233,9 +258,13 @@ def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level
         alert_id=alert.id,
         disease=report.syndrome_type,
         barangay_name=barangay.barangay_name,
+        purok=purok,
         severity_level=alert_level.title(),
         final_risk_score=assessment.risk_score,
         anomaly_score=assessment.anomaly_score,
+        active_cases=active_cases,
+        trigger_source='New Confirmed Case' if is_anomaly else 'Spatial Cluster Spike',
+        last_evaluated_at=timezone.now(),
         spatial_metric=f"Spatial Risk: {assessment.risk_score} — Elevated risk in {barangay.barangay_name}",
         temporal_metric=f"Temporal Surge: {assessment.anomaly_score} — Recent anomaly detected",
     )
@@ -300,7 +329,47 @@ def trigger_threshold_outbreak_alert(*, report_id, threshold_result):
         f'{threshold_result.get("time_window_days")}d)'
     )
 
-    # Bridge to legacy schema: alerts.analysis_id FK → risk_analysis.analysis_id
+    purok = _get_purok_for_report(report)
+    from django.utils import timezone
+    today = timezone.now().date()
+    
+    active_cases = SurveillanceReport.objects.filter(
+        barangay_id=report.barangay_id,
+        syndrome_type=report.syndrome_type,
+        status__in=['Pending ML Analysis', 'Suspected', 'Probable', 'Confirmed']
+    ).count()
+
+    from dashboard.models import AppNotification
+    
+    existing_notif = AppNotification.objects.filter(
+        disease=threshold_result.get('disease_label') or report.syndrome_type,
+        barangay_name=threshold_result.get("barangay_name") or report.barangay.barangay_name,
+        purok=purok,
+        created_at__date=today
+    ).order_by('-created_at').first()
+    
+    if existing_notif and existing_notif.alert_id:
+        alert = Alert.objects.filter(id=existing_notif.alert_id, status='active').first()
+        if alert:
+            if alert_level == 'critical' and alert.alert_level != 'critical':
+                alert.alert_level = 'critical'
+                alert.save(update_fields=['alert_level'])
+                existing_notif.severity_level = 'Critical'
+            
+            score_shift = float(risk_score) - float(existing_notif.final_risk_score or 0)
+            existing_notif.score_shift = score_shift
+            existing_notif.final_risk_score = risk_score
+            existing_notif.anomaly_score = anomaly_score
+            existing_notif.active_cases = active_cases
+            existing_notif.trigger_source = 'PIDSR Threshold Breach'
+            existing_notif.last_evaluated_at = timezone.now()
+            existing_notif.save(update_fields=[
+                'final_risk_score', 'anomaly_score', 'severity_level', 
+                'score_shift', 'active_cases', 'trigger_source', 'last_evaluated_at'
+            ])
+            return alert
+    
+    # Bridge to legacy schema: alerts.analysis_id FK + risk_analysis.analysis_id
     now_ts = timezone.now()
     analysis = _create_risk_analysis_bridge(
         report,
@@ -329,14 +398,17 @@ def trigger_threshold_outbreak_alert(*, report_id, threshold_result):
             created_at=timezone.now(),
         )
 
-    from dashboard.models import AppNotification
     AppNotification.objects.create(
         alert_id=alert.id,
         disease=threshold_result.get('disease_label') or report.syndrome_type,
         barangay_name=threshold_result.get("barangay_name") or report.barangay.barangay_name,
+        purok=purok,
         severity_level=alert_level.title(),
         final_risk_score=risk_score,
         anomaly_score=anomaly_score,
+        active_cases=active_cases,
+        trigger_source='PIDSR Threshold Breach',
+        last_evaluated_at=timezone.now(),
         spatial_metric=f"Spatial Cluster Score: {risk_score} — High density in {threshold_result.get('barangay_name')}",
         temporal_metric=f"Temporal Surge Score: {anomaly_score} — {threshold_result.get('confirmed_count')} cases within {threshold_result.get('time_window_days')} days",
     )

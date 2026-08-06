@@ -13,6 +13,12 @@ class AppNotification(models.Model):
     spatial_metric = models.TextField(null=True, blank=True)
     temporal_metric = models.TextField(null=True, blank=True)
     
+    purok = models.CharField(max_length=150, null=True, blank=True)
+    active_cases = models.IntegerField(null=True, blank=True)
+    trigger_source = models.CharField(max_length=100, null=True, blank=True)
+    score_shift = models.DecimalField(max_digits=8, decimal_places=4, null=True, blank=True)
+    last_evaluated_at = models.DateTimeField(null=True, blank=True)
+    
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
