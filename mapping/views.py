@@ -286,7 +286,7 @@ def api_cases(request):
         base_qs = base_qs.filter(case_classification=case_classif)
 
     rows = list(
-        base_qs.select_related('barangay', 'submitted_by', 'validated_by').order_by('-report_date')
+        base_qs.select_related('barangay', 'submitted_by', 'validated_by').prefetch_related('patient_case').order_by('-report_date')
     )
     report_ids = [r.id for r in rows]
     latest_assessments = {}
@@ -429,8 +429,11 @@ def api_cases(request):
             r, status_norm, ml_predicted, confirmed_disease,
         )
         aptas_scores = _aptas_breakdown_for_report(r, assessment, aptas_cache)
+        p_cases = r.patient_case.all()
+        purok_val = (p_cases[0].purok_street if p_cases else r.detailed_address) or ''
         cases.append({
             'id':                  r.id,
+            'purok':               purok_val.strip(),
             'patient_name':        (r.patient_name or '').strip() or 'Unknown Resident',
             'latitude':            float(r.latitude),
             'longitude':           float(r.longitude),
