@@ -1210,14 +1210,14 @@
 
       var purokName = cases[0].purok || 'Unknown Purok';
       var barangayName = cases[0].barangay_name || 'Unknown Barangay';
-      var shortId = clusterId ? clusterId.replace('cluster_', '') : Math.floor(Math.random()*100);
+      var clusterNum = window.clusterMap[clusterId] ? window.clusterMap[clusterId].clusterNumber : 1;
 
       var html = '<div class="map-cluster-popup">';
 
       // ── Header ──
       html += '<div class="map-cluster-popup__header">';
       html += '<div>';
-      html += '<div class="map-cluster-popup__header-title">Cluster ' + shortId + ': ' + escapeMapPopupHtml(purokName) + ', Brgy. ' + escapeMapPopupHtml(barangayName) + '</div>';
+      html += '<div class="map-cluster-popup__header-title">Cluster ' + clusterNum + ': ' + escapeMapPopupHtml(purokName) + ', Brgy. ' + escapeMapPopupHtml(barangayName) + '</div>';
       html += '<div class="map-cluster-popup__header-meta">Total Cases: ' + totalCases + ' &nbsp;|&nbsp; ' + statusDisplay + '</div>';
       html += '</div>';
       html += '</div>';
@@ -1510,6 +1510,7 @@
 
 
 
+      var clusterCounter = 1;
       clusterRenderModels.forEach(function (clusterModel) {
 
         var group = clusterModel.cases;
@@ -1527,7 +1528,9 @@
         };
 
         if (clusterModel.caseCount >= 2 && ll) {
+          window.clusterMap[clusterId].clusterNumber = clusterCounter;
           var popupHtml = buildClusterPopup(group, clusterId);
+          clusterCounter++;
           L.marker(ll, {
             pane: 'pins-pane',
             interactive: true,
