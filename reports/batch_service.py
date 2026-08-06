@@ -37,7 +37,8 @@ def format_symptoms_for_remarks(symptoms):
 
 
 def build_remarks(purok_street, symptoms, age=None, sex=None, disease_label=None, is_anomaly=False,
-                  patient_name=None, detailed_address=None, ml_top_prediction=None, ml_confidence=None):
+                  patient_name=None, detailed_address=None, ml_top_prediction=None, ml_confidence=None,
+                  ml_secondary_prediction=None, ml_secondary_confidence=None, has_multiple_probable=False):
 
     parts = []
 
@@ -72,6 +73,18 @@ def build_remarks(purok_street, symptoms, age=None, sex=None, disease_label=None
     if ml_confidence is not None:
 
         parts.append(f'ML Confidence: {float(ml_confidence) * 100:.1f}%')
+
+    if ml_secondary_prediction:
+
+        parts.append(f'ML Secondary Prediction: {ml_secondary_prediction}')
+
+    if ml_secondary_confidence is not None:
+
+        parts.append(f'ML Secondary Confidence: {float(ml_secondary_confidence) * 100:.1f}%')
+
+    if has_multiple_probable:
+
+        parts.append('Multiple Probable: YES')
 
     if is_anomaly:
 
@@ -350,11 +363,11 @@ def save_batch_submission(*, payload, submitted_by_id, locked_barangay=None):
             patient_name=demographics['patient_name'],
 
             detailed_address=demographics['detailed_address'] or purok,
-
             ml_top_prediction=ml.get('top_predicted_disease') or '',
-
             ml_confidence=ml.get('classification_confidence'),
-
+            ml_secondary_prediction=ml.get('secondary_predicted_disease') or '',
+            ml_secondary_confidence=ml.get('secondary_classification_confidence'),
+            has_multiple_probable=ml.get('has_multiple_probable', False),
         )
 
 

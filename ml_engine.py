@@ -210,9 +210,22 @@ def train_and_classify_result(
     class_labels = [str(label_encoder.inverse_transform([i])[0]) for i in range(len(proba))]
     gated_proba = apply_exposure_gating(proba, class_labels, feature_row)
 
-    max_idx = int(np.argmax(gated_proba))
+    sorted_indices = np.argsort(gated_proba)[::-1]
+    max_idx = int(sorted_indices[0])
     max_prob = float(gated_proba[max_idx])
     top_label = class_labels[max_idx]
+
+    secondary_label = None
+    secondary_prob = None
+    has_multiple_probable = False
+
+    if len(sorted_indices) > 1:
+        sec_idx = int(sorted_indices[1])
+        sec_p = float(gated_proba[sec_idx])
+        if sec_p >= 0.20 or (max_prob - sec_p) <= 0.20:
+            secondary_label = class_labels[sec_idx]
+            secondary_prob = sec_p
+            has_multiple_probable = True
 
     if max_prob < confidence_threshold:
         disease_label = low_confidence_label
@@ -223,6 +236,9 @@ def train_and_classify_result(
         'disease_label': disease_label,
         'top_predicted_disease': top_label,
         'classification_confidence': max_prob,
+        'secondary_predicted_disease': secondary_label,
+        'secondary_classification_confidence': secondary_prob,
+        'has_multiple_probable': has_multiple_probable,
         'exposure_gated': not np.allclose(proba, gated_proba),
     }
 

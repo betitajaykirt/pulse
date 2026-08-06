@@ -452,6 +452,8 @@ def api_cases(request):
             'ml_top_predicted_disease': ml_top_prediction_for_report(r) or ml_predicted,
             'ml_classification_confidence': ml_confidence,
             'ml_confidence_pct':   ml_display.get('confidence_pct'),
+            'ml_secondary_predicted_disease': ml_display.get('secondary') or '',
+            'ml_secondary_confidence_pct': ml_display.get('secondary_confidence_pct'),
             'ml_confidence_high':  ml_high,
             'status':              r.status,
             'case_count':          r.case_count,

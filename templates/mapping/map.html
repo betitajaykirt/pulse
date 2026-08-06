@@ -1003,61 +1003,57 @@
 
 
     function mapPopupMlDiseaseDisplay(c) {
-
       var status = (c.status || '').trim();
-
       if (status === 'Confirmed') {
-
         var confirmedName = c.confirmed_disease || c.syndrome_type || c.suspected_disease || 'Unknown';
-
         return escapeMapPopupHtml(confirmedName) + ' <span class="map-case-popup__ml-tag">(Lab Confirmed)</span>';
-
       }
 
       var top = c.ml_top_predicted_disease || c.ml_predicted_disease;
-
       var confPct = c.ml_confidence_pct;
-
       if (confPct == null && c.ml_classification_confidence != null) {
-
         confPct = Math.round(c.ml_classification_confidence * 1000) / 10;
-
+      }
+      
+      var secondary = c.ml_secondary_predicted_disease;
+      var secConfPct = c.ml_secondary_confidence_pct;
+      
+      if (!top) {
+          if (status === 'Probable' || status === 'Suspected') {
+            return 'Inconclusive Syndromic Pattern';
+          }
+          if (c.suspected_disease || c.syndrome_type) {
+            return escapeMapPopupHtml(c.suspected_disease || c.syndrome_type);
+          }
+          return 'Inconclusive Syndromic Pattern';
       }
 
-      if (top) {
-
-        var line = escapeMapPopupHtml(top);
-
-        if (confPct != null) {
-
-          return line + ' <span class="map-case-popup__ml-tag">(' + confPct + '% ML confidence)</span>';
-
-        }
-
-        if (status === 'Probable' || status === 'Suspected') {
-
-          return line + ' <span class="map-case-popup__ml-tag">(ML Suggested)</span>';
-
-        }
-
-        return line;
-
+      var html = '<div style="margin-top:2px;">';
+      
+      // Primary
+      html += '<div>';
+      if (secondary) html += '<strong>Primary:</strong> ';
+      html += escapeMapPopupHtml(top);
+      if (confPct != null) {
+        html += ' <span class="map-case-popup__ml-tag">(' + confPct + '% confidence)</span>';
+      } else if (status === 'Probable' || status === 'Suspected') {
+        html += ' <span class="map-case-popup__ml-tag">(ML Suggested)</span>';
       }
+      html += '</div>';
 
-      if (status === 'Probable' || status === 'Suspected') {
-
-        return 'Inconclusive Syndromic Pattern';
-
+      // Secondary
+      if (secondary) {
+          html += '<div style="margin-top:4px;">';
+          html += '<strong>Secondary:</strong> ' + escapeMapPopupHtml(secondary);
+          if (secConfPct != null) {
+             html += ' <span class="map-case-popup__ml-tag">(' + secConfPct + '% confidence)</span>';
+          }
+          html += '</div>';
+          html += '<div style="margin-top:6px; display:inline-block; font-size:0.7rem; font-weight:600; color:#b45309; background:#fef3c7; padding:2px 6px; border-radius:4px;">Differential Diagnosis: High Symptom Overlap</div>';
       }
-
-      if (c.suspected_disease || c.syndrome_type) {
-
-        return escapeMapPopupHtml(c.suspected_disease || c.syndrome_type);
-
-      }
-
-      return 'Inconclusive Syndromic Pattern';
-
+      
+      html += '</div>';
+      return html;
     }
 
 

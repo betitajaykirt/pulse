@@ -119,6 +119,9 @@ def analyze_patient_case(
         disease_label = INSUFFICIENT_DATA_LABEL
         top_predicted = ''
         classification_confidence = None
+        secondary_predicted = ''
+        secondary_confidence = None
+        has_multiple_probable = False
         exposure_gated = False
     else:
         try:
@@ -131,12 +134,18 @@ def analyze_patient_case(
             disease_label = clf['disease_label']
             top_predicted = clf.get('top_predicted_disease') or ''
             classification_confidence = clf.get('classification_confidence')
+            secondary_predicted = clf.get('secondary_predicted_disease') or ''
+            secondary_confidence = clf.get('secondary_classification_confidence')
+            has_multiple_probable = bool(clf.get('has_multiple_probable'))
             exposure_gated = bool(clf.get('exposure_gated'))
         except Exception as exc:
             logger.exception('Random Forest classification failed: %s', exc)
             disease_label = INCONCLUSIVE_SYNDROMIC_LABEL
             top_predicted = ''
             classification_confidence = None
+            secondary_predicted = ''
+            secondary_confidence = None
+            has_multiple_probable = False
             exposure_gated = False
 
     return {
@@ -145,6 +154,9 @@ def analyze_patient_case(
         'disease_label': disease_label,
         'top_predicted_disease': top_predicted,
         'classification_confidence': classification_confidence,
+        'secondary_predicted_disease': secondary_predicted,
+        'secondary_classification_confidence': secondary_confidence,
+        'has_multiple_probable': has_multiple_probable,
         'exposure_gated': exposure_gated,
         'case_classification': _classification_from_label(disease_label),
         'symptom_count': symptom_count,
