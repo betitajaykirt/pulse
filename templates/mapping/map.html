@@ -166,7 +166,8 @@
 
       {% elif barangay_scoped and user_barangay %}
 
-      <select id="filter-barangay" class="input-soft input-soft--plain" disabled aria-label="Assigned barangay (locked)">
+      <select id="filter-barangay" class="input-soft input-soft--plain" disabled
+        aria-label="Assigned barangay (locked)">
 
         <option value="{{ user_barangay }}" selected>{{ user_barangay }}</option>
 
@@ -214,11 +215,17 @@
 
       <div class="map-legend">
 
-        <div class="legend-item"><div class="legend-dot" style="background:#F59E0B;"></div>Suspected</div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#F59E0B;"></div>Suspected
+        </div>
 
-        <div class="legend-item"><div class="legend-dot" style="background:#EF4444;"></div>Probable</div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#EF4444;"></div>Probable
+        </div>
 
-        <div class="legend-item"><div class="legend-dot" style="background:#7C3AED;"></div>Confirmed</div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#7C3AED;"></div>Confirmed
+        </div>
 
       </div>
 
@@ -226,13 +233,21 @@
 
         <span class="map-legend__label">APTAS Risk</span>
 
-        <div class="legend-item"><div class="legend-swatch" style="background:#16A34A;opacity:.55;"></div>Low</div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:#16A34A;opacity:.55;"></div>Low
+        </div>
 
-        <div class="legend-item"><div class="legend-swatch" style="background:#F59E0B;opacity:.6;"></div>Moderate</div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:#F59E0B;opacity:.6;"></div>Moderate
+        </div>
 
-        <div class="legend-item"><div class="legend-swatch" style="background:#DC2626;opacity:.65;"></div>High</div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:#DC2626;opacity:.65;"></div>High
+        </div>
 
-        <div class="legend-item"><div class="legend-swatch" style="background:#7C3AED;opacity:.7;"></div>Critical</div>
+        <div class="legend-item">
+          <div class="legend-swatch" style="background:#7C3AED;opacity:.7;"></div>Critical
+        </div>
 
       </div>
 
@@ -268,398 +283,362 @@
 
 <script>
 
-document.addEventListener('DOMContentLoaded', function () {
+  document.addEventListener('DOMContentLoaded', function () {
 
-  if (window.lucide) lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 
 
 
-  var MAP_ZOOM = Object.freeze({ min: 1, max: 20 });
-  var TILE_ZOOM = Object.freeze({ maxNative: 18, max: 20 });
+    var MAP_ZOOM = Object.freeze({ min: 1, max: 20 });
+    var TILE_ZOOM = Object.freeze({ maxNative: 18, max: 20 });
 
-  var map = L.map('map', {
-    preferCanvas: true,
-    zoomControl: true,
-    attributionControl: true,
-    minZoom: MAP_ZOOM.min,
-    maxZoom: MAP_ZOOM.max,
-  }).setView([10.5389, 122.8366], 13);
+    var map = L.map('map', {
+      preferCanvas: true,
+      zoomControl: true,
+      attributionControl: true,
+      minZoom: MAP_ZOOM.min,
+      maxZoom: MAP_ZOOM.max,
+    }).setView([10.5389, 122.8366], 13);
 
-  var MAP_VIEW = Object.freeze({ center: [10.5389, 122.8366], zoom: 13 });
+    var MAP_VIEW = Object.freeze({ center: [10.5389, 122.8366], zoom: 13 });
 
-  var streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    maxNativeZoom: TILE_ZOOM.maxNative,
-    maxZoom: TILE_ZOOM.max,
-  });
-
-  var satelliteLayer = L.tileLayer(
-    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    {
-      attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+    var streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxNativeZoom: TILE_ZOOM.maxNative,
       maxZoom: TILE_ZOOM.max,
-    }
-  );
+    });
 
-  streetLayer.addTo(map);
+    var satelliteLayer = L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      {
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+        maxNativeZoom: TILE_ZOOM.maxNative,
+        maxZoom: TILE_ZOOM.max,
+      }
+    );
 
-  L.control.layers(
-    {
-      'Street View': streetLayer,
-      'Satellite View': satelliteLayer,
-    },
-    null,
-    { position: 'topright', collapsed: true }
-  ).addTo(map);
+    streetLayer.addTo(map);
+
+    L.control.layers(
+      {
+        'Street View': streetLayer,
+        'Satellite View': satelliteLayer,
+      },
+      null,
+      { position: 'topright', collapsed: true }
+    ).addTo(map);
 
 
 
-  /* ── Custom panes for correct z-stacking ─────────────────────── */
+    /* ── Custom panes for correct z-stacking ─────────────────────── */
 
-  /* Stacking order: Tiles → Heatmap (340) → Boundaries (350) → Cluster circles (650) → Pins (750) */
+    /* Stacking order: Tiles → Heatmap (340) → Boundaries (350) → Cluster circles (650) → Pins (750) */
 
-  if (!map.getPane('heatmapPane')) {
+    if (!map.getPane('heatmapPane')) {
 
-    map.createPane('heatmapPane');
+      map.createPane('heatmapPane');
 
-    map.getPane('heatmapPane').style.zIndex = 340;
-
-  }
-
-  if (!map.getPane('cluster-pane')) {
-    map.createPane('cluster-pane');
-    map.getPane('cluster-pane').style.zIndex = '650';
-    map.getPane('cluster-pane').style.pointerEvents = 'none';
-  }
-
-  if (!map.getPane('pins-pane')) {
-    map.createPane('pins-pane');
-    map.getPane('pins-pane').style.zIndex = '750';
-    map.getPane('pins-pane').style.pointerEvents = 'auto';
-  }
-
-  var clusterSvgRenderer = L.svg({ pane: 'cluster-pane', padding: 0.5 });
-
-  var pinsSvgRenderer = L.svg({ pane: 'pins-pane', padding: 0.5 });
-
-  var CLASSIF_RANK = { confirmed: 3, probable: 2, suspected: 1 };
-
-  function classificationRadiusStyle(classification) {
-
-    var level = classification || 'suspected';
-
-    if (level === 'confirmed') {
-
-      return { color: '#a855f7', fillColor: '#d8b4fe', fillOpacity: 0.35, weight: 2 };
+      map.getPane('heatmapPane').style.zIndex = 340;
 
     }
 
-    if (level === 'probable') {
+    if (!map.getPane('cluster-pane')) {
+      map.createPane('cluster-pane');
+      map.getPane('cluster-pane').style.zIndex = '650';
+      map.getPane('cluster-pane').style.pointerEvents = 'none';
+    }
 
-      return { color: '#ef4444', fillColor: '#fca5a5', fillOpacity: 0.35, weight: 2 };
+    if (!map.getPane('pins-pane')) {
+      map.createPane('pins-pane');
+      map.getPane('pins-pane').style.zIndex = '750';
+      map.getPane('pins-pane').style.pointerEvents = 'auto';
+    }
+
+    var clusterSvgRenderer = L.svg({ pane: 'cluster-pane', padding: 0.5 });
+
+    var pinsSvgRenderer = L.svg({ pane: 'pins-pane', padding: 0.5 });
+
+    var CLASSIF_RANK = { confirmed: 3, probable: 2, suspected: 1 };
+
+    function classificationRadiusStyle(classification) {
+
+      var level = classification || 'suspected';
+
+      if (level === 'confirmed') {
+
+        return { color: '#a855f7', fillColor: '#d8b4fe', fillOpacity: 0.35, weight: 2 };
+
+      }
+
+      if (level === 'probable') {
+
+        return { color: '#ef4444', fillColor: '#fca5a5', fillOpacity: 0.35, weight: 2 };
+
+      }
+
+      return { color: '#f59e0b', fillColor: '#fde68a', fillOpacity: 0.35, weight: 2 };
 
     }
 
-    return { color: '#f59e0b', fillColor: '#fde68a', fillOpacity: 0.35, weight: 2 };
+    function casePinAppearance(c) {
 
-  }
+      var isPending = c.validation_status === 'pending';
 
-  function casePinAppearance(c) {
+      var classification = c.case_classification || 'suspected';
 
-    var isPending = c.validation_status === 'pending';
+      var fillColor = classification === 'confirmed' ? '#a855f7'
 
-    var classification = c.case_classification || 'suspected';
+        : classification === 'probable' ? '#ef4444' : '#f59e0b';
 
-    var fillColor = classification === 'confirmed' ? '#a855f7'
+      var radius = classification === 'confirmed' ? 10
 
-      : classification === 'probable' ? '#ef4444' : '#f59e0b';
+        : classification === 'probable' ? 8 : 6;
 
-    var radius = classification === 'confirmed' ? 10
+      return {
 
-      : classification === 'probable' ? 8 : 6;
+        isPending: isPending,
 
-    return {
+        fillColor: fillColor,
 
-      isPending: isPending,
+        radius: radius,
 
-      fillColor: fillColor,
+        classification: classification,
 
-      radius: radius,
+      };
 
-      classification: classification,
+    }
+
+    function worstCaseClassification(cases) {
+
+      if (!cases || !cases.length) return 'suspected';
+
+      return cases.reduce(function (best, c) {
+
+        var cl = c.case_classification || 'suspected';
+
+        return (CLASSIF_RANK[cl] || 0) > (CLASSIF_RANK[best] || 0) ? cl : best;
+
+      }, cases[0].case_classification || 'suspected');
+
+    }
+
+
+
+    function isValidLatLng(lat, lng) {
+
+      return Number.isFinite(lat) && Number.isFinite(lng)
+
+        && lat >= -90 && lat <= 90
+
+        && lng >= -180 && lng <= 180;
+
+    }
+
+
+
+    function normalizeLatLngPair(coords) {
+
+      if (!coords || coords.length < 2) return null;
+
+      var lat = parseFloat(coords[0]);
+
+      var lng = parseFloat(coords[1]);
+
+      if (!isValidLatLng(lat, lng)) return null;
+
+      return [lat, lng];
+
+    }
+
+
+
+    function toClusterRenderModel(cluster, index) {
+
+      var ll = normalizeLatLngPair(cluster.centroid);
+
+      return {
+
+        id: 'cluster-' + index,
+
+        lat: ll ? ll[0] : null,
+
+        lng: ll ? ll[1] : null,
+
+        cases: cluster.cases,
+
+        caseCount: cluster.cases.length,
+
+      };
+
+    }
+
+
+
+    function bringLayerGroupToFront(layerGroup) {
+
+      if (!layerGroup || typeof layerGroup.eachLayer !== 'function') return;
+
+      layerGroup.eachLayer(function (layer) {
+
+        if (layer && typeof layer.bringToFront === 'function') {
+
+          layer.bringToFront();
+
+        }
+
+      });
+
+    }
+
+    function renderClusterRadiusCircles(clusterModels) {
+
+      clusterCirclesLayer.clearLayers();
+
+      clusterModels.forEach(function (cluster) {
+
+        if (cluster.caseCount < 1) return;
+
+        if (!isValidLatLng(cluster.lat, cluster.lng)) return;
+
+        var lat = cluster.lat;
+
+        var lng = cluster.lng;
+
+        var radiusStyle = classificationRadiusStyle(worstCaseClassification(cluster.cases));
+
+        console.log('Rendering 25m circle at:', lat, lng, 'Total clusters:', clusterModels.length);
+
+
+
+        L.circle([lat, lng], {
+
+          radius: 25,
+
+          color: radiusStyle.color,
+
+          fillColor: radiusStyle.fillColor,
+
+          fillOpacity: radiusStyle.fillOpacity,
+
+          weight: radiusStyle.weight,
+
+          pane: 'cluster-pane',
+
+          interactive: false,
+
+          renderer: clusterSvgRenderer,
+
+          bubblingMouseEvents: false,
+
+          opacity: 1,
+
+        }).addTo(clusterCirclesLayer);
+
+      });
+
+      bringLayerGroupToFront(clusterCirclesLayer);
+
+    }
+
+
+
+    function refreshMapSize() {
+
+      map.invalidateSize({ animate: false });
+
+    }
+
+    refreshMapSize();
+
+    window.addEventListener('resize', refreshMapSize);
+
+    setTimeout(refreshMapSize, 150);
+
+    setTimeout(refreshMapSize, 500);
+
+    setTimeout(applyUrlCoordinateFocus, 600);
+
+
+
+    let casePinsLayer = L.layerGroup().addTo(map);
+
+    let clusterCirclesLayer = L.layerGroup().addTo(map);
+
+    let heatLayer = null;
+
+    let boundaryLayer = null;
+
+    let cityBoundaryLayer = null;
+
+    let barangayGeoCache = null;
+
+    let boundaryApi = null;
+
+    let boundariesInitialized = false;
+
+    let boundariesLoadPromise = null;
+
+    let mapDataRequestId = 0;
+
+    let selectedBarangayName = null;
+
+    const layerState = { boundaries: true, cases: true, heat: true };
+
+
+
+    const MAP_CONFIG = {
+
+      barangayGeoUrl: "{% static 'ph-json/bago_barangay_boundaries.geojson' %}",
+
+      cityGeoUrl: "{% static 'ph-json/bago_city_boundary.geojson' %}",
+
+      riskUrl: "{% url 'get_barangay_risk_map_data' %}",
 
     };
 
-  }
-
-  function worstCaseClassification(cases) {
-
-    if (!cases || !cases.length) return 'suspected';
-
-    return cases.reduce(function (best, c) {
-
-      var cl = c.case_classification || 'suspected';
-
-      return (CLASSIF_RANK[cl] || 0) > (CLASSIF_RANK[best] || 0) ? cl : best;
-
-    }, cases[0].case_classification || 'suspected');
-
-  }
 
 
+    function toggleLayer(n) {
 
-  function isValidLatLng(lat, lng) {
+      layerState[n] = !layerState[n];
 
-    return Number.isFinite(lat) && Number.isFinite(lng)
+      document.getElementById('btn-' + n).classList.toggle('active', layerState[n]);
 
-      && lat >= -90 && lat <= 90
+      if (n === 'cases') {
 
-      && lng >= -180 && lng <= 180;
+        if (layerState[n]) {
 
-  }
+          map.addLayer(casePinsLayer);
 
+          map.addLayer(clusterCirclesLayer);
 
+        } else {
 
-  function normalizeLatLngPair(coords) {
+          map.removeLayer(casePinsLayer);
 
-    if (!coords || coords.length < 2) return null;
+          map.removeLayer(clusterCirclesLayer);
 
-    var lat = parseFloat(coords[0]);
-
-    var lng = parseFloat(coords[1]);
-
-    if (!isValidLatLng(lat, lng)) return null;
-
-    return [lat, lng];
-
-  }
-
-
-
-  function toClusterRenderModel(cluster, index) {
-
-    var ll = normalizeLatLngPair(cluster.centroid);
-
-    return {
-
-      id: 'cluster-' + index,
-
-      lat: ll ? ll[0] : null,
-
-      lng: ll ? ll[1] : null,
-
-      cases: cluster.cases,
-
-      caseCount: cluster.cases.length,
-
-    };
-
-  }
-
-
-
-  function bringLayerGroupToFront(layerGroup) {
-
-    if (!layerGroup || typeof layerGroup.eachLayer !== 'function') return;
-
-    layerGroup.eachLayer(function (layer) {
-
-      if (layer && typeof layer.bringToFront === 'function') {
-
-        layer.bringToFront();
+        }
 
       }
 
-    });
+      if (n === 'heat' && heatLayer) {
 
-  }
-
-  function renderClusterRadiusCircles(clusterModels) {
-
-    clusterCirclesLayer.clearLayers();
-
-    clusterModels.forEach(function (cluster) {
-
-      if (cluster.caseCount < 1) return;
-
-      if (!isValidLatLng(cluster.lat, cluster.lng)) return;
-
-      var lat = cluster.lat;
-
-      var lng = cluster.lng;
-
-      var radiusStyle = classificationRadiusStyle(worstCaseClassification(cluster.cases));
-
-      console.log('Rendering 25m circle at:', lat, lng, 'Total clusters:', clusterModels.length);
-
-
-
-      L.circle([lat, lng], {
-
-        radius: 25,
-
-        color: radiusStyle.color,
-
-        fillColor: radiusStyle.fillColor,
-
-        fillOpacity: radiusStyle.fillOpacity,
-
-        weight: radiusStyle.weight,
-
-        pane: 'cluster-pane',
-
-        interactive: false,
-
-        renderer: clusterSvgRenderer,
-
-        bubblingMouseEvents: false,
-
-        opacity: 1,
-
-      }).addTo(clusterCirclesLayer);
-
-    });
-
-    bringLayerGroupToFront(clusterCirclesLayer);
-
-  }
-
-
-
-  function refreshMapSize() {
-
-    map.invalidateSize({ animate: false });
-
-  }
-
-  refreshMapSize();
-
-  window.addEventListener('resize', refreshMapSize);
-
-  setTimeout(refreshMapSize, 150);
-
-  setTimeout(refreshMapSize, 500);
-
-  setTimeout(applyUrlCoordinateFocus, 600);
-
-
-
-  let casePinsLayer = L.layerGroup().addTo(map);
-
-  let clusterCirclesLayer = L.layerGroup().addTo(map);
-
-  let heatLayer = null;
-
-  let boundaryLayer = null;
-
-  let cityBoundaryLayer = null;
-
-  let barangayGeoCache = null;
-
-  let boundaryApi = null;
-
-  let boundariesInitialized = false;
-
-  let boundariesLoadPromise = null;
-
-  let mapDataRequestId = 0;
-
-  let selectedBarangayName = null;
-
-  const layerState = { boundaries: true, cases: true, heat: true };
-
-
-
-  const MAP_CONFIG = {
-
-    barangayGeoUrl: "{% static 'ph-json/bago_barangay_boundaries.geojson' %}",
-
-    cityGeoUrl: "{% static 'ph-json/bago_city_boundary.geojson' %}",
-
-    riskUrl: "{% url 'get_barangay_risk_map_data' %}",
-
-  };
-
-
-
-  function toggleLayer(n) {
-
-    layerState[n] = !layerState[n];
-
-    document.getElementById('btn-' + n).classList.toggle('active', layerState[n]);
-
-    if (n === 'cases') {
-
-      if (layerState[n]) {
-
-        map.addLayer(casePinsLayer);
-
-        map.addLayer(clusterCirclesLayer);
-
-      } else {
-
-        map.removeLayer(casePinsLayer);
-
-        map.removeLayer(clusterCirclesLayer);
+        layerState[n] ? map.addLayer(heatLayer) : map.removeLayer(heatLayer);
 
       }
 
-    }
+      if (n === 'boundaries') {
 
-    if (n === 'heat' && heatLayer) {
+        if (boundaryLayer) {
 
-      layerState[n] ? map.addLayer(heatLayer) : map.removeLayer(heatLayer);
+          layerState[n] ? map.addLayer(boundaryLayer) : map.removeLayer(boundaryLayer);
 
-    }
+        }
 
-    if (n === 'boundaries') {
+        if (cityBoundaryLayer) {
 
-      if (boundaryLayer) {
-
-        layerState[n] ? map.addLayer(boundaryLayer) : map.removeLayer(boundaryLayer);
-
-      }
-
-      if (cityBoundaryLayer) {
-
-        layerState[n] ? map.addLayer(cityBoundaryLayer) : map.removeLayer(cityBoundaryLayer);
-
-      }
-
-    }
-
-  }
-
-  window.toggleLayer = toggleLayer;
-
-
-
-  function applyUrlBarangayFocus() {
-
-    var params = new URLSearchParams(window.location.search);
-
-    applyUrlCoordinateFocus();
-
-    var barangayParam = params.get('barangay');
-
-    if (!barangayParam || !boundaryApi) return;
-
-
-
-    var filterSelect = document.getElementById('filter-barangay');
-
-    if (filterSelect) {
-
-      for (var i = 0; i < filterSelect.options.length; i++) {
-
-        if (filterSelect.options[i].value.toLowerCase() === barangayParam.toLowerCase()) {
-
-          filterSelect.value = filterSelect.options[i].value;
-
-          selectedBarangayName = filterSelect.options[i].value;
-
-          break;
+          layerState[n] ? map.addLayer(cityBoundaryLayer) : map.removeLayer(cityBoundaryLayer);
 
         }
 
@@ -667,69 +646,181 @@ document.addEventListener('DOMContentLoaded', function () {
 
     }
 
-
-
-    boundaryApi.selectBarangay(barangayParam, { silent: true });
-
-  }
+    window.toggleLayer = toggleLayer;
 
 
 
-  function applyUrlCoordinateFocus() {
+    function applyUrlBarangayFocus() {
 
-    var params = new URLSearchParams(window.location.search);
+      var params = new URLSearchParams(window.location.search);
 
-    var lat = parseFloat(params.get('lat'));
+      applyUrlCoordinateFocus();
 
-    var lng = parseFloat(params.get('lng'));
+      var barangayParam = params.get('barangay');
 
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-
-    map.setView([lat, lng], Math.max(map.getZoom(), 17));
-
-  }
+      if (!barangayParam || !boundaryApi) return;
 
 
 
-  function onBarangayFilterChange() {
+      var filterSelect = document.getElementById('filter-barangay');
 
-    var filterSelect = document.getElementById('filter-barangay');
+      if (filterSelect) {
 
-    var value = filterSelect ? filterSelect.value : '';
+        for (var i = 0; i < filterSelect.options.length; i++) {
 
-    selectedBarangayName = value || null;
+          if (filterSelect.options[i].value.toLowerCase() === barangayParam.toLowerCase()) {
 
-    if (boundaryApi) {
+            filterSelect.value = filterSelect.options[i].value;
 
-      if (value) {
+            selectedBarangayName = filterSelect.options[i].value;
 
-        boundaryApi.selectBarangay(value, { silent: true });
+            break;
 
-      } else {
+          }
 
-        boundaryApi.selectBarangay(null, { silent: true });
+        }
 
       }
 
-    }
-
-    loadMapData(false);
-
-  }
-
-  window.onBarangayFilterChange = onBarangayFilterChange;
 
 
-
-  function loadBarangayBoundaries() {
-
-    if (boundaryApi) {
-
-      return Promise.resolve(boundaryApi);
+      boundaryApi.selectBarangay(barangayParam, { silent: true });
 
     }
 
-    if (boundariesLoadPromise) {
+
+
+    function applyUrlCoordinateFocus() {
+
+      var params = new URLSearchParams(window.location.search);
+
+      var lat = parseFloat(params.get('lat'));
+
+      var lng = parseFloat(params.get('lng'));
+
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+      map.setView([lat, lng], Math.max(map.getZoom(), 17));
+
+    }
+
+
+
+    function onBarangayFilterChange() {
+
+      var filterSelect = document.getElementById('filter-barangay');
+
+      var value = filterSelect ? filterSelect.value : '';
+
+      selectedBarangayName = value || null;
+
+      if (boundaryApi) {
+
+        if (value) {
+
+          boundaryApi.selectBarangay(value, { silent: true });
+
+        } else {
+
+          boundaryApi.selectBarangay(null, { silent: true });
+
+        }
+
+      }
+
+      loadMapData(false);
+
+    }
+
+    window.onBarangayFilterChange = onBarangayFilterChange;
+
+
+
+    function loadBarangayBoundaries() {
+
+      if (boundaryApi) {
+
+        return Promise.resolve(boundaryApi);
+
+      }
+
+      if (boundariesLoadPromise) {
+
+        return boundariesLoadPromise;
+
+      }
+
+
+
+      boundariesLoadPromise = PulseMapBoundaries.load(map, {
+
+        barangayGeoUrl: MAP_CONFIG.barangayGeoUrl,
+
+        cityGeoUrl: MAP_CONFIG.cityGeoUrl,
+
+        riskUrl: MAP_CONFIG.riskUrl,
+
+        casePinsLayer: casePinsLayer,
+
+        skipFitBounds: boundariesInitialized,
+
+        onBarangaySelect: function (name) {
+
+          selectedBarangayName = name;
+
+          var filterSelect = document.getElementById('filter-barangay');
+
+          if (filterSelect && filterSelect.value !== name) {
+
+            filterSelect.value = name;
+
+            loadMapData(false);
+
+          }
+
+        },
+
+        onReady: function (payload) {
+
+          boundaryApi = payload;
+
+          boundaryLayer = payload.boundaryLayer;
+
+          cityBoundaryLayer = payload.cityLayer;
+
+          barangayGeoCache = payload.barangayGeo;
+
+          boundariesInitialized = true;
+
+          if (!layerState.boundaries) {
+
+            if (boundaryLayer) map.removeLayer(boundaryLayer);
+
+            if (cityBoundaryLayer) map.removeLayer(cityBoundaryLayer);
+
+          }
+
+          if (selectedBarangayName) {
+
+            boundaryApi.selectBarangay(selectedBarangayName, { silent: true, openPopup: false });
+
+          } else {
+
+            applyUrlBarangayFocus();
+
+          }
+
+        },
+
+      }).catch(function (e) {
+
+        console.error('Boundary layer error:', e);
+
+        boundariesLoadPromise = null;
+
+      });
+
+
 
       return boundariesLoadPromise;
 
@@ -737,603 +828,75 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
-    boundariesLoadPromise = PulseMapBoundaries.load(map, {
+    function refreshBoundaryRisks() {
 
-      barangayGeoUrl: MAP_CONFIG.barangayGeoUrl,
+      if (!boundaryApi || !MAP_CONFIG.riskUrl) {
 
-      cityGeoUrl: MAP_CONFIG.cityGeoUrl,
+        return Promise.resolve();
 
-      riskUrl: MAP_CONFIG.riskUrl,
+      }
 
-      casePinsLayer: casePinsLayer,
+      return fetch(MAP_CONFIG.riskUrl)
 
-      skipFitBounds: boundariesInitialized,
+        .then(function (r) { return r.json(); })
 
-      onBarangaySelect: function (name) {
+        .then(function (riskData) {
 
-        selectedBarangayName = name;
+          if (typeof boundaryApi.updateRiskData === 'function') {
 
-        var filterSelect = document.getElementById('filter-barangay');
+            boundaryApi.updateRiskData(riskData);
 
-        if (filterSelect && filterSelect.value !== name) {
+          } else if (typeof boundaryApi.refreshRiskStyles === 'function') {
 
-          filterSelect.value = name;
+            boundaryApi.refreshRiskStyles();
 
-          loadMapData(false);
+          }
 
-        }
+        })
 
-      },
+        .catch(function (e) {
 
-      onReady: function (payload) {
+          console.error('Risk refresh error:', e);
 
-        boundaryApi = payload;
-
-        boundaryLayer = payload.boundaryLayer;
-
-        cityBoundaryLayer = payload.cityLayer;
-
-        barangayGeoCache = payload.barangayGeo;
-
-        boundariesInitialized = true;
-
-        if (!layerState.boundaries) {
-
-          if (boundaryLayer) map.removeLayer(boundaryLayer);
-
-          if (cityBoundaryLayer) map.removeLayer(cityBoundaryLayer);
-
-        }
-
-        if (selectedBarangayName) {
-
-          boundaryApi.selectBarangay(selectedBarangayName, { silent: true, openPopup: false });
-
-        } else {
-
-          applyUrlBarangayFocus();
-
-        }
-
-      },
-
-    }).catch(function (e) {
-
-      console.error('Boundary layer error:', e);
-
-      boundariesLoadPromise = null;
-
-    });
-
-
-
-    return boundariesLoadPromise;
-
-  }
-
-
-
-  function refreshBoundaryRisks() {
-
-    if (!boundaryApi || !MAP_CONFIG.riskUrl) {
-
-      return Promise.resolve();
+        });
 
     }
 
-    return fetch(MAP_CONFIG.riskUrl)
 
-      .then(function (r) { return r.json(); })
 
-      .then(function (riskData) {
+    function buildMitigationBanner(mitigation) {
 
-        if (typeof boundaryApi.updateRiskData === 'function') {
+      if (!mitigation || !mitigation.steps || !mitigation.steps.length) return '';
 
-          boundaryApi.updateRiskData(riskData);
 
-        } else if (typeof boundaryApi.refreshRiskStyles === 'function') {
 
-          boundaryApi.refreshRiskStyles();
+      var isEarly = mitigation.banner_type === 'early_warning';
 
-        }
+      var cls = isEarly ? 'map-mitigation-banner map-mitigation-banner--warning' : 'map-mitigation-banner map-mitigation-banner--critical';
 
-      })
+      var header = isEarly
 
-      .catch(function (e) {
+        ? '⚠️ Early Preventive Containment Tasks (ML Predicted Pattern)'
 
-        console.error('Risk refresh error:', e);
+        : '🚨 Critical Outbreak Suppression Actions (Admin Confirmed Threshold)';
+
+
+
+      var html = '<div class="' + cls + '">';
+
+      html += '<div class="map-mitigation-banner__header">' + header + '</div>';
+
+      html += '<div class="map-mitigation-banner__disease">' + (mitigation.disease_label || '') + '</div>';
+
+      html += '<ol class="map-mitigation-banner__steps">';
+
+      mitigation.steps.forEach(function (step) {
+
+        html += '<li><span class="map-mitigation-banner__cat">' + step.action_category.replace('_', ' ') + '</span> ' + step.action_text + '</li>';
 
       });
 
-  }
-
-
-
-  function buildMitigationBanner(mitigation) {
-
-    if (!mitigation || !mitigation.steps || !mitigation.steps.length) return '';
-
-
-
-    var isEarly = mitigation.banner_type === 'early_warning';
-
-    var cls = isEarly ? 'map-mitigation-banner map-mitigation-banner--warning' : 'map-mitigation-banner map-mitigation-banner--critical';
-
-    var header = isEarly
-
-      ? '⚠️ Early Preventive Containment Tasks (ML Predicted Pattern)'
-
-      : '🚨 Critical Outbreak Suppression Actions (Admin Confirmed Threshold)';
-
-
-
-    var html = '<div class="' + cls + '">';
-
-    html += '<div class="map-mitigation-banner__header">' + header + '</div>';
-
-    html += '<div class="map-mitigation-banner__disease">' + (mitigation.disease_label || '') + '</div>';
-
-    html += '<ol class="map-mitigation-banner__steps">';
-
-    mitigation.steps.forEach(function (step) {
-
-      html += '<li><span class="map-mitigation-banner__cat">' + step.action_category.replace('_', ' ') + '</span> ' + step.action_text + '</li>';
-
-    });
-
-    html += '</ol></div>';
-
-    return html;
-
-  }
-
-
-
-  function escapeMapPopupHtml(value) {
-
-    if (value == null || value === '') return '—';
-
-    return String(value)
-
-      .replace(/&/g, '&amp;')
-
-      .replace(/</g, '&lt;')
-
-      .replace(/>/g, '&gt;')
-
-      .replace(/"/g, '&quot;');
-
-  }
-
-
-
-  function mapPopupClassificationKey(c) {
-
-    var cl = (c.case_classification || 'suspected').toLowerCase();
-
-    if (cl === 'confirmed') return 'confirmed';
-
-    if (cl === 'probable') return 'probable';
-
-    if (cl === 'unassigned') return 'unassigned';
-
-    return 'suspected';
-
-  }
-
-
-
-  function mapPopupClassificationLabel(c) {
-
-    var raw = (c.case_classification || c.status || 'Suspected').toString().replace(/_/g, ' ').trim();
-
-    return raw.toUpperCase();
-
-  }
-
-
-
-  function formatRiskMetric(value) {
-
-    if (value == null || value === '') return '0.00';
-
-    var n = Number(value);
-
-    if (isNaN(n)) return '0.00';
-
-    if (n > 1.5) return (n / 100).toFixed(2);
-
-    return n.toFixed(2);
-
-  }
-
-
-
-  function buildRiskFactorGrid(c) {
-
-    var metrics = [
-
-      { label: 'FINAL', value: c.final_score != null ? c.final_score : c.risk_score },
-
-      { label: 'ANOMALY', value: c.anomaly_score },
-
-      { label: 'TEMPORAL', value: c.temporal_score },
-
-      { label: 'SPATIAL', value: c.spatial_score },
-
-      { label: 'ENVIRONMENTAL', value: c.environmental_score },
-
-    ];
-
-    var html = '<div class="map-case-popup__risk-grid" role="list" aria-label="Risk factor breakdown">';
-
-    metrics.forEach(function (metric) {
-
-      html += '<div class="map-case-popup__risk-pill" role="listitem">';
-
-      html += '<span class="map-case-popup__risk-pill-label">' + metric.label + '</span>';
-
-      html += '<span class="map-case-popup__risk-pill-value">' + formatRiskMetric(metric.value) + '</span>';
-
-      html += '</div>';
-
-    });
-
-    html += '</div>';
-
-    return html;
-
-  }
-
-
-
-  function mapPopupMlDiseaseDisplay(c) {
-
-    var status = (c.status || '').trim();
-
-    if (status === 'Confirmed') {
-
-      var confirmedName = c.confirmed_disease || c.syndrome_type || c.suspected_disease || 'Unknown';
-
-      return escapeMapPopupHtml(confirmedName) + ' <span class="map-case-popup__ml-tag">(Lab Confirmed)</span>';
-
-    }
-
-    var top = c.ml_top_predicted_disease || c.ml_predicted_disease;
-
-    var confPct = c.ml_confidence_pct;
-
-    if (confPct == null && c.ml_classification_confidence != null) {
-
-      confPct = Math.round(c.ml_classification_confidence * 1000) / 10;
-
-    }
-
-    if (top) {
-
-      var line = escapeMapPopupHtml(top);
-
-      if (confPct != null) {
-
-        return line + ' <span class="map-case-popup__ml-tag">(' + confPct + '% ML confidence)</span>';
-
-      }
-
-      if (status === 'Probable' || status === 'Suspected') {
-
-        return line + ' <span class="map-case-popup__ml-tag">(ML Suggested)</span>';
-
-      }
-
-      return line;
-
-    }
-
-    if (status === 'Probable' || status === 'Suspected') {
-
-      return 'Inconclusive Syndromic Pattern';
-
-    }
-
-    if (c.suspected_disease || c.syndrome_type) {
-
-      return escapeMapPopupHtml(c.suspected_disease || c.syndrome_type);
-
-    }
-
-    return 'Inconclusive Syndromic Pattern';
-
-  }
-
-
-
-  function buildCasePopup(c, fromClusterId) {
-
-    var isPending = c.validation_status === 'pending';
-
-    var classKey = mapPopupClassificationKey(c);
-
-    var classLabel = mapPopupClassificationLabel(c);
-
-    var caseStatus = (c.status || '').trim();
-
-    var onsetDate = c.date_of_onset || c.report_date || '—';
-
-    var barangayDisplay = escapeMapPopupHtml(c.barangay_name);
-    if (c.purok) {
-        barangayDisplay += ' (' + escapeMapPopupHtml(c.purok) + ')';
-    }
-
-    var html = '<div class="map-case-popup">';
-
-    if (fromClusterId) {
-        html += '<div style="padding:10px 16px 8px;border-bottom:1px solid var(--border-light,#e2e8f0);">';
-        html += '<button type="button" class="nc-btn nc-btn--soft nc-btn--sm" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:6px 12px;" onclick="openClusterPopupContext(\'' + fromClusterId + '\')">';
-        html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> Back to Cluster List</button>';
-        html += '</div>';
-    }
-
-    html += '<div class="map-case-popup__header">';
-
-    html += '<span class="map-case-popup__badge map-case-popup__badge--' + classKey + '">' + escapeMapPopupHtml(classLabel) + '</span>';
-
-    if (isPending) {
-
-      html += '<span class="map-case-popup__pending">Pending validation</span>';
-
-    }
-
-    html += '</div>';
-
-
-
-    html += '<div class="map-case-popup__section map-case-popup__section--details">';
-
-    html += '<div class="map-case-popup__row"><strong>Patient:</strong> ' + escapeMapPopupHtml(c.patient_name || 'Unknown Resident') + '</div>';
-
-    html += '<div class="map-case-popup__row map-case-popup__row--disease"><strong>ML Predicted Disease:</strong> ' + mapPopupMlDiseaseDisplay(c) + '</div>';
-
-    html += '<div class="map-case-popup__row"><strong>Barangay:</strong> ' + barangayDisplay + '</div>';
-
-    html += '<div class="map-case-popup__row"><strong>Cases:</strong> ' + escapeMapPopupHtml(c.case_count) + '</div>';
-
-    html += '<div class="map-case-popup__row"><strong>Onset Date:</strong> ' + escapeMapPopupHtml(onsetDate) + '</div>';
-
-    html += '<div class="map-case-popup__row"><strong>Status:</strong> ' + escapeMapPopupHtml(caseStatus || '—') + '</div>';
-
-    html += '</div>';
-
-
-
-    html += '<div class="map-case-popup__section map-case-popup__section--divider map-case-popup__officer-grid">';
-
-    html += '<div class="map-case-popup__officer-item"><span class="map-case-popup__officer-label">Officer in Charge</span><span class="map-case-popup__officer-value">' + escapeMapPopupHtml(c.officer_name || 'Not recorded') + '</span></div>';
-
-    html += '<div class="map-case-popup__officer-item"><span class="map-case-popup__officer-label">Contact</span><span class="map-case-popup__officer-value">' + escapeMapPopupHtml(c.officer_contact || 'Not available') + '</span></div>';
-
-    if (caseStatus === 'Confirmed') {
-
-      if (c.confirmed_date) {
-
-        html += '<div class="map-case-popup__officer-item map-case-popup__officer-item--full"><span class="map-case-popup__officer-label">Confirmed Date</span><span class="map-case-popup__officer-value">' + escapeMapPopupHtml(c.confirmed_date) + '</span></div>';
-
-      }
-
-      html += '<div class="map-case-popup__officer-item map-case-popup__officer-item--full"><span class="map-case-popup__officer-label">Confirmed By</span><span class="map-case-popup__officer-value">' + escapeMapPopupHtml(c.confirmed_by || 'System Administrator') + '</span></div>';
-
-    }
-
-    html += '</div>';
-
-
-
-    html += '<div class="map-case-popup__section map-case-popup__section--divider map-case-popup__risk-section">';
-
-    html += '<div class="map-case-popup__risk-heading">Risk Factors</div>';
-
-    html += buildRiskFactorGrid(c);
-
-    if (c.epidemic_threshold_status) {
-
-      html += '<div class="map-case-popup__threshold"><strong>Threshold:</strong> ' + escapeMapPopupHtml(c.epidemic_threshold_status.replace(/_/g, ' ')) + '</div>';
-
-    }
-
-    html += '</div>';
-
-
-
-    html += '<div class="map-case-popup__section map-case-popup__section--divider map-case-popup__recommendations">';
-
-    html += '<div class="map-case-popup__rec-head">';
-
-    html += '<svg class="map-case-popup__rec-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26A7 7 0 0 0 12 2z"/></svg>';
-
-    html += '<strong>Recommendations</strong>';
-
-    html += '</div>';
-
-    html += '<p class="map-case-popup__rec-text">' + escapeMapPopupHtml(c.recommendations) + '</p>';
-
-    html += '</div>';
-
-
-
-    html += buildMitigationBanner(c.mitigation_suggestions);
-
-    html += '</div>';
-
-    return html;
-
-  }
-
-
-
-  window.openClusterPopupContext = function(clusterId) {
-    if (!clusterId || !window.clusterMap[clusterId]) return;
-    var clusterModel = window.clusterMap[clusterId];
-    var ll = [clusterModel.lat, clusterModel.lng];
-    var html = buildClusterPopup(clusterModel.cases, clusterId);
-    L.popup({ maxWidth: 440, minWidth: 400, autoPan: true, autoPanPadding: [20, 20], className: 'map-case-popup-wrap' })
-      .setLatLng(ll)
-      .setContent(html)
-      .openOn(map);
-    setTimeout(function() { if (window.lucide) lucide.createIcons(); }, 10);
-  };
-
-  window.showSingleCasePopup = function(caseId, clusterId) {
-    var c = window.globalCasesMap[caseId];
-    if (!c) return;
-    var html = buildCasePopup(c, clusterId);
-    var ll = window.clusterMap[clusterId] ? [window.clusterMap[clusterId].lat, window.clusterMap[clusterId].lng] : [c.latitude, c.longitude];
-    L.popup({ maxWidth: 440, minWidth: 400, autoPan: true, autoPanPadding: [20, 20], className: 'map-case-popup-wrap' })
-      .setLatLng(ll)
-      .setContent(html)
-      .openOn(map);
-    setTimeout(function() { if (window.lucide) lucide.createIcons(); }, 10);
-  };
-
-  function buildClusterPopup(cases, clusterId) {
-
-    var totalCases = cases.reduce(function (s, c) { return s + c.case_count; }, 0);
-
-    var classifCounts = { suspected: 0, probable: 0, confirmed: 0 };
-    cases.forEach(function(c) {
-       var cls = (c.case_classification || 'suspected').toLowerCase();
-       if (classifCounts[cls] !== undefined) classifCounts[cls]++;
-    });
-    var statusText = [];
-    if (classifCounts.confirmed) statusText.push(classifCounts.confirmed + ' Confirmed');
-    if (classifCounts.probable) statusText.push(classifCounts.probable + ' Probable');
-    if (classifCounts.suspected) statusText.push(classifCounts.suspected + ' Suspected');
-    var statusDisplay = statusText.join(', ') || 'No cases';
-
-    var purokName = cases[0].purok || 'Unknown Purok';
-    var barangayName = cases[0].barangay_name || 'Unknown Barangay';
-
-    var shortId = clusterId ? clusterId.replace('cluster_', '') : Math.floor(Math.random()*100);
-
-    var html = '<div class="map-cluster-popup">';
-
-    // ── Header ──
-    html += '<div class="map-cluster-popup__header">';
-    html += '<div class="map-cluster-popup__header-title">Cluster ' + shortId + ': ' + escapeMapPopupHtml(purokName) + ', Brgy. ' + escapeMapPopupHtml(barangayName) + '</div>';
-    html += '<div class="map-cluster-popup__header-meta">Total Cases: ' + totalCases + ' &nbsp;|&nbsp; ' + statusDisplay + '</div>';
-    html += '</div>';
-
-    // ── Scrollable accordion list ──
-    html += '<div class="map-cluster-popup__scroll">';
-
-    cases.forEach(function (c, idx) {
-      var classKey = mapPopupClassificationKey(c);
-      var classLabel = mapPopupClassificationLabel(c);
-      var onset = c.date_of_onset || c.report_date || '\u2014';
-      var patientName = escapeMapPopupHtml(c.patient_name || 'Unknown Resident');
-
-      // Each patient is a collapsible <details> element (collapsed by default)
-      html += '<details class="cluster-accordion">';
-
-      // ── Accordion trigger (summary) ──
-      html += '<summary class="cluster-accordion__trigger">';
-      html += '<span class="cluster-accordion__trigger-left">';
-      html += '<span class="cluster-accordion__patient-name">' + patientName + '</span>';
-      html += '<span class="map-case-popup__badge map-case-popup__badge--' + classKey + '" style="font-size:.62rem;padding:2px 6px;">' + escapeMapPopupHtml(classLabel) + '</span>';
-      html += '</span>';
-      html += '<span class="cluster-accordion__caret">&#9660;</span>';
-      html += '</summary>';
-
-      // ── Accordion body (expanded content) ──
-      html += '<div class="cluster-accordion__body">';
-
-      html += '<div class="cluster-accordion__detail-row"><strong>Disease:</strong> ' + mapPopupMlDiseaseDisplay(c) + '</div>';
-      html += '<div class="cluster-accordion__detail-row"><strong>Onset Date:</strong> ' + escapeMapPopupHtml(onset) + '</div>';
-      html += '<div class="cluster-accordion__detail-row"><strong>Barangay:</strong> ' + escapeMapPopupHtml(c.barangay_name || '\u2014') + '</div>';
-      if (c.purok) {
-          html += '<div class="cluster-accordion__detail-row"><strong>Purok:</strong> ' + escapeMapPopupHtml(c.purok) + '</div>';
-      }
-      html += '<div class="cluster-accordion__detail-row"><strong>Status:</strong> ' + escapeMapPopupHtml((c.status || '').trim() || '\u2014') + '</div>';
-      html += '<div class="cluster-accordion__detail-row"><strong>Officer:</strong> ' + escapeMapPopupHtml(c.officer_name || 'Not recorded') + '</div>';
-
-      // Risk factor pills (compact)
-      if (c.final_score != null || c.anomaly_score != null) {
-          html += '<div style="margin-top:6px;">' + buildRiskFactorGrid(c) + '</div>';
-      }
-
-      // View Full Details action
-      html += '<div class="cluster-accordion__actions">';
-      html += '<button type="button" class="nc-btn nc-btn--sm nc-btn--outline" style="width:100%;justify-content:center;padding:6px;" onclick="showSingleCasePopup(' + c.id + ',\'' + clusterId + '\')">View Full Details</button>';
-      html += '</div>';
-
-      html += '</div>'; // end body
-      html += '</details>'; // end accordion
-    });
-
-    html += '</div>'; // end scroll
-    html += '</div>'; // end popup
-
-    return html;
-
-  }
-
-
-
-  function updateCaseAndHeatLayers(caseList) {
-
-    casePinsLayer.clearLayers();
-
-    clusterCirclesLayer.clearLayers();
-
-    if (heatLayer) {
-
-      map.removeLayer(heatLayer);
-
-      heatLayer = null;
-
-    }
-
-    const hp = [];
-
-    let counts = { suspected: 0, probable: 0, confirmed: 0, total: 0 };
-    window.globalCasesMap = {};
-    window.clusterMap = {};
-
-
-
-    caseList.forEach(function (c) {
-      window.globalCasesMap[c.id] = c;
-
-      hp.push([c.latitude, c.longitude, c.heat_intensity]);
-
-      counts[c.case_classification] = (counts[c.case_classification] || 0) + c.case_count;
-
-      counts.total += c.case_count;
-
-    });
-
-
-
-    // Leaflet L.circle uses radius in meters (geographic), not screen pixels.
-    const CLUSTER_RADIUS_M = 25;
-
-
-
-    function buildCaseTooltip(c) {
-
-      var appearance = casePinAppearance(c);
-
-      var html = '<b>Syndromic report</b><br>';
-
-      html += 'Cases: <b>' + (c.case_count || 0) + '</b><br>';
-
-      html += 'Classification: <b>' + (c.case_classification || 'suspected').toUpperCase() + '</b><br>';
-
-      html += 'Barangay: ' + (c.barangay_name || '—');
-
-      if (appearance.isPending) {
-
-        html += '<br><span style="color:#f59e0b;font-size:.75rem;font-weight:600;">Pending validation</span>';
-
-      }
+      html += '</ol></div>';
 
       return html;
 
@@ -1341,181 +904,517 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
-    function addCasePin(c) {
+    function escapeMapPopupHtml(value) {
 
-      var lat = parseFloat(c.latitude);
+      if (value == null || value === '') return '—';
 
-      var lon = parseFloat(c.longitude);
+      return String(value)
 
-      if (!isValidLatLng(lat, lon)) return;
+        .replace(/&/g, '&amp;')
 
-      var ll = [lat, lon];
+        .replace(/</g, '&lt;')
 
-      var appearance = casePinAppearance(c);
+        .replace(/>/g, '&gt;')
 
-      var popupHtml = buildCasePopup(c);
-
-
-
-      L.circleMarker(ll, {
-
-        pane: 'pins-pane',
-
-        renderer: pinsSvgRenderer,
-
-        radius: appearance.radius,
-
-        fillColor: appearance.fillColor,
-
-        color: '#ffffff',
-
-        weight: 3,
-
-        fillOpacity: appearance.isPending ? 0.5 : 0.95,
-
-        opacity: 1,
-
-      })
-
-        .bindTooltip(buildCaseTooltip(c), { sticky: true, direction: 'top', className: 'hotspot-tip' })
-
-        .bindPopup(popupHtml, { maxWidth: 440, minWidth: 400, autoPan: true, autoPanPadding: [20, 20], className: 'map-case-popup-wrap' })
-
-        .addTo(casePinsLayer);
+        .replace(/"/g, '&quot;');
 
     }
 
 
 
-    function buildProximityClusters(cases, thresholdM) {
+    function mapPopupClassificationKey(c) {
 
-      if (!cases.length) return [];
+      var cl = (c.case_classification || 'suspected').toLowerCase();
 
-      var parent = cases.map(function (_, idx) { return idx; });
+      if (cl === 'confirmed') return 'confirmed';
+
+      if (cl === 'probable') return 'probable';
+
+      if (cl === 'unassigned') return 'unassigned';
+
+      return 'suspected';
+
+    }
 
 
 
-      function find(idx) {
+    function mapPopupClassificationLabel(c) {
 
-        while (parent[idx] !== idx) {
+      var raw = (c.case_classification || c.status || 'Suspected').toString().replace(/_/g, ' ').trim();
 
-          parent[idx] = parent[parent[idx]];
+      return raw.toUpperCase();
 
-          idx = parent[idx];
+    }
+
+
+
+    function formatRiskMetric(value) {
+
+      if (value == null || value === '') return '0.00';
+
+      var n = Number(value);
+
+      if (isNaN(n)) return '0.00';
+
+      if (n > 1.5) return (n / 100).toFixed(2);
+
+      return n.toFixed(2);
+
+    }
+
+
+
+    function buildRiskFactorGrid(c) {
+
+      var metrics = [
+
+        { label: 'FINAL', value: c.final_score != null ? c.final_score : c.risk_score },
+
+        { label: 'ANOMALY', value: c.anomaly_score },
+
+        { label: 'TEMPORAL', value: c.temporal_score },
+
+        { label: 'SPATIAL', value: c.spatial_score },
+
+        { label: 'ENVIRONMENTAL', value: c.environmental_score },
+
+      ];
+
+      var html = '<div class="map-case-popup__risk-grid" role="list" aria-label="Risk factor breakdown">';
+
+      metrics.forEach(function (metric) {
+
+        html += '<div class="map-case-popup__risk-pill" role="listitem">';
+
+        html += '<span class="map-case-popup__risk-pill-label">' + metric.label + '</span>';
+
+        html += '<span class="map-case-popup__risk-pill-value">' + formatRiskMetric(metric.value) + '</span>';
+
+        html += '</div>';
+
+      });
+
+      html += '</div>';
+
+      return html;
+
+    }
+
+
+
+    function mapPopupMlDiseaseDisplay(c) {
+
+      var status = (c.status || '').trim();
+
+      if (status === 'Confirmed') {
+
+        var confirmedName = c.confirmed_disease || c.syndrome_type || c.suspected_disease || 'Unknown';
+
+        return escapeMapPopupHtml(confirmedName) + ' <span class="map-case-popup__ml-tag">(Lab Confirmed)</span>';
+
+      }
+
+      var top = c.ml_top_predicted_disease || c.ml_predicted_disease;
+
+      var confPct = c.ml_confidence_pct;
+
+      if (confPct == null && c.ml_classification_confidence != null) {
+
+        confPct = Math.round(c.ml_classification_confidence * 1000) / 10;
+
+      }
+
+      if (top) {
+
+        var line = escapeMapPopupHtml(top);
+
+        if (confPct != null) {
+
+          return line + ' <span class="map-case-popup__ml-tag">(' + confPct + '% ML confidence)</span>';
 
         }
 
-        return idx;
+        if (status === 'Probable' || status === 'Suspected') {
 
-      }
-
-
-
-      function union(a, b) {
-
-        var rootA = find(a);
-
-        var rootB = find(b);
-
-        if (rootA !== rootB) parent[rootB] = rootA;
-
-      }
-
-
-
-      for (var i = 0; i < cases.length; i++) {
-
-        var latA = parseFloat(cases[i].latitude);
-
-        var lonA = parseFloat(cases[i].longitude);
-
-        if (!Number.isFinite(latA) || !Number.isFinite(lonA)) continue;
-
-        for (var j = i + 1; j < cases.length; j++) {
-
-          var latB = parseFloat(cases[j].latitude);
-
-          var lonB = parseFloat(cases[j].longitude);
-
-          if (!Number.isFinite(latB) || !Number.isFinite(lonB)) continue;
-
-          var dist = L.latLng(latA, lonA).distanceTo(L.latLng(latB, lonB));
-
-          if (dist <= thresholdM) union(i, j);
+          return line + ' <span class="map-case-popup__ml-tag">(ML Suggested)</span>';
 
         }
 
+        return line;
+
       }
 
+      if (status === 'Probable' || status === 'Suspected') {
+
+        return 'Inconclusive Syndromic Pattern';
+
+      }
+
+      if (c.suspected_disease || c.syndrome_type) {
+
+        return escapeMapPopupHtml(c.suspected_disease || c.syndrome_type);
+
+      }
+
+      return 'Inconclusive Syndromic Pattern';
+
+    }
 
 
-      var groups = {};
+
+    window.clusterMap = {};
+
+    window.openClusterPopupContext = function(clusterId) {
+      if (!window.clusterMap[clusterId]) return;
+      var clusterModel = window.clusterMap[clusterId];
+      var ll = [clusterModel.lat, clusterModel.lng];
+      var html = buildClusterPopup(clusterModel.cases, clusterId);
+      L.popup({ maxWidth: 440, minWidth: 380, autoPan: true, autoPanPadding: [30, 30], className: 'custom-fixed-popup' })
+        .setLatLng(ll)
+        .setContent(html)
+        .openOn(map);
+    };
+
+    window.showSingleCasePopup = function(caseId, clusterId) {
+      var clusterModel = window.clusterMap[clusterId];
+      if (!clusterModel) return;
+      var c = clusterModel.cases.find(function(item) { return item.id === caseId; });
+      if (!c) return;
+      var html = buildCasePopup(c, clusterId);
+      var ll = window.clusterMap[clusterId] ? [window.clusterMap[clusterId].lat, window.clusterMap[clusterId].lng] : [c.latitude, c.longitude];
+      L.popup({ maxWidth: 440, minWidth: 380, autoPan: true, autoPanPadding: [30, 30], className: 'custom-fixed-popup' })
+        .setLatLng(ll)
+        .setContent(html)
+        .openOn(map);
+    };
+
+    function buildCasePopup(c, fromClusterId) {
+
+      var isPending = c.validation_status === 'pending';
+      var classKey = mapPopupClassificationKey(c);
+      var classLabel = mapPopupClassificationLabel(c);
+      var caseStatus = (c.status || '').trim();
+      var onsetDate = c.date_of_onset || c.report_date || '—';
+
+      var html = '<div class="map-case-popup">';
+
+      if (fromClusterId) {
+          html += '<div style="padding:10px 16px 8px;border-bottom:1px solid var(--border-light,#e2e8f0); position: sticky; top: 0; background: white; z-index: 10;">';
+          html += '<button type="button" class="nc-btn nc-btn--soft nc-btn--sm" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:6px 12px;" onclick="openClusterPopupContext(\'' + fromClusterId + '\')">';
+          html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> Back to Cluster List</button>';
+          html += '</div>';
+      }
+
+      html += '<div class="map-case-popup__header">';
+      html += '<span class="map-case-popup__badge map-case-popup__badge--' + classKey + '">' + escapeMapPopupHtml(classLabel) + '</span>';
+
+      if (isPending) {
+        html += '<span class="map-case-popup__pending">Pending validation</span>';
+      }
+      html += '</div>';
+
+      var barangayDisplay = escapeMapPopupHtml(c.barangay_name);
+      if (c.purok) {
+          barangayDisplay += ' (' + escapeMapPopupHtml(c.purok) + ')';
+      }
+
+      html += '<div class="map-case-popup__section map-case-popup__section--details">';
+      html += '<div class="map-case-popup__row"><strong>Patient:</strong> ' + escapeMapPopupHtml(c.patient_name || 'Unknown Resident') + '</div>';
+      html += '<div class="map-case-popup__row map-case-popup__row--disease"><strong>ML Predicted Disease:</strong> ' + mapPopupMlDiseaseDisplay(c) + '</div>';
+      html += '<div class="map-case-popup__row"><strong>Barangay:</strong> ' + barangayDisplay + '</div>';
+
+      html += '<div class="map-case-popup__row"><strong>Cases:</strong> ' + escapeMapPopupHtml(c.case_count) + '</div>';
+
+      html += '<div class="map-case-popup__row"><strong>Onset Date:</strong> ' + escapeMapPopupHtml(onsetDate) + '</div>';
+
+      html += '<div class="map-case-popup__row"><strong>Status:</strong> ' + escapeMapPopupHtml(caseStatus || '—') + '</div>';
+
+      html += '</div>';
+
+
+
+      html += '<div class="map-case-popup__section map-case-popup__section--divider map-case-popup__officer-grid">';
+
+      html += '<div class="map-case-popup__officer-item"><span class="map-case-popup__officer-label">Officer in Charge</span><span class="map-case-popup__officer-value">' + escapeMapPopupHtml(c.officer_name || 'Not recorded') + '</span></div>';
+
+      html += '<div class="map-case-popup__officer-item"><span class="map-case-popup__officer-label">Contact</span><span class="map-case-popup__officer-value">' + escapeMapPopupHtml(c.officer_contact || 'Not available') + '</span></div>';
+
+      if (caseStatus === 'Confirmed') {
+
+        if (c.confirmed_date) {
+
+          html += '<div class="map-case-popup__officer-item map-case-popup__officer-item--full"><span class="map-case-popup__officer-label">Confirmed Date</span><span class="map-case-popup__officer-value">' + escapeMapPopupHtml(c.confirmed_date) + '</span></div>';
+
+        }
+
+        html += '<div class="map-case-popup__officer-item map-case-popup__officer-item--full"><span class="map-case-popup__officer-label">Confirmed By</span><span class="map-case-popup__officer-value">' + escapeMapPopupHtml(c.confirmed_by || 'System Administrator') + '</span></div>';
+
+      }
+
+      html += '</div>';
+
+
+
+      html += '<div class="map-case-popup__section map-case-popup__section--divider map-case-popup__risk-section">';
+
+      html += '<div class="map-case-popup__risk-heading">Risk Factors</div>';
+
+      html += buildRiskFactorGrid(c);
+
+      if (c.epidemic_threshold_status) {
+
+        html += '<div class="map-case-popup__threshold"><strong>Threshold:</strong> ' + escapeMapPopupHtml(c.epidemic_threshold_status.replace(/_/g, ' ')) + '</div>';
+
+      }
+
+      html += '</div>';
+
+
+
+      html += '<div class="map-case-popup__section map-case-popup__section--divider map-case-popup__recommendations">';
+
+      html += '<div class="map-case-popup__rec-head">';
+
+      html += '<svg class="map-case-popup__rec-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26A7 7 0 0 0 12 2z"/></svg>';
+
+      html += '<strong>Recommendations</strong>';
+
+      html += '</div>';
+
+      html += '<p class="map-case-popup__rec-text">' + escapeMapPopupHtml(c.recommendations) + '</p>';
+
+      html += '</div>';
+
+
+
+      html += buildMitigationBanner(c.mitigation_suggestions);
+
+      html += '</div>';
+
+      return html;
+
+    }
+
+
+
+    function buildClusterPopup(cases, clusterId) {
+
+      var totalCases = cases.reduce(function (s, c) { return s + c.case_count; }, 0);
+
+      var classifCounts = { suspected: 0, probable: 0, confirmed: 0 };
+      cases.forEach(function(c) {
+         var cls = (c.case_classification || 'suspected').toLowerCase();
+         if (classifCounts[cls] !== undefined) classifCounts[cls]++;
+      });
+      var statusText = [];
+      if (classifCounts.confirmed) statusText.push(classifCounts.confirmed + ' Confirmed');
+      if (classifCounts.probable) statusText.push(classifCounts.probable + ' Probable');
+      if (classifCounts.suspected) statusText.push(classifCounts.suspected + ' Suspected');
+      var statusDisplay = statusText.join(', ') || 'No cases';
+
+      var purokName = cases[0].purok || 'Unknown Purok';
+      var barangayName = cases[0].barangay_name || 'Unknown Barangay';
+      var shortId = clusterId ? clusterId.replace('cluster_', '') : Math.floor(Math.random()*100);
+
+      var html = '<div class="map-cluster-popup">';
+
+      // ── Header ──
+      html += '<div class="map-cluster-popup__header">';
+      html += '<div>';
+      html += '<div class="map-cluster-popup__header-title">Cluster ' + shortId + ': ' + escapeMapPopupHtml(purokName) + ', Brgy. ' + escapeMapPopupHtml(barangayName) + '</div>';
+      html += '<div class="map-cluster-popup__header-meta">Total Cases: ' + totalCases + ' &nbsp;|&nbsp; ' + statusDisplay + '</div>';
+      html += '</div>';
+      html += '</div>';
+
+      // ── Scrollable accordion list ──
+      html += '<div class="map-cluster-popup__scroll">';
 
       cases.forEach(function (c, idx) {
+        var classKey = mapPopupClassificationKey(c);
+        var classLabel = mapPopupClassificationLabel(c);
+        var onset = c.date_of_onset || c.report_date || '\u2014';
+        var patientName = escapeMapPopupHtml(c.patient_name || 'Unknown Resident');
 
-        var root = find(idx);
+        html += '<details class="cluster-accordion">';
+        html += '<summary class="cluster-accordion__trigger">';
+        html += '<span class="cluster-accordion__trigger-left">';
+        html += '<span class="cluster-accordion__patient-name">' + patientName + '</span>';
+        html += '<span class="map-case-popup__badge map-case-popup__badge--' + classKey + '" style="font-size:.62rem;padding:2px 6px;">' + escapeMapPopupHtml(classLabel) + '</span>';
+        html += '</span>';
+        html += '<span class="cluster-accordion__caret">&#9660;</span>';
+        html += '</summary>';
 
-        if (!groups[root]) groups[root] = [];
+        html += '<div class="cluster-accordion__body">';
+        html += '<div class="cluster-accordion__detail-row"><strong>Disease:</strong> ' + mapPopupMlDiseaseDisplay(c) + '</div>';
+        html += '<div class="cluster-accordion__detail-row"><strong>Onset Date:</strong> ' + escapeMapPopupHtml(onset) + '</div>';
+        html += '<div class="cluster-accordion__detail-row"><strong>Barangay:</strong> ' + escapeMapPopupHtml(c.barangay_name || '\u2014') + '</div>';
+        if (c.purok) {
+            html += '<div class="cluster-accordion__detail-row"><strong>Purok:</strong> ' + escapeMapPopupHtml(c.purok) + '</div>';
+        }
+        html += '<div class="cluster-accordion__detail-row"><strong>Status:</strong> ' + escapeMapPopupHtml((c.status || '').trim() || '\u2014') + '</div>';
+        html += '<div class="cluster-accordion__detail-row"><strong>Officer:</strong> ' + escapeMapPopupHtml(c.officer_name || 'Not recorded') + '</div>';
 
-        groups[root].push(c);
+        if (c.final_score != null || c.anomaly_score != null) {
+            html += '<div style="margin-top:6px;">' + buildRiskFactorGrid(c) + '</div>';
+        }
+
+        html += '<div class="cluster-accordion__actions">';
+        html += '<button type="button" class="nc-btn nc-btn--sm nc-btn--outline" style="width:100%;justify-content:center;padding:6px;" onclick="showSingleCasePopup(' + c.id + ',\'' + clusterId + '\')">View Full Details</button>';
+        html += '</div>';
+        html += '</div>'; 
+        html += '</details>'; 
+      });
+
+      html += '</div></div>';
+      return html;
+
+    }
+
+
+
+    function updateCaseAndHeatLayers(caseList) {
+
+      window.clusterMap = {};
+      casePinsLayer.clearLayers();
+
+      clusterCirclesLayer.clearLayers();
+
+      if (heatLayer) {
+
+        map.removeLayer(heatLayer);
+
+        heatLayer = null;
+
+      }
+
+      const hp = [];
+
+      let counts = { suspected: 0, probable: 0, confirmed: 0, total: 0 };
+
+
+
+      caseList.forEach(function (c) {
+
+        hp.push([c.latitude, c.longitude, c.heat_intensity]);
+
+        counts[c.case_classification] = (counts[c.case_classification] || 0) + c.case_count;
+
+        counts.total += c.case_count;
 
       });
 
 
 
-      return Object.keys(groups).map(function (key) {
-
-        var group = groups[key];
-
-        var sumLat = 0;
-
-        var sumLon = 0;
-
-        var validCount = 0;
-
-        group.forEach(function (c) {
-
-          var lat = parseFloat(c.latitude);
-
-          var lon = parseFloat(c.longitude);
-
-          if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-
-          sumLat += lat;
-
-          sumLon += lon;
-
-          validCount += 1;
-
-        });
-
-        var centroidLat = validCount ? (sumLat / validCount) : NaN;
-
-        var centroidLng = validCount ? (sumLon / validCount) : NaN;
-
-        var centroid = isValidLatLng(centroidLat, centroidLng)
-
-          ? [centroidLat, centroidLng]
-
-          : null;
+      // Leaflet L.circle uses radius in meters (geographic), not screen pixels.
+      const CLUSTER_RADIUS_M = 25;
 
 
 
-        if (!centroid) {
+      function buildCaseTooltip(c) {
 
-          for (var g = 0; g < group.length; g++) {
+        var appearance = casePinAppearance(c);
 
-            var fallbackLat = parseFloat(group[g].latitude);
+        var html = '<b>Syndromic report</b><br>';
 
-            var fallbackLng = parseFloat(group[g].longitude);
+        html += 'Cases: <b>' + (c.case_count || 0) + '</b><br>';
 
-            if (isValidLatLng(fallbackLat, fallbackLng)) {
+        html += 'Classification: <b>' + (c.case_classification || 'suspected').toUpperCase() + '</b><br>';
 
-              centroid = [fallbackLat, fallbackLng];
+        html += 'Barangay: ' + (c.barangay_name || '—');
 
-              break;
+        if (appearance.isPending) {
 
-            }
+          html += '<br><span style="color:#f59e0b;font-size:.75rem;font-weight:600;">Pending validation</span>';
+
+        }
+
+        return html;
+
+      }
+
+
+
+      function addCasePin(c, clusterId) {
+
+        var lat = parseFloat(c.latitude);
+        var lon = parseFloat(c.longitude);
+        if (!isValidLatLng(lat, lon)) return;
+        var ll = [lat, lon];
+        var appearance = casePinAppearance(c);
+        var popupHtml = buildCasePopup(c, clusterId);
+
+        L.circleMarker(ll, {
+          pane: 'pins-pane',
+          renderer: pinsSvgRenderer,
+          radius: appearance.radius,
+          fillColor: appearance.fillColor,
+          color: '#ffffff',
+          weight: 3,
+          fillOpacity: appearance.isPending ? 0.5 : 0.95,
+          opacity: 1,
+        })
+          .bindTooltip(buildCaseTooltip(c), { sticky: true, direction: 'top', className: 'hotspot-tip' })
+          .bindPopup(popupHtml, { maxWidth: 440, minWidth: 380, autoPan: true, autoPanPadding: [30, 30], className: 'custom-fixed-popup' })
+          .addTo(casePinsLayer);
+      }
+
+
+
+      function buildProximityClusters(cases, thresholdM) {
+
+        if (!cases.length) return [];
+
+        var parent = cases.map(function (_, idx) { return idx; });
+
+
+
+        function find(idx) {
+
+          while (parent[idx] !== idx) {
+
+            parent[idx] = parent[parent[idx]];
+
+            idx = parent[idx];
+
+          }
+
+          return idx;
+
+        }
+
+
+
+        function union(a, b) {
+
+          var rootA = find(a);
+
+          var rootB = find(b);
+
+          if (rootA !== rootB) parent[rootB] = rootA;
+
+        }
+
+
+
+        for (var i = 0; i < cases.length; i++) {
+
+          var latA = parseFloat(cases[i].latitude);
+
+          var lonA = parseFloat(cases[i].longitude);
+
+          if (!Number.isFinite(latA) || !Number.isFinite(lonA)) continue;
+
+          for (var j = i + 1; j < cases.length; j++) {
+
+            var latB = parseFloat(cases[j].latitude);
+
+            var lonB = parseFloat(cases[j].longitude);
+
+            if (!Number.isFinite(latB) || !Number.isFinite(lonB)) continue;
+
+            var dist = L.latLng(latA, lonA).distanceTo(L.latLng(latB, lonB));
+
+            if (dist <= thresholdM) union(i, j);
 
           }
 
@@ -1523,212 +1422,264 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
-        if (!centroid) return null;
+        var groups = {};
 
-        return { cases: group, centroid: centroid };
+        cases.forEach(function (c, idx) {
 
-      });
+          var root = find(idx);
 
-    }
+          if (!groups[root]) groups[root] = [];
 
+          groups[root].push(c);
 
-
-    const clusters = buildProximityClusters(caseList, CLUSTER_RADIUS_M).filter(Boolean);
-
-    const clusterRenderModels = clusters.map(function(c, i) {
-      var model = toClusterRenderModel(c);
-      model.clusterId = 'cluster_' + i;
-      return model;
-    });
-
-    renderClusterRadiusCircles(clusterRenderModels);
+        });
 
 
 
-    clusterRenderModels.forEach(function (clusterModel) {
+        return Object.keys(groups).map(function (key) {
 
-      window.clusterMap[clusterModel.clusterId] = clusterModel;
+          var group = groups[key];
 
-      var group = clusterModel.cases;
+          var sumLat = 0;
 
-      var ll = isValidLatLng(clusterModel.lat, clusterModel.lng)
+          var sumLon = 0;
 
-        ? [clusterModel.lat, clusterModel.lng]
+          var validCount = 0;
 
-        : null;
+          group.forEach(function (c) {
+
+            var lat = parseFloat(c.latitude);
+
+            var lon = parseFloat(c.longitude);
+
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+            sumLat += lat;
+
+            sumLon += lon;
+
+            validCount += 1;
+
+          });
+
+          var centroidLat = validCount ? (sumLat / validCount) : NaN;
+
+          var centroidLng = validCount ? (sumLon / validCount) : NaN;
+
+          var centroid = isValidLatLng(centroidLat, centroidLng)
+
+            ? [centroidLat, centroidLng]
+
+            : null;
 
 
 
-      // Always render every individual case pin so each patient's
-      // exact location is visible inside the hotspot radius circle.
-      group.forEach(function (c) {
+          if (!centroid) {
 
-        addCasePin(c);
+            for (var g = 0; g < group.length; g++) {
 
-      });
+              var fallbackLat = parseFloat(group[g].latitude);
 
-      // Add the cluster summary badge on top for multi-case clusters.
-      if (clusterModel.caseCount >= 2 && ll) {
+              var fallbackLng = parseFloat(group[g].longitude);
 
-        var popupHtml = buildClusterPopup(group, clusterModel.clusterId);
+              if (isValidLatLng(fallbackLat, fallbackLng)) {
 
-        L.marker(ll, {
+                centroid = [fallbackLat, fallbackLng];
 
-          pane: 'pins-pane',
+                break;
 
-          interactive: true,
+              }
 
-          zIndexOffset: 1000,
+            }
 
-          icon: L.divIcon({
+          }
 
-            className: 'map-cluster-badge',
 
-            html: '<span class="map-cluster-badge__label">' + group.length + '</span>',
 
-            iconSize: [24, 24],
+          if (!centroid) return null;
 
-            iconAnchor: [4, 20],
+          return { cases: group, centroid: centroid };
 
-          }),
-
-        }).bindPopup(popupHtml, { maxWidth: 440, minWidth: 400, autoPan: true, autoPanPadding: [20, 20], className: 'map-case-popup-wrap' })
-          .addTo(casePinsLayer);
+        });
 
       }
 
-    });
 
 
-
-    bringLayerGroupToFront(casePinsLayer);
-
-
-
-    document.getElementById('stat-suspected').textContent = counts.suspected || 0;
-
-    document.getElementById('stat-probable').textContent = counts.probable || 0;
-
-    document.getElementById('stat-confirmed').textContent = counts.confirmed || 0;
-
-    document.getElementById('stat-total').textContent = counts.total || 0;
-
-
-
-    if (hp.length > 0) {
-
-      heatLayer = L.heatLayer(hp, { pane: 'heatmapPane', radius: 45, blur: 38, maxZoom: 17, max: 0.85, minOpacity: 0.12, gradient: { 0.2: '#22c55e', 0.45: '#f59e0b', 0.7: '#ef4444', 1.0: '#7c3aed' } });
-
-      if (layerState.heat) map.addLayer(heatLayer);
-
-    }
-
-    if (!layerState.cases) {
-
-      map.removeLayer(casePinsLayer);
-
-      map.removeLayer(clusterCirclesLayer);
-
-    } else {
-
-      if (!map.hasLayer(casePinsLayer)) map.addLayer(casePinsLayer);
-
-      if (!map.hasLayer(clusterCirclesLayer)) map.addLayer(clusterCirclesLayer);
-
-    }
-
-  }
-
-
-
-  function loadMapData(reloadBoundaries) {
-
-    const requestId = ++mapDataRequestId;
-
-    const time = document.getElementById('filter-time').value;
-
-    const barangayF = document.getElementById('filter-barangay') ? document.getElementById('filter-barangay').value : '';
-
-    const syndromeF = document.getElementById('filter-syndrome') ? document.getElementById('filter-syndrome').value : '';
-
-    const diseaseCategoryF = document.getElementById('filter-disease-category') ? document.getElementById('filter-disease-category').value : '';
-
-    const classifF = document.getElementById('filter-classif') ? document.getElementById('filter-classif').value : '';
-
-    const casesUrl = "{% url 'api_cases' %}";
-
-
-
-    const params = new URLSearchParams({ time_range: time });
-
-    if (barangayF) params.set('barangay', barangayF);
-
-    if (syndromeF) params.set('symptom_category', syndromeF);
-
-    if (diseaseCategoryF) params.set('disease_category', diseaseCategoryF);
-
-    if (classifF) params.set('case_classification', classifF);
-
-
-
-    const shouldInitBoundaries = reloadBoundaries !== false && !boundariesInitialized;
-
-
-
-    const boundaryPromise = shouldInitBoundaries
-
-      ? loadBarangayBoundaries()
-
-      : Promise.resolve(boundaryApi);
-
-
-
-    boundaryPromise
-
-      .then(function () {
-
-        return Promise.all([
-
-          refreshBoundaryRisks(),
-
-          fetch(casesUrl + '?' + params.toString()).then(function (r) { return r.json(); }),
-
-        ]);
-
-      })
-
-      .then(function (results) {
-
-        if (requestId !== mapDataRequestId) return;
-
-        const data = results[1];
-
-        if (!data.ok && data.error) {
-
-          console.error('Cases error:', data.error);
-
-          return;
-
+      const clusters = buildProximityClusters(caseList, CLUSTER_RADIUS_M).filter(Boolean);
+
+      const clusterRenderModels = clusters.map(toClusterRenderModel);
+
+      renderClusterRadiusCircles(clusterRenderModels);
+
+
+
+      clusterRenderModels.forEach(function (clusterModel) {
+
+        var group = clusterModel.cases;
+        var ll = isValidLatLng(clusterModel.lat, clusterModel.lng)
+          ? [clusterModel.lat, clusterModel.lng]
+          : null;
+
+        var clusterId = 'cluster_' + Math.random().toString(36).substr(2, 9);
+        window.clusterMap[clusterId] = {
+            clusterId: clusterId,
+            cases: group,
+            lat: clusterModel.lat,
+            lng: clusterModel.lng,
+            caseCount: clusterModel.caseCount
+        };
+
+        if (clusterModel.caseCount >= 2 && ll) {
+          var popupHtml = buildClusterPopup(group, clusterId);
+          L.marker(ll, {
+            pane: 'pins-pane',
+            interactive: true,
+            zIndexOffset: 1000,
+            icon: L.divIcon({
+              className: 'map-cluster-badge',
+              html: '<span class="map-cluster-badge__label">' + group.length + '</span>',
+              iconSize: [24, 24],
+              iconAnchor: [4, 20],
+            }),
+          })
+          .bindPopup(popupHtml, { maxWidth: 440, minWidth: 380, autoPan: true, autoPanPadding: [30, 30], className: 'custom-fixed-popup' })
+          .addTo(casePinsLayer);
         }
 
-        updateCaseAndHeatLayers(data.cases || []);
-
-      }).catch(e => console.error('Map data error:', e));
-
-  }
-
-  window.loadMapData = loadMapData;
+        group.forEach(function (c) {
+          addCasePin(c, clusterId);
+        });
+      });
 
 
 
-  loadMapData(true);
+      bringLayerGroupToFront(casePinsLayer);
 
-  setInterval(function () { loadMapData(false); }, 60000);
 
-});
+
+      document.getElementById('stat-suspected').textContent = counts.suspected || 0;
+
+      document.getElementById('stat-probable').textContent = counts.probable || 0;
+
+      document.getElementById('stat-confirmed').textContent = counts.confirmed || 0;
+
+      document.getElementById('stat-total').textContent = counts.total || 0;
+
+
+
+      if (hp.length > 0) {
+
+        heatLayer = L.heatLayer(hp, { pane: 'heatmapPane', radius: 45, blur: 38, maxZoom: 17, max: 0.85, minOpacity: 0.12, gradient: { 0.2: '#22c55e', 0.45: '#f59e0b', 0.7: '#ef4444', 1.0: '#7c3aed' } });
+
+        if (layerState.heat) map.addLayer(heatLayer);
+
+      }
+
+      if (!layerState.cases) {
+
+        map.removeLayer(casePinsLayer);
+
+        map.removeLayer(clusterCirclesLayer);
+
+      } else {
+
+        if (!map.hasLayer(casePinsLayer)) map.addLayer(casePinsLayer);
+
+        if (!map.hasLayer(clusterCirclesLayer)) map.addLayer(clusterCirclesLayer);
+
+      }
+
+    }
+
+
+
+    function loadMapData(reloadBoundaries) {
+
+      const requestId = ++mapDataRequestId;
+
+      const time = document.getElementById('filter-time').value;
+
+      const barangayF = document.getElementById('filter-barangay') ? document.getElementById('filter-barangay').value : '';
+
+      const syndromeF = document.getElementById('filter-syndrome') ? document.getElementById('filter-syndrome').value : '';
+
+      const diseaseCategoryF = document.getElementById('filter-disease-category') ? document.getElementById('filter-disease-category').value : '';
+
+      const classifF = document.getElementById('filter-classif') ? document.getElementById('filter-classif').value : '';
+
+      const casesUrl = "{% url 'api_cases' %}";
+
+
+
+      const params = new URLSearchParams({ time_range: time });
+
+      if (barangayF) params.set('barangay', barangayF);
+
+      if (syndromeF) params.set('symptom_category', syndromeF);
+
+      if (diseaseCategoryF) params.set('disease_category', diseaseCategoryF);
+
+      if (classifF) params.set('case_classification', classifF);
+
+
+
+      const shouldInitBoundaries = reloadBoundaries !== false && !boundariesInitialized;
+
+
+
+      const boundaryPromise = shouldInitBoundaries
+
+        ? loadBarangayBoundaries()
+
+        : Promise.resolve(boundaryApi);
+
+
+
+      boundaryPromise
+
+        .then(function () {
+
+          return Promise.all([
+
+            refreshBoundaryRisks(),
+
+            fetch(casesUrl + '?' + params.toString()).then(function (r) { return r.json(); }),
+
+          ]);
+
+        })
+
+        .then(function (results) {
+
+          if (requestId !== mapDataRequestId) return;
+
+          const data = results[1];
+
+          if (!data.ok && data.error) {
+
+            console.error('Cases error:', data.error);
+
+            return;
+
+          }
+
+          updateCaseAndHeatLayers(data.cases || []);
+
+        }).catch(e => console.error('Map data error:', e));
+
+    }
+
+    window.loadMapData = loadMapData;
+
+
+
+    loadMapData(true);
+
+    setInterval(function () { loadMapData(false); }, 60000);
+
+  });
 
 </script>
 
 {% endblock %}
-
-

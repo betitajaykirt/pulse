@@ -2242,17 +2242,21 @@ tbody tr:last-child td { border-bottom: none; }
 }
 .hotspot-tip::before { border-top-color: var(--text); }
 
-/* ── Leaflet popup wrapper — zoom-stable fixed sizing ─────────── */
-.map-case-popup-wrap .leaflet-popup-content-wrapper {
-  padding: 0 !important;
-  border-radius: 12px !important;
-  overflow: hidden;
-  box-shadow: 0 12px 32px -16px rgba(15, 76, 129, 0.18);
-}
-.map-case-popup-wrap .leaflet-popup-content {
-  margin: 0 !important;
+/* Stop popup scaling and overflow on zoom out */
+.custom-fixed-popup .leaflet-popup-content-wrapper {
+  max-width: 440px !important;
   width: 420px !important;
-  max-width: 90vw;
+  max-height: 80vh !important;
+  overflow: hidden !important;
+  border-radius: 12px !important;
+  padding: 0 !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+}
+.custom-fixed-popup .leaflet-popup-content {
+  margin: 0 !important;
+  width: 100% !important;
+  max-height: 80vh !important;
+  overflow-y: auto !important; /* Internal scrolling only */
 }
 
 /* ── Single-case popup card ────────────────────────────────────── */
