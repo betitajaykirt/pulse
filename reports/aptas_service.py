@@ -79,6 +79,68 @@ PIDSR_STATUS_HEADLINE = {
 }
 
 
+def _enrich_card_context(card: Dict[str, Any]) -> Dict[str, Any]:
+    """Attach report-level context (officer, purok, coordinates, active cases) to a card."""
+    from myapp.models import Alert
+
+    barangay_name = card.get('barangay', '')
+    syndrome_name = card.get('syndrome', '')
+
+    # Count active cases for this barangay + syndrome
+    active_qs = _active_reports_qs(barangay_name, syndrome_name) if barangay_name else None
+    card['active_cases'] = active_qs.count() if active_qs else 0
+
+    # Find anchor report for officer, purok, coordinates
+    anchor = (
+        active_qs.select_related('submitted_by')
+        .order_by('-report_date')
+        .first()
+    ) if active_qs else None
+
+    if anchor:
+        card['purok'] = (anchor.detailed_address or '').strip()
+        card['latitude'] = float(anchor.latitude) if anchor.latitude is not None else None
+        card['longitude'] = float(anchor.longitude) if anchor.longitude is not None else None
+        if anchor.submitted_by_id and anchor.submitted_by:
+            officer = anchor.submitted_by
+            card['officer_name'] = f'{officer.first_name} {officer.last_name}'.strip()
+            card['officer_contact'] = officer.contact_number or ''
+        else:
+            card['officer_name'] = ''
+            card['officer_contact'] = ''
+    else:
+        card['purok'] = ''
+        card['latitude'] = None
+        card['longitude'] = None
+        card['officer_name'] = ''
+        card['officer_contact'] = ''
+
+    # Trigger source
+    if not card.get('trigger_source'):
+        card['trigger_source'] = 'Spatial Cluster Spike'
+
+    # Build map URL with lat/lng for direct pan
+    map_params = {'barangay': barangay_name}
+    if card.get('latitude') is not None and card.get('longitude') is not None:
+        map_params['lat'] = card['latitude']
+        map_params['lng'] = card['longitude']
+    card['map_url'] = f'/map/?{urlencode(map_params)}' if barangay_name else '/map/'
+
+    # Find associated Alert ID (most recent active alert for this syndrome in this barangay)
+    if not card.get('alert_id'):
+        alert = (
+            Alert.objects.filter(
+                alert_type__iexact=syndrome_name,
+                status='active',
+            )
+            .order_by('-alert_date')
+            .first()
+        )
+        card['alert_id'] = alert.id if alert else None
+
+    return card
+
+
 def _aptas_ml_log_to_card(log: BarangayRiskLog) -> Dict[str, Any]:
     return {
         'alert_source': 'aptas_ml',
@@ -94,6 +156,7 @@ def _aptas_ml_log_to_card(log: BarangayRiskLog) -> Dict[str, Any]:
         'created_at': log.created_at,
         'is_active_alert': log.is_active_alert,
     }
+
 
 
 def _latest_threshold_window_days(barangay_id: int, disease_label: str) -> int:
@@ -185,6 +248,7 @@ def get_aptas_dashboard_context(*, barangay_name=None, limit=12):
         return (pidsr_rank, level_rank, -float(card.get('final_risk_score') or 0))
 
     merged_alerts = sorted(pidsr_cards + ml_cards, key=_sort_key)[:limit]
+    merged_alerts = [_enrich_card_context(card) for card in merged_alerts]
 
     critical_count = sum(1 for c in pidsr_cards + ml_cards if c['risk_level'] == 'Critical')
     high_count = sum(1 for c in pidsr_cards + ml_cards if c['risk_level'] == 'High')

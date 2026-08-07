@@ -1019,11 +1019,12 @@
       var secConfPct = c.ml_secondary_confidence_pct;
       
       if (!top) {
-          if (status === 'Probable' || status === 'Suspected') {
-            return 'Inconclusive Syndromic Pattern';
-          }
           if (c.suspected_disease || c.syndrome_type) {
-            return escapeMapPopupHtml(c.suspected_disease || c.syndrome_type);
+            var storedLabel = c.suspected_disease || c.syndrome_type;
+            var inconclusiveLabels = ['inconclusive syndromic pattern', 'insufficient data for prediction', 'undetermined', ''];
+            if (inconclusiveLabels.indexOf(storedLabel.toLowerCase()) === -1) {
+              return escapeMapPopupHtml(storedLabel);
+            }
           }
           return 'Inconclusive Syndromic Pattern';
       }

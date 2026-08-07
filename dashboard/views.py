@@ -415,3 +415,16 @@ def api_notification_read(request, notif_id):
             return JsonResponse({'ok': True})
     return JsonResponse({'ok': False}, status=400)
 
+
+@login_required
+def api_alert_acknowledge(request, alert_id):
+    """Update an alert's status from 'active' to 'acknowledged'."""
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+    alert = Alert.objects.filter(id=alert_id).first()
+    if not alert:
+        return JsonResponse({'ok': False, 'error': 'Alert not found'}, status=404)
+    if alert.status == 'active':
+        alert.status = 'acknowledged'
+        alert.save(update_fields=['status'])
+    return JsonResponse({'ok': True, 'new_status': alert.status})

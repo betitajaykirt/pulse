@@ -29,7 +29,7 @@ from reports.pidsr_schema import (
 CLIMATE_FEATURE_COLUMNS: Sequence[str] = ('temperature', 'humidity', 'rainfall')
 CLIMATE_DEFAULTS = {'temperature': 30.0, 'humidity': 70.0, 'rainfall': 0.0}
 TARGET_COLUMN = 'disease_label'
-DEFAULT_CLASSIFICATION_CONFIDENCE = 0.60
+DEFAULT_CLASSIFICATION_CONFIDENCE = 0.30
 
 
 def resolve_syndromic_feature_columns(
