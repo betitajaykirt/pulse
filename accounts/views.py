@@ -126,12 +126,22 @@ def login_view(request):
 # ── Logout ────────────────────────────────────────────────────────
 
 def logout_view(request):
-    session_key = request.session.session_key
-    if session_key:
-        PulseSession.objects.filter(id=session_key).update(invalidated=True)
-    request.session.flush()
-    messages.success(request, 'You have been logged out.')
-    return redirect('login')
+    try:
+        session_key = request.session.session_key
+        if session_key:
+            PulseSession.objects.filter(id=session_key).update(invalidated=True)
+        request.session.flush()
+        messages.success(request, 'You have been logged out.')
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        # Suppress DB connection errors during logout so the user isn't blocked
+        pass
+
+    response = redirect('login')
+    # Manually delete the session cookie just in case flush() failed
+    response.delete_cookie(settings.SESSION_COOKIE_NAME)
+    return response
 
 
 # ── First-Login Set Password ──────────────────────────────────────
