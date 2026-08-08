@@ -18,6 +18,11 @@ from .analytics_service import (
 )
 from reports.weather_service import fetch_bago_city_weather
 from reports.aptas_service import get_aptas_dashboard_context, resolve_aptas_barangay_filter
+import json
+from django.db.models import Count, Avg, Sum
+from django.db.models.functions import TruncDate
+from datetime import timedelta
+from django.utils import timezone
 
 
 @login_required
@@ -82,9 +87,16 @@ def _get_stats(role, user_id=None):
     ctx = {}
     if role in ('admin', 'super_admin'):
         ctx['total_users']     = User.objects.count()
-        ctx['active_alerts']   = Alert.objects.filter(status='active').count()
         ctx['total_barangays'] = Barangay.objects.count()
-        ctx['pending_reports'] = SurveillanceReport.objects.filter(validation_status='pending').exclude(status='Closed').count()
+
+        # Surveillance & Epidemiological KPIs
+        active_qs = SurveillanceReport.objects.exclude(status='Closed')
+        ctx['active_cases_total'] = active_qs.count()
+        ctx['active_cases_dengue'] = active_qs.filter(syndrome_type__icontains='dengue').count()
+        ctx['active_cases_lepto'] = active_qs.filter(syndrome_type__icontains='lepto').count()
+        ctx['total_confirmed'] = SurveillanceReport.objects.filter(status='Confirmed').count()
+        ctx['pending_reports'] = active_qs.filter(validation_status='pending').count()
+        
     if role == 'super_admin':
         ctx['total_admins']  = Admin.objects.count()
         ctx['total_reports'] = SurveillanceReport.objects.exclude(status='Closed').count()
@@ -567,4 +579,99 @@ def bhw_reports_view(request):
     # If the user specifically wants BHW reports, we can just redirect to case_records
     # because in the catchment nurse view, most reports are from BHWs.
     return redirect(url)
+
+@login_required
+@role_required('admin', 'super_admin', 'health_officer', 'surveillance_officer')
+def environmental_intelligence_view(request):
+    weather = fetch_bago_city_weather()
+    
+    now = timezone.now()
+    thirty_days_ago = now - timedelta(days=30)
+    
+    # Chart data: Environmental Trends & APTAS Correlation
+    env_qs = EnvironmentalData.objects.filter(
+        recorded_at__gte=thirty_days_ago
+    ).annotate(
+        date=TruncDate('recorded_at')
+    ).values('date').annotate(
+        avg_temp=Avg('temperature'),
+        avg_rain=Sum('rainfall')
+    ).order_by('date')
+    
+    surveillance_qs = SurveillanceReport.objects.filter(
+        report_date__gte=thirty_days_ago
+    ).annotate(
+        date=TruncDate('report_date')
+    ).values('date').annotate(
+        cases=Count('id')
+    ).order_by('date')
+    
+    chart_labels = []
+    chart_temp = []
+    chart_rain = []
+    chart_cases = []
+    
+    env_map = {item['date']: item for item in env_qs if item['date']}
+    surveillance_map = {item['date']: item for item in surveillance_qs if item['date']}
+    
+    for i in range(30):
+        d = (thirty_days_ago + timedelta(days=i)).date()
+        chart_labels.append(d.strftime('%b %d'))
+        e = env_map.get(d, {'avg_temp': 0, 'avg_rain': 0})
+        s = surveillance_map.get(d, {'cases': 0})
+        
+        chart_temp.append(float(e.get('avg_temp') or 0))
+        chart_rain.append(float(e.get('avg_rain') or 0))
+        chart_cases.append(s.get('cases', 0))
+        
+    # Barangay Vector Risk Table
+    seven_days_ago = now - timedelta(days=7)
+    recent_rain = EnvironmentalData.objects.filter(
+        recorded_at__gte=seven_days_ago
+    ).values('barangay_id').annotate(
+        total_rain=Sum('rainfall')
+    )
+    rain_map = {r['barangay_id']: r['total_rain'] for r in recent_rain if r['barangay_id']}
+    
+    active_cases_by_brgy = SurveillanceReport.objects.exclude(status='Closed').values('barangay_id').annotate(
+        cases=Count('id')
+    )
+    cases_map = {c['barangay_id']: c['cases'] for c in active_cases_by_brgy if c['barangay_id']}
+    
+    barangays = Barangay.objects.all()
+    vector_risk_data = []
+    
+    for b in barangays:
+        cases = cases_map.get(b.id, 0)
+        rain = float(rain_map.get(b.id, 0) or 0)
+        risk_index = (cases * 15.0) + (rain * 0.5)
+        
+        level = 'Low'
+        if risk_index >= 75:
+            level = 'Critical'
+        elif risk_index >= 50:
+            level = 'High'
+        elif risk_index >= 25:
+            level = 'Moderate'
+            
+        vector_risk_data.append({
+            'barangay': b.barangay_name,
+            'active_cases': cases,
+            'recent_rain_mm': round(rain, 2),
+            'risk_index': round(risk_index, 1),
+            'risk_level': level
+        })
+        
+    vector_risk_data.sort(key=lambda x: x['risk_index'], reverse=True)
+    
+    context = {
+        'weather': weather,
+        'chart_labels': json.dumps(chart_labels),
+        'chart_temp': json.dumps(chart_temp),
+        'chart_rain': json.dumps(chart_rain),
+        'chart_cases': json.dumps(chart_cases),
+        'vector_risk_data': vector_risk_data,
+    }
+    
+    return render(request, 'dashboard/environmental_intelligence.html', context)
 

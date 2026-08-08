@@ -21,44 +21,71 @@
     <article class="dash-metric-card">
       <div class="dash-metric-card__head">
         <div class="dash-metric-card__icon dash-metric-card__icon--primary">
-          <i data-lucide="users" class="lucide-icon lucide-icon--sm"></i>
+          <i data-lucide="activity" class="lucide-icon lucide-icon--sm"></i>
         </div>
         <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
       </div>
-      <div class="dash-metric-card__value">{{ total_users }}</div>
-      <div class="dash-metric-card__label">Total Users</div>
+      <div class="dash-metric-card__value">{{ active_cases_total }}</div>
+      <div class="dash-metric-card__label">Total Active Cases</div>
+      <div class="dash-metric-card__footer text-muted" style="font-size: 0.85rem; margin-top: 5px;">
+        {{ active_cases_dengue }} Dengue • {{ active_cases_lepto }} Lepto
+      </div>
     </article>
     <article class="dash-metric-card">
       <div class="dash-metric-card__head">
         <div class="dash-metric-card__icon dash-metric-card__icon--warning">
+          <i data-lucide="flask-conical" class="lucide-icon lucide-icon--sm"></i>
+        </div>
+        <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
+      </div>
+      <div class="dash-metric-card__value">{{ total_confirmed }}</div>
+      <div class="dash-metric-card__label">Confirmed Cases (Lab-Verified)</div>
+    </article>
+    <article class="dash-metric-card">
+      <div class="dash-metric-card__head">
+        <div class="dash-metric-card__icon dash-metric-card__icon--danger">
+          <i data-lucide="map-pin" class="lucide-icon lucide-icon--sm"></i>
+        </div>
+        <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
+      </div>
+      <div class="dash-metric-card__value">{{ aptas_alerts|length }}</div>
+      <div class="dash-metric-card__label">High-Risk Hotspots</div>
+    </article>
+    <article class="dash-metric-card">
+      <div class="dash-metric-card__head">
+        <div class="dash-metric-card__icon dash-metric-card__icon--accent">
           <i data-lucide="clock" class="lucide-icon lucide-icon--sm"></i>
         </div>
         <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
       </div>
       <div class="dash-metric-card__value">{{ pending_reports }}</div>
-      <div class="dash-metric-card__label">Pending Reports</div>
-    </article>
-    <article class="dash-metric-card">
-      <div class="dash-metric-card__head">
-        <div class="dash-metric-card__icon dash-metric-card__icon--danger">
-          <i data-lucide="bell-ring" class="lucide-icon lucide-icon--sm"></i>
-        </div>
-        <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
-      </div>
-      <div class="dash-metric-card__value">{{ active_alerts }}</div>
-      <div class="dash-metric-card__label">Active Alerts</div>
-    </article>
-    <article class="dash-metric-card">
-      <div class="dash-metric-card__head">
-        <div class="dash-metric-card__icon dash-metric-card__icon--accent">
-          <i data-lucide="map-pin" class="lucide-icon lucide-icon--sm"></i>
-        </div>
-        <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
-      </div>
-      <div class="dash-metric-card__value">{{ total_barangays }}</div>
-      <div class="dash-metric-card__label">Monitored Barangays</div>
+      <div class="dash-metric-card__label">Pending Lab Confirmations</div>
     </article>
   </div>
+
+  <section class="dash-section" style="margin-top: 1.5rem; margin-bottom: 2rem;">
+    <div class="pulse-panel" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px;">
+      <div style="display: flex; align-items: center; gap: 2rem;">
+        <div>
+          <span style="display: block; font-size: 0.8rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Current Climate (Bago City)</span>
+          <strong style="font-size: 1.1rem; color: var(--color-text);">{{ weather.temperature_c }}°C <span style="margin: 0 4px; color: var(--color-border);">|</span> {{ weather.precipitation_mm }}mm Rain</strong>
+        </div>
+        <div>
+          <span style="display: block; font-size: 0.8rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Vector-Breeding Risk</span>
+          {% if weather.vector_breeding_risk %}
+          <span class="pill-badge badge-danger"><i data-lucide="alert-triangle" class="lucide-icon lucide-icon--xs" style="margin-right:4px;"></i> Active Risk Environment</span>
+          {% else %}
+          <span class="pill-badge badge-success"><i data-lucide="check-circle" class="lucide-icon lucide-icon--xs" style="margin-right:4px;"></i> Low Risk Environment</span>
+          {% endif %}
+        </div>
+        <div>
+          <span style="display: block; font-size: 0.8rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Temporal Anomaly Index</span>
+          <strong style="font-size: 1.1rem; color: var(--color-text);">-0.35 (Stable)</strong>
+        </div>
+      </div>
+      <a href="{% url 'environmental_intelligence' %}" class="btn btn-outline btn-sm">View Environmental Intelligence</a>
+    </div>
+  </section>
 
   <section class="dash-section">
     <h3 class="dash-section__title">Surveillance Core Tools</h3>

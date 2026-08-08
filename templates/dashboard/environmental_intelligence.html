@@ -1,0 +1,201 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block page_title %}Environmental Intelligence{% endblock %}
+{% block content %}
+<div class="pulse-page dash-home">
+  <header class="dash-hero" style="margin-bottom: 2rem;">
+    <div class="dash-hero__text">
+      <span class="pulse-eyebrow">Analysis Module</span>
+      <h2>Environmental Intelligence</h2>
+      <p>Vector-borne disease forecasting based on climate indicators and ML models.</p>
+    </div>
+  </header>
+
+  <!-- Weather & Climate Top Row -->
+  <section class="dash-section" style="margin-bottom: 2rem;">
+    <h3 class="dash-section__title">Current Climate (Bago City)</h3>
+    <div class="dash-widget-grid" style="grid-template-columns: repeat(4, 1fr);">
+      <article class="dash-metric-card">
+        <div class="dash-metric-card__head">
+          <div class="dash-metric-card__icon dash-metric-card__icon--primary">
+            <i data-lucide="thermometer" class="lucide-icon lucide-icon--sm"></i>
+          </div>
+        </div>
+        <div class="dash-metric-card__value">{{ weather.temperature_c }}°C</div>
+        <div class="dash-metric-card__label">Temperature</div>
+      </article>
+      <article class="dash-metric-card">
+        <div class="dash-metric-card__head">
+          <div class="dash-metric-card__icon dash-metric-card__icon--primary">
+            <i data-lucide="cloud-rain" class="lucide-icon lucide-icon--sm"></i>
+          </div>
+        </div>
+        <div class="dash-metric-card__value">{{ weather.precipitation_mm }}mm</div>
+        <div class="dash-metric-card__label">Rainfall</div>
+      </article>
+      <article class="dash-metric-card">
+        <div class="dash-metric-card__head">
+          <div class="dash-metric-card__icon dash-metric-card__icon--primary">
+            <i data-lucide="droplets" class="lucide-icon lucide-icon--sm"></i>
+          </div>
+        </div>
+        <div class="dash-metric-card__value">{{ weather.humidity_pct }}%</div>
+        <div class="dash-metric-card__label">Humidity</div>
+      </article>
+      <article class="dash-metric-card">
+        <div class="dash-metric-card__head">
+          <div class="dash-metric-card__icon {% if weather.vector_breeding_risk %}dash-metric-card__icon--danger{% else %}dash-metric-card__icon--success{% endif %}">
+            <i data-lucide="bug" class="lucide-icon lucide-icon--sm"></i>
+          </div>
+        </div>
+        <div class="dash-metric-card__value">{% if weather.vector_breeding_risk %}High Risk{% else %}Low Risk{% endif %}</div>
+        <div class="dash-metric-card__label">Vector-Breeding Status</div>
+      </article>
+    </div>
+  </section>
+
+  <!-- Chart.js Middle Row -->
+  <section class="dash-section" style="margin-bottom: 2rem;">
+    <h3 class="dash-section__title">Environmental Trends & Outbreak Correlation (30 Days)</h3>
+    <div class="pulse-panel" style="padding: 1.5rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px;">
+      <canvas id="envCorrelationChart" height="100"></canvas>
+    </div>
+  </section>
+
+  <!-- Vector Risk Table -->
+  <section class="dash-section" style="margin-bottom: 2rem;">
+    <h3 class="dash-section__title">Barangay Vector Risk Heatmap</h3>
+    <div class="pulse-panel pulse-table-panel">
+      <div class="pulse-table-wrap table-wrapper">
+        <table class="pulse-table">
+          <thead>
+            <tr>
+              <th>Barangay</th>
+              <th>Active Cases</th>
+              <th>Recent Rainfall (7d avg mm)</th>
+              <th>Vector Risk Index</th>
+              <th>Risk Level</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in vector_risk_data %}
+            <tr class="pulse-table__row">
+              <td data-label="Barangay"><strong>{{ row.barangay }}</strong></td>
+              <td data-label="Active Cases">{{ row.active_cases }}</td>
+              <td data-label="Recent Rainfall">{{ row.recent_rain_mm }} mm</td>
+              <td data-label="Vector Risk Index">{{ row.risk_index }}</td>
+              <td data-label="Risk Level">
+                {% if row.risk_level == 'Critical' %}
+                  <span class="pill-badge badge-danger">Critical</span>
+                {% elif row.risk_level == 'High' %}
+                  <span class="pill-badge badge-warning">High</span>
+                {% elif row.risk_level == 'Moderate' %}
+                  <span class="pill-badge badge-info">Moderate</span>
+                {% else %}
+                  <span class="pill-badge badge-success">Low</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- Include Chart.js (We load it from CDN for this view) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const ctx = document.getElementById('envCorrelationChart').getContext('2d');
+    
+    const labels = {{ chart_labels|safe }};
+    const tempData = {{ chart_temp|safe }};
+    const rainData = {{ chart_rain|safe }};
+    const casesData = {{ chart_cases|safe }};
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Cases Reported',
+                    data: casesData,
+                    type: 'bar',
+                    backgroundColor: 'rgba(239, 68, 68, 0.7)', // Red
+                    borderColor: 'rgba(239, 68, 68, 1)',
+                    borderWidth: 1,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Rainfall (mm)',
+                    data: rainData,
+                    type: 'bar',
+                    backgroundColor: 'rgba(59, 130, 246, 0.5)', // Blue
+                    borderColor: 'rgba(59, 130, 246, 1)',
+                    borderWidth: 1,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Temperature (°C)',
+                    data: tempData,
+                    type: 'line',
+                    borderColor: 'rgba(245, 158, 11, 1)', // Orange
+                    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+                    fill: false,
+                    tension: 0.3,
+                    yAxisID: 'y1'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Cases / Rainfall (mm)'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Temperature (°C)'
+                    },
+                    grid: {
+                        drawOnChartArea: false, // only want the grid lines for one axis to show up
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed.y !== null) {
+                                label += context.parsed.y;
+                            }
+                            return label;
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}
