@@ -55,6 +55,24 @@
   <section class="dash-section">
     <h3 class="dash-section__title">Quick Actions</h3>
     <div class="dash-widget-grid">
+      <a href="{% url 'submit_report' %}" class="dash-widget-card">
+        <div class="dash-widget-card__head">
+          <div class="dash-widget-card__icon dash-widget-card__icon--primary"><i data-lucide="file-plus" class="lucide-icon lucide-icon--sm"></i></div>
+          <span class="dash-widget-menu" aria-hidden="true"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></span>
+        </div>
+        <h4>Submit Case Report</h4>
+        <p>Record a new syndromic case for {{ barangay_name }}</p>
+        <span class="dash-widget-card__link">Open <i data-lucide="arrow-right" class="lucide-icon lucide-icon--xs"></i></span>
+      </a>
+      <a href="{% url 'my_reports' %}" class="dash-widget-card">
+        <div class="dash-widget-card__head">
+          <div class="dash-widget-card__icon dash-widget-card__icon--warning"><i data-lucide="files" class="lucide-icon lucide-icon--sm"></i></div>
+          <span class="dash-widget-menu" aria-hidden="true"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></span>
+        </div>
+        <h4>My Reports</h4>
+        <p>View and track your submitted reports{% if pending_reports %} — <strong>{{ pending_reports }} pending</strong>{% endif %}</p>
+        <span class="dash-widget-card__link">Open <i data-lucide="arrow-right" class="lucide-icon lucide-icon--xs"></i></span>
+      </a>
       <a href="{% url 'case_records' %}" class="dash-widget-card">
         <div class="dash-widget-card__head">
           <div class="dash-widget-card__icon dash-widget-card__icon--teal"><i data-lucide="clipboard-list" class="lucide-icon lucide-icon--sm"></i></div>
