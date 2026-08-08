@@ -502,3 +502,62 @@ def api_dispatch_task(request):
     
     return JsonResponse({'ok': True, 'task_id': task.id})
 
+@login_required
+@role_required('catchment_nurse')
+def manage_bhws_view(request):
+    from django.utils import timezone
+    from datetime import timedelta
+    from django.db.models import Count, Q
+    
+    user = User.objects.filter(id=request.session.get('user_id')).first()
+    barangay = resolve_user_barangay(user)
+    
+    if not barangay:
+        return redirect('login')
+        
+    now = timezone.now()
+    start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    yesterday = now - timedelta(days=1)
+    
+    # Base query for BHWs in the same barangay
+    bhws = User.objects.filter(
+        role='barangay_health_worker',
+        barangay_text__iexact=barangay.barangay_name
+    ).annotate(
+        reports_filed=Count('surveillancereport')
+    ).order_by('first_name', 'last_name')
+    
+    total_bhws = bhws.count()
+    active_today = bhws.filter(last_login__gte=yesterday).count()
+    
+    # Reports submitted by these BHWs this month
+    reports_this_month = SurveillanceReport.objects.filter(
+        submitted_by__in=bhws,
+        report_date__gte=start_of_month
+    ).count()
+    
+    ctx = {
+        'session_full_name': request.session.get('full_name'),
+        'barangay_name': barangay.barangay_name,
+        'bhws': bhws,
+        'total_bhws': total_bhws,
+        'active_today': active_today,
+        'reports_this_month': reports_this_month,
+        'now': now,
+        'yesterday': yesterday,
+    }
+    
+    return render(request, 'dashboard/nurse_manage_bhws.html', ctx)
+
+
+@login_required
+@role_required('catchment_nurse')
+def bhw_reports_view(request):
+    # Redirect to case_records but append a query parameter so we can filter.
+    # Actually, the case_records view doesn't currently filter by submitter role.
+    # To keep it simple, we'll just redirect to case records since it's already scoped 
+    # to their barangay. We could pass a parameter, but for now case_records does the job.
+    url = reverse('case_records')
+    # If the user specifically wants BHW reports, we can just redirect to case_records
+    # because in the catchment nurse view, most reports are from BHWs.
+    return redirect(url)

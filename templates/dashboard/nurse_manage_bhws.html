@@ -1,0 +1,116 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block page_title %}Manage BHWs{% endblock %}
+{% block content %}
+<div class="pulse-page dash-home">
+
+  <header class="dash-hero">
+    <div class="dash-hero__text">
+      <span class="pulse-eyebrow">Management</span>
+      <h2>Manage BHWs</h2>
+      <p>Barangay Command Center — {{ barangay_name }}</p>
+    </div>
+    <span class="dash-hero__date pill-badge badge-info">
+      <i data-lucide="calendar" class="lucide-icon lucide-icon--xs"></i>
+      {% now "l, F d, Y" %}
+    </span>
+  </header>
+
+  <div class="dash-metrics">
+    <article class="dash-metric-card">
+      <div class="dash-metric-card__head">
+        <div class="dash-metric-card__icon dash-metric-card__icon--primary"><i data-lucide="users" class="lucide-icon lucide-icon--sm"></i></div>
+      </div>
+      <div class="dash-metric-card__value">{{ total_bhws|default:0 }}</div>
+      <div class="dash-metric-card__label">Total BHWs Assigned</div>
+    </article>
+    <article class="dash-metric-card">
+      <div class="dash-metric-card__head">
+        <div class="dash-metric-card__icon dash-metric-card__icon--teal"><i data-lucide="user-check" class="lucide-icon lucide-icon--sm"></i></div>
+      </div>
+      <div class="dash-metric-card__value">{{ active_today|default:0 }}</div>
+      <div class="dash-metric-card__label">Active Today</div>
+    </article>
+    <article class="dash-metric-card">
+      <div class="dash-metric-card__head">
+        <div class="dash-metric-card__icon dash-metric-card__icon--warning"><i data-lucide="clipboard-list" class="lucide-icon lucide-icon--sm"></i></div>
+      </div>
+      <div class="dash-metric-card__value">{{ reports_this_month|default:0 }}</div>
+      <div class="dash-metric-card__label">Reports This Month</div>
+    </article>
+  </div>
+
+  <section class="dash-section">
+    <h3 class="dash-section__title">BHW Personnel Roster</h3>
+    <div class="pulse-panel pulse-table-panel">
+      <div class="pulse-table-wrap table-wrapper">
+        <table class="pulse-table">
+          <thead>
+            <tr>
+              <th>BHW Name</th>
+              <th>Contact Details</th>
+              <th>Assigned Area</th>
+              <th>Status</th>
+              <th>Reports Filed</th>
+              <th>Last Active</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for bhw in bhws %}
+            <tr class="pulse-table__row">
+              <td data-label="BHW Name">
+                <strong>{{ bhw.first_name }} {{ bhw.last_name }}</strong>
+              </td>
+              <td data-label="Contact Details">
+                <div><i data-lucide="mail" class="lucide-icon lucide-icon--xs text-muted"></i> {{ bhw.email }}</div>
+                {% if bhw.contact_number %}
+                <div><i data-lucide="phone" class="lucide-icon lucide-icon--xs text-muted"></i> {{ bhw.contact_number }}</div>
+                {% endif %}
+              </td>
+              <td data-label="Assigned Area">
+                {{ bhw.assigned_cluster|default:"Barangay-wide" }}
+              </td>
+              <td data-label="Status">
+                {% if bhw.last_login and bhw.last_login >= yesterday %}
+                  <span class="pill-badge badge-active">Active</span>
+                {% else %}
+                  <span class="pill-badge badge-muted">Offline</span>
+                {% endif %}
+              </td>
+              <td data-label="Reports Filed">
+                <span class="pill-badge badge-info">{{ bhw.reports_filed }}</span>
+              </td>
+              <td data-label="Last Active">
+                {% if bhw.last_login %}
+                  {{ bhw.last_login|timesince }} ago
+                {% else %}
+                  Never
+                {% endif %}
+              </td>
+              <td data-label="Actions">
+                <button type="button" class="btn btn-sm btn-primary" onclick="openDispatchModal('{{ bhw.id }}', '{{ bhw.first_name|escapejs }} {{ bhw.last_name|escapejs }}', '')">
+                  Assign Task
+                </button>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="7" style="text-align: center; padding: 2rem;">
+                <div class="text-muted">
+                  <i data-lucide="users" class="lucide-icon" style="margin-bottom:10px; width:32px; height:32px;"></i>
+                  <p>No BHWs found assigned to {{ barangay_name }}.</p>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+{% include "dashboard/partials/dispatch_task_modal.html" %}
+
+{% endblock %}

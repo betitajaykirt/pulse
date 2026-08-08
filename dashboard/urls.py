@@ -14,5 +14,7 @@ urlpatterns = [
     path('api/notifications/<int:notif_id>/read/', views.api_notification_read, name='api_notification_read'),
     path('nurse/', views.nurse_dashboard_view, name='nurse_dashboard'),
     path('nurse/api/dispatch-task/', views.api_dispatch_task, name='api_dispatch_task'),
+    path('nurse/manage-bhws/', views.manage_bhws_view, name='manage_bhws'),
+    path('nurse/bhw-reports/', views.bhw_reports_view, name='bhw_reports'),
 ]
 
