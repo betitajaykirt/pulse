@@ -199,6 +199,36 @@
         item.className = `notification-item ${notif.is_read ? 'read' : 'unread'}`;
         item.dataset.id = notif.id;
 
+        // Handle task notifications differently
+        if (notif.is_task) {
+            const isAssigned = notif.severity_level === 'task_assigned';
+            const iconName = isAssigned ? 'clipboard-check' : 'check-circle-2';
+            const bgClass = isAssigned ? 'bg-high' : 'bg-moderate';
+            const label = isAssigned
+                ? `New Field Task: ${escapeHtml(notif.task_title)}`
+                : `${escapeHtml(notif.disease)}`;
+            const desc = isAssigned
+                ? `Assigned by ${escapeHtml(notif.task_nurse || 'Nurse')}`
+                : `Completed by ${escapeHtml(notif.task_bhw || 'BHW')}`;
+
+            item.innerHTML = `
+                <div class="notification-item-icon ${bgClass}">
+                    <i data-lucide="${iconName}" class="lucide-icon lucide-icon--sm"></i>
+                </div>
+                <div class="notification-item-content">
+                    <div class="notification-item-title">${label}</div>
+                    <div class="notification-item-desc">${desc}</div>
+                    <div class="notification-item-time">${new Date(notif.created_at).toLocaleString()}</div>
+                </div>
+            `;
+
+            item.addEventListener('click', () => {
+                window.location.href = isAssigned ? '/dashboard/bhw/tasks/' : '/dashboard/nurse/manage-bhws/';
+            });
+
+            return item;
+        }
+
         const locationText = notif.purok ? `${escapeHtml(notif.barangay_name)} — ${escapeHtml(notif.purok)}` : escapeHtml(notif.barangay_name);
         
         let subtitle = escapeHtml(notif.disease);

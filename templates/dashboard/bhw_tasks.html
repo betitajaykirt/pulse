@@ -1,0 +1,154 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block page_title %}My Tasks{% endblock %}
+{% block content %}
+<div class="pulse-page dash-home">
+
+  <header class="dash-hero">
+    <div class="dash-hero__text">
+      <span class="pulse-eyebrow">Tasks</span>
+      <h2>My Field Tasks</h2>
+      <p>Tasks assigned to you by your Catchment Nurse</p>
+    </div>
+    <span class="dash-hero__date pill-badge badge-info">
+      <i data-lucide="calendar" class="lucide-icon lucide-icon--xs"></i>
+      {% now "l, F d, Y" %}
+    </span>
+  </header>
+
+  <div class="dash-metrics">
+    <article class="dash-metric-card">
+      <div class="dash-metric-card__head">
+        <div class="dash-metric-card__icon dash-metric-card__icon--warning"><i data-lucide="clock" class="lucide-icon lucide-icon--sm"></i></div>
+      </div>
+      <div class="dash-metric-card__value">{{ pending_count|default:0 }}</div>
+      <div class="dash-metric-card__label">Pending</div>
+    </article>
+    <article class="dash-metric-card">
+      <div class="dash-metric-card__head">
+        <div class="dash-metric-card__icon dash-metric-card__icon--primary"><i data-lucide="loader" class="lucide-icon lucide-icon--sm"></i></div>
+      </div>
+      <div class="dash-metric-card__value">{{ in_progress_count|default:0 }}</div>
+      <div class="dash-metric-card__label">In Progress</div>
+    </article>
+    <article class="dash-metric-card">
+      <div class="dash-metric-card__head">
+        <div class="dash-metric-card__icon dash-metric-card__icon--teal"><i data-lucide="check-circle-2" class="lucide-icon lucide-icon--sm"></i></div>
+      </div>
+      <div class="dash-metric-card__value">{{ completed_count|default:0 }}</div>
+      <div class="dash-metric-card__label">Completed</div>
+    </article>
+  </div>
+
+  <section class="dash-section">
+    <h3 class="dash-section__title">All Tasks</h3>
+    <div class="pulse-panel pulse-table-panel">
+      <div class="pulse-table-wrap table-wrapper">
+        <table class="pulse-table">
+          <thead>
+            <tr>
+              <th>Task</th>
+              <th>Description</th>
+              <th>Assigned By</th>
+              <th>Status</th>
+              <th>Assigned On</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for task in tasks %}
+            <tr class="pulse-table__row" id="task-row-{{ task.id }}">
+              <td data-label="Task">
+                <strong>{{ task.title }}</strong>
+              </td>
+              <td data-label="Description">
+                {{ task.description|default:"No additional details"|truncatewords:15 }}
+              </td>
+              <td data-label="Assigned By">
+                {% if task.assigned_by %}
+                  Nurse {{ task.assigned_by.first_name }} {{ task.assigned_by.last_name }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td data-label="Status">
+                <span class="pill-badge {% if task.status == 'Pending' %}badge-suspected{% elif task.status == 'In Progress' %}badge-info{% elif task.status == 'Completed' %}badge-active{% else %}badge-muted{% endif %}">
+                  {{ task.status }}
+                </span>
+              </td>
+              <td data-label="Assigned On">
+                <span class="um-date">{{ task.created_at|date:"M d, Y H:i" }}</span>
+              </td>
+              <td data-label="Actions">
+                {% if task.status != 'Completed' and task.status != 'Cancelled' %}
+                <button type="button" class="btn btn-sm btn-primary btn-mark-done" data-task-id="{{ task.id }}">
+                  <i data-lucide="check" class="lucide-icon lucide-icon--xs"></i> Mark as Done
+                </button>
+                {% else %}
+                <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" style="text-align: center; padding: 2rem;">
+                <div class="text-muted">
+                  <i data-lucide="check-square" class="lucide-icon" style="margin-bottom:10px; width:32px; height:32px;"></i>
+                  <p>No tasks assigned to you yet.</p>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/notifications.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.btn-mark-done').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var taskId = btn.dataset.taskId;
+      var csrfMatch = document.cookie.match(/csrftoken=([^;]+)/);
+      var csrfToken = csrfMatch ? csrfMatch[1] : '';
+
+      btn.disabled = true;
+      btn.textContent = 'Updating...';
+
+      fetch('/dashboard/bhw/api/task/' + taskId + '/done/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken }
+      })
+      .then(function(resp) { return resp.json(); })
+      .then(function(data) {
+        if (data.ok) {
+          var row = document.getElementById('task-row-' + taskId);
+          if (row) {
+            var statusCell = row.querySelector('[data-label="Status"] .pill-badge');
+            if (statusCell) {
+              statusCell.className = 'pill-badge badge-active';
+              statusCell.textContent = 'Completed';
+            }
+            btn.parentNode.innerHTML = '<span class="text-muted">—</span>';
+          }
+        } else {
+          btn.disabled = false;
+          btn.textContent = 'Mark as Done';
+          alert('Failed to update task: ' + (data.error || 'Unknown error'));
+        }
+      })
+      .catch(function() {
+        btn.disabled = false;
+        btn.textContent = 'Mark as Done';
+        alert('Network error. Please try again.');
+      });
+    });
+  });
+});
+</script>
+{% endblock %}
