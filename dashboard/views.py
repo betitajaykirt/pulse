@@ -7,7 +7,7 @@ from accounts.auth_utils import login_required
 from myapp.audit_utils import display_name_for_audit_log, display_name_for_system_log
 from myapp.models import (
     User, Admin, SuperAdmin, Barangay, SurveillanceReport,
-    Alert, SystemLog, AuditLog, NotificationLog, FieldTask,
+    Alert, SystemLog, AuditLog, NotificationLog, FieldTask, EnvironmentalData
 )
 from accounts.auth_utils import role_required
 from myapp.barangay_scope import (
