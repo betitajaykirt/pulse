@@ -80,7 +80,7 @@
     {% endif %}
     {% endif %}
 
-    {% if session_role == 'health_officer' or session_role == 'encoder' or session_role == 'barangay_health_worker' %}
+    {% if session_role == 'health_officer' or session_role == 'encoder' or session_role == 'barangay_health_worker' or session_role == 'catchment_nurse' %}
     <div class="nav-section-label">Data Entry</div>
     <a href="{% url 'submit_report' %}" class="nav-item {% if 'submit' in request.path %}active{% endif %}">
       <span class="nav-icon"><i data-lucide="file-plus" class="lucide-icon lucide-icon--sm"></i></span>
