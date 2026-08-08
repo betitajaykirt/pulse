@@ -103,61 +103,14 @@
             : '';
 
         const acknowledge = () => {
-            if (notif.is_task && notif.task_id) {
-                const csrfTokenMatch = document.cookie.match(/csrftoken=([^;]+)/);
-                const csrfToken = csrfTokenMatch ? csrfTokenMatch[1] : '';
-                fetch(`/dashboard/bhw/api/task/${notif.task_id}/in-progress/`, {
-                    method: 'POST',
-                    headers: { 'X-CSRFToken': csrfToken }
-                }).catch(err => console.error(err));
-            }
-
             markAsRead(notif.id).finally(() => {
                 removeToast(toast);
                 setTimeout(showNextModal, 300);
             });
         };
 
-        if (notif.is_task) {
-            const isAssigned = notif.severity_level === 'task_assigned';
-            const badgeLabel = isAssigned ? 'TASK ASSIGNMENT' : 'TASK COMPLETED';
-            const title = escapeHtml(notif.task_title || notif.disease);
-            const officerDisplay = notif.officer_contact ? escapeHtml(formatContact(notif)) : 'Contact Officer via System';
-            
-            // For tasks, barangay_name holds the description. Let's format actionable bullet points.
-            const rawDescription = (notif.recommendations || notif.barangay_name || 'Complete assigned field task.');
-            const formattedActions = rawDescription.split('\n').map(line => `<p>• ${escapeHtml(line.trim())}</p>`).join('');
-
-            toast.innerHTML = `
-                <div class="toast-header pulse-alert-card__header">
-                    <div>
-                        <span class="toast-badge pulse-alert-card__classification">${badgeLabel}</span>
-                        <h3 class="pulse-alert-card__title">${title}</h3>
-                    </div>
-                    <button type="button" class="toast-close" aria-label="Close alert">&times;</button>
-                </div>
-                <div class="toast-body pulse-alert-card__body">
-                    <p>${isAssigned ? 'New field investigation required.' : 'Field task has been marked as done.'}</p>
-                    <dl class="pulse-alert-card__meta">
-                        <div><dt>Status</dt><dd>${isAssigned ? 'Pending' : 'Completed'}</dd></div>
-                        <div><dt>Officer</dt><dd>${escapeHtml(notif.officer_name || 'System')}</dd></div>
-                        <div><dt>Contact</dt><dd>${notif.officer_contact ? officerDisplay : `<a href="#">${officerDisplay}</a>`}</dd></div>
-                    </dl>
-                    <div class="pulse-alert-card__recommendations">
-                        <strong>Actionable Items</strong>
-                        ${formattedActions}
-                    </div>
-                    ${queuedNote}
-                    <div class="toast-actions pulse-alert-card__actions">
-                        <button type="button" class="btn btn-secondary toast-dismiss-btn" data-task-id="${notif.task_id}">Acknowledge</button>
-                        ${notif.map_url ? `<a href="${escapeHtml(notif.map_url)}" class="btn btn-outline pulse-alert-card__map-btn">View on Map</a>` : ''}
-                        <a href="${isAssigned ? '/dashboard/bhw/tasks/' : '/dashboard/nurse/manage-bhws/'}" class="btn btn-primary">View Tasks</a>
-                    </div>
-                </div>
-            `;
-        } else {
-            const locationText = notif.purok ? `${escapeHtml(notif.barangay_name)} — ${escapeHtml(notif.purok)}` : escapeHtml(notif.barangay_name);
-            let badgeHtml = '';
+        const locationText = notif.purok ? `${escapeHtml(notif.barangay_name)} — ${escapeHtml(notif.purok)}` : escapeHtml(notif.barangay_name);
+        let badgeHtml = '';
             if (notif.score_shift && notif.score_shift > 0) {
                 badgeHtml = `<span class="toast-badge" style="background:#fef2f2;color:#ef4444;margin-left:8px;">+${notif.score_shift.toFixed(2)} Risk Increase</span>`;
             }
@@ -199,8 +152,6 @@
                     </div>
                 </div>
             `;
-        }
-
         toastContainer.appendChild(toast);
         setTimeout(() => toast.classList.add('show'), 10);
 
@@ -247,36 +198,6 @@
         const item = document.createElement('div');
         item.className = `notification-item ${notif.is_read ? 'read' : 'unread'}`;
         item.dataset.id = notif.id;
-
-        // Handle task notifications differently
-        if (notif.is_task) {
-            const isAssigned = notif.severity_level === 'task_assigned';
-            const iconName = isAssigned ? 'clipboard-check' : 'check-circle-2';
-            const bgClass = isAssigned ? 'bg-high' : 'bg-moderate';
-            const label = isAssigned
-                ? `New Field Task: ${escapeHtml(notif.task_title)}`
-                : `${escapeHtml(notif.disease)}`;
-            const desc = isAssigned
-                ? `Assigned by ${escapeHtml(notif.task_nurse || 'Nurse')}`
-                : `Completed by ${escapeHtml(notif.task_bhw || 'BHW')}`;
-
-            item.innerHTML = `
-                <div class="notification-item-icon ${bgClass}">
-                    <i data-lucide="${iconName}" class="lucide-icon lucide-icon--sm"></i>
-                </div>
-                <div class="notification-item-content">
-                    <div class="notification-item-title">${label}</div>
-                    <div class="notification-item-desc">${desc}</div>
-                    <div class="notification-item-time">${new Date(notif.created_at).toLocaleString()}</div>
-                </div>
-            `;
-
-            item.addEventListener('click', () => {
-                window.location.href = isAssigned ? '/dashboard/bhw/tasks/' : '/dashboard/nurse/manage-bhws/';
-            });
-
-            return item;
-        }
 
         const locationText = notif.purok ? `${escapeHtml(notif.barangay_name)} — ${escapeHtml(notif.purok)}` : escapeHtml(notif.barangay_name);
         
@@ -349,16 +270,6 @@
                     badge.style.display = 'flex';
                 } else {
                     badge.style.display = 'none';
-                }
-
-                const sidebarTaskBadge = document.getElementById('sidebar-task-badge');
-                if (sidebarTaskBadge) {
-                    if (data.pending_task_count > 0) {
-                        sidebarTaskBadge.textContent = data.pending_task_count;
-                        sidebarTaskBadge.style.display = 'inline-flex';
-                    } else {
-                        sidebarTaskBadge.style.display = 'none';
-                    }
                 }
 
                 if (data.notifications.length === 0) {

@@ -47,16 +47,6 @@ def dashboard(request):
     if barangay_filter:
         ctx['aptas_barangay_scope'] = barangay_filter
 
-    # Inject active tasks for BHW dashboard
-    if role == 'barangay_health_worker':
-        uid = request.session.get('user_id')
-        ctx['active_tasks'] = FieldTask.objects.select_related('assigned_by').filter(
-            assigned_to_id=uid
-        ).exclude(status='Completed').exclude(status='Cancelled').order_by('-created_at')[:5]
-        ctx['active_task_count'] = FieldTask.objects.filter(
-            assigned_to_id=uid
-        ).exclude(status='Completed').exclude(status='Cancelled').count()
-
     return render(request, template, ctx)
 
 
@@ -402,7 +392,6 @@ def api_notifications(request):
 
     data = []
     unread_count = 0
-    pending_task_count = 0
 
     for notif in notifications_list:
         is_read = notif.id in read_notification_ids
@@ -410,65 +399,9 @@ def api_notifications(request):
             unread_count += 1
         data.append(_serialize_notification(notif, is_read))
 
-    # Inject task notifications for BHWs and Catchment Nurses
-    if role == 'barangay_health_worker' and user_id:
-        pending_tasks = FieldTask.objects.select_related('assigned_by').filter(
-            assigned_to_id=user_id, status='Pending'
-        ).order_by('-created_at')[:10]
-        for task in pending_tasks:
-            nurse_name = f'{task.assigned_by.first_name} {task.assigned_by.last_name}' if task.assigned_by else 'Nurse'
-            # Attempt to extract location from associated report
-            map_url = '/map/'
-            if task.report:
-                if task.report.latitude and task.report.longitude:
-                    map_url = f'/map/?lat={task.report.latitude}&lng={task.report.longitude}'
-                elif task.report.barangay:
-                    map_url = f'/map/?barangay={task.report.barangay}'
-
-            data.insert(0, {
-                'id': f'task-{task.id}',
-                'is_task': True,
-                'task_id': task.id,
-                'disease': task.title,
-                'barangay_name': task.description or '',
-                'severity_level': 'task_assigned',
-                'created_at': task.created_at.isoformat(),
-                'is_read': False,
-                'officer_name': f'Nurse {nurse_name}',
-                'recommendations': task.description or 'Complete assigned field task.',
-                'task_title': task.title,
-                'task_nurse': nurse_name,
-                'map_url': map_url,
-            })
-            unread_count += 1
-            pending_task_count += 1
-
-    if role == 'catchment_nurse' and user_id:
-        completed_tasks = FieldTask.objects.select_related('assigned_to').filter(
-            assigned_by_id=user_id, status='Completed'
-        ).order_by('-updated_at')[:10]
-        for task in completed_tasks:
-            bhw_name = f'{task.assigned_to.first_name} {task.assigned_to.last_name}' if task.assigned_to else 'BHW'
-            data.insert(0, {
-                'id': f'task-done-{task.id}',
-                'is_task': True,
-                'task_id': task.id,
-                'disease': f'Task Completed: {task.title}',
-                'barangay_name': '',
-                'severity_level': 'task_completed',
-                'created_at': task.updated_at.isoformat(),
-                'is_read': False,
-                'officer_name': bhw_name,
-                'recommendations': f'{bhw_name} completed: {task.title}',
-                'task_title': task.title,
-                'task_bhw': bhw_name,
-            })
-            unread_count += 1
-
     return JsonResponse({
         'ok': True, 
         'unread_count': unread_count, 
-        'pending_task_count': pending_task_count,
         'notifications': data
     })
 
@@ -635,57 +568,3 @@ def bhw_reports_view(request):
     # because in the catchment nurse view, most reports are from BHWs.
     return redirect(url)
 
-
-@login_required
-@role_required('barangay_health_worker')
-def bhw_tasks_view(request):
-    uid = request.session.get('user_id')
-    tasks = FieldTask.objects.select_related('assigned_by', 'report').filter(
-        assigned_to_id=uid
-    ).order_by('-created_at')
-    
-    pending_count = tasks.filter(status='Pending').count()
-    in_progress_count = tasks.filter(status='In Progress').count()
-    completed_count = tasks.filter(status='Completed').count()
-    
-    return render(request, 'dashboard/bhw_tasks.html', {
-        'tasks': tasks,
-        'pending_count': pending_count,
-        'in_progress_count': in_progress_count,
-        'completed_count': completed_count,
-    })
-
-
-@login_required
-@role_required('barangay_health_worker')
-def api_task_mark_done(request, task_id):
-    if request.method != 'POST':
-        return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
-
-    uid = request.session.get('user_id')
-    task = FieldTask.objects.filter(id=task_id, assigned_to_id=uid).first()
-    if not task:
-        return JsonResponse({'ok': False, 'error': 'Task not found'}, status=404)
-
-    task.status = 'Completed'
-    task.save(update_fields=['status', 'updated_at'])
-
-    return JsonResponse({'ok': True})
-
-
-@login_required
-@role_required('barangay_health_worker')
-def api_task_acknowledge(request, task_id):
-    if request.method != 'POST':
-        return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
-
-    uid = request.session.get('user_id')
-    task = FieldTask.objects.filter(id=task_id, assigned_to_id=uid).first()
-    if not task:
-        return JsonResponse({'ok': False, 'error': 'Task not found'}, status=404)
-
-    if task.status == 'Pending':
-        task.status = 'In Progress'
-        task.save(update_fields=['status', 'updated_at'])
-
-    return JsonResponse({'ok': True})

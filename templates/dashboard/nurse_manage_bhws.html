@@ -52,7 +52,6 @@
               <th>Status</th>
               <th>Reports Filed</th>
               <th>Last Active</th>
-              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -87,15 +86,10 @@
                   Never
                 {% endif %}
               </td>
-              <td data-label="Actions">
-                <button type="button" class="btn btn-sm btn-primary" onclick="openDispatchModal('{{ bhw.id }}', '{{ bhw.first_name|escapejs }} {{ bhw.last_name|escapejs }}', '')">
-                  Assign Task
-                </button>
-              </td>
             </tr>
             {% empty %}
             <tr>
-              <td colspan="7" style="text-align: center; padding: 2rem;">
+              <td colspan="6" style="text-align: center; padding: 2rem;">
                 <div class="text-muted">
                   <i data-lucide="users" class="lucide-icon" style="margin-bottom:10px; width:32px; height:32px;"></i>
                   <p>No BHWs found assigned to {{ barangay_name }}.</p>
@@ -110,7 +104,5 @@
   </section>
 
 </div>
-
-{% include "dashboard/partials/dispatch_task_modal.html" %}
 
 {% endblock %}
