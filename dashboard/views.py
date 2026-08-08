@@ -524,7 +524,7 @@ def manage_bhws_view(request):
         role='barangay_health_worker',
         barangay_text__iexact=barangay.barangay_name
     ).annotate(
-        reports_filed=Count('surveillancereport')
+        reports_filed=Count('submitted_reports')
     ).order_by('first_name', 'last_name')
     
     total_bhws = bhws.count()
