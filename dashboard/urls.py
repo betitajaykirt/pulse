@@ -18,5 +18,6 @@ urlpatterns = [
     path('nurse/bhw-reports/', views.bhw_reports_view, name='bhw_reports'),
     path('bhw/tasks/', views.bhw_tasks_view, name='bhw_tasks'),
     path('bhw/api/task/<int:task_id>/done/', views.api_task_mark_done, name='api_task_mark_done'),
+    path('bhw/api/task/<int:task_id>/in-progress/', views.api_task_acknowledge, name='api_task_acknowledge'),
 ]
 

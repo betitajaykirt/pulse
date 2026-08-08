@@ -95,65 +95,114 @@
         toast.className = `toast toast-${severityClass} pulse-alert-card`;
 
         const contactTel = (notif.officer_contact || '').replace(/\D/g, '');
+        // For task notifications, if no contact number, fallback to 'Contact Officer via System' link
         const contactHref = contactTel ? `tel:${contactTel}` : (notif.officer_email ? `mailto:${notif.officer_email}` : '#');
         const mapUrl = notif.map_url || `/map/?barangay=${encodeURIComponent(notif.barangay_name || '')}`;
         const queuedNote = modalQueue.length > 0
             ? `<p class="pulse-alert-card__queue">+ ${modalQueue.length} more unread alert(s) queued</p>`
             : '';
 
-        const locationText = notif.purok ? `${escapeHtml(notif.barangay_name)} — ${escapeHtml(notif.purok)}` : escapeHtml(notif.barangay_name);
-        let badgeHtml = '';
-        if (notif.score_shift && notif.score_shift > 0) {
-            badgeHtml = `<span class="toast-badge" style="background:#fef2f2;color:#ef4444;margin-left:8px;">+${notif.score_shift.toFixed(2)} Risk Increase</span>`;
-        }
-
-        let subtitle = escapeHtml(notif.disease);
-        if (notif.purok) subtitle += ` • ${escapeHtml(notif.purok)}`;
-        if (notif.active_cases) subtitle += ` • ${notif.active_cases} Active Cases`;
-        if (notif.trigger_source) subtitle += ` • Triggered by ${escapeHtml(notif.trigger_source)}`;
-
-        toast.innerHTML = `
-            <div class="toast-header pulse-alert-card__header">
-                <div>
-                    <span class="toast-badge pulse-alert-card__classification">${escapeHtml(getAlertTitle(notif))}</span>${badgeHtml}
-                    <h3 class="pulse-alert-card__title">${locationText}</h3>
-                </div>
-                <button type="button" class="toast-close" aria-label="Close alert">&times;</button>
-            </div>
-            <div class="toast-body pulse-alert-card__body">
-                <p>${subtitle}</p>
-                <div class="pulse-alert-risk-badge pulse-alert-risk-badge--${severityClass}">
-                    ${escapeHtml(formatRiskScoreLine(notif))}
-                </div>
-                <dl class="pulse-alert-card__meta">
-                    <div><dt>Status</dt><dd>${escapeHtml(notif.case_status || 'Active')}</dd></div>
-                    <div><dt>Disease</dt><dd>${escapeHtml(notif.disease || '—')}</dd></div>
-                    <div><dt>Location</dt><dd>${escapeHtml(formatLocation(notif))}</dd></div>
-                    <div><dt>Officer</dt><dd>${escapeHtml(formatOfficer(notif))}</dd></div>
-                    <div><dt>Contact</dt><dd>${escapeHtml(formatContact(notif))}</dd></div>
-                </dl>
-                <div class="pulse-alert-card__recommendations">
-                    <strong>Recommended actions</strong>
-                    <p>${escapeHtml(notif.recommendations || 'Review case details and coordinate barangay response.')}</p>
-                </div>
-                ${queuedNote}
-                <div class="toast-actions pulse-alert-card__actions">
-                    <button type="button" class="btn btn-secondary toast-dismiss-btn">Acknowledge</button>
-                    ${contactTel || notif.officer_email ? `<a href="${escapeHtml(contactHref)}" class="btn btn-outline pulse-alert-card__contact-btn">Contact Officer</a>` : ''}
-                    <a href="${escapeHtml(mapUrl)}" class="btn btn-primary pulse-alert-card__map-btn">View on Map</a>
-                </div>
-            </div>
-        `;
-
-        toastContainer.appendChild(toast);
-        setTimeout(() => toast.classList.add('show'), 10);
-
         const acknowledge = () => {
+            if (notif.is_task && notif.task_id) {
+                const csrfTokenMatch = document.cookie.match(/csrftoken=([^;]+)/);
+                const csrfToken = csrfTokenMatch ? csrfTokenMatch[1] : '';
+                fetch(`/dashboard/bhw/api/task/${notif.task_id}/in-progress/`, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken }
+                }).catch(err => console.error(err));
+            }
+
             markAsRead(notif.id).finally(() => {
                 removeToast(toast);
                 setTimeout(showNextModal, 300);
             });
         };
+
+        if (notif.is_task) {
+            const isAssigned = notif.severity_level === 'task_assigned';
+            const badgeLabel = isAssigned ? 'TASK ASSIGNMENT' : 'TASK COMPLETED';
+            const title = escapeHtml(notif.task_title || notif.disease);
+            const officerDisplay = notif.officer_contact ? escapeHtml(formatContact(notif)) : 'Contact Officer via System';
+            
+            // For tasks, barangay_name holds the description. Let's format actionable bullet points.
+            const rawDescription = (notif.recommendations || notif.barangay_name || 'Complete assigned field task.');
+            const formattedActions = rawDescription.split('\n').map(line => `<p>• ${escapeHtml(line.trim())}</p>`).join('');
+
+            toast.innerHTML = `
+                <div class="toast-header pulse-alert-card__header">
+                    <div>
+                        <span class="toast-badge pulse-alert-card__classification">${badgeLabel}</span>
+                        <h3 class="pulse-alert-card__title">${title}</h3>
+                    </div>
+                    <button type="button" class="toast-close" aria-label="Close alert">&times;</button>
+                </div>
+                <div class="toast-body pulse-alert-card__body">
+                    <p>${isAssigned ? 'New field investigation required.' : 'Field task has been marked as done.'}</p>
+                    <dl class="pulse-alert-card__meta">
+                        <div><dt>Status</dt><dd>${isAssigned ? 'Pending' : 'Completed'}</dd></div>
+                        <div><dt>Officer</dt><dd>${escapeHtml(notif.officer_name || 'System')}</dd></div>
+                        <div><dt>Contact</dt><dd>${notif.officer_contact ? officerDisplay : `<a href="#">${officerDisplay}</a>`}</dd></div>
+                    </dl>
+                    <div class="pulse-alert-card__recommendations">
+                        <strong>Actionable Items</strong>
+                        ${formattedActions}
+                    </div>
+                    ${queuedNote}
+                    <div class="toast-actions pulse-alert-card__actions">
+                        <button type="button" class="btn btn-secondary toast-dismiss-btn" data-task-id="${notif.task_id}">Acknowledge</button>
+                        ${notif.map_url ? `<a href="${escapeHtml(notif.map_url)}" class="btn btn-outline pulse-alert-card__map-btn">View on Map</a>` : ''}
+                        <a href="${isAssigned ? '/dashboard/bhw/tasks/' : '/dashboard/nurse/manage-bhws/'}" class="btn btn-primary">View Tasks</a>
+                    </div>
+                </div>
+            `;
+        } else {
+            const locationText = notif.purok ? `${escapeHtml(notif.barangay_name)} — ${escapeHtml(notif.purok)}` : escapeHtml(notif.barangay_name);
+            let badgeHtml = '';
+            if (notif.score_shift && notif.score_shift > 0) {
+                badgeHtml = `<span class="toast-badge" style="background:#fef2f2;color:#ef4444;margin-left:8px;">+${notif.score_shift.toFixed(2)} Risk Increase</span>`;
+            }
+
+            let subtitle = escapeHtml(notif.disease);
+            if (notif.purok) subtitle += ` • ${escapeHtml(notif.purok)}`;
+            if (notif.active_cases) subtitle += ` • ${notif.active_cases} Active Cases`;
+            if (notif.trigger_source) subtitle += ` • Triggered by ${escapeHtml(notif.trigger_source)}`;
+
+            toast.innerHTML = `
+                <div class="toast-header pulse-alert-card__header">
+                    <div>
+                        <span class="toast-badge pulse-alert-card__classification">${escapeHtml(getAlertTitle(notif))}</span>${badgeHtml}
+                        <h3 class="pulse-alert-card__title">${locationText}</h3>
+                    </div>
+                    <button type="button" class="toast-close" aria-label="Close alert">&times;</button>
+                </div>
+                <div class="toast-body pulse-alert-card__body">
+                    <p>${subtitle}</p>
+                    <div class="pulse-alert-risk-badge pulse-alert-risk-badge--${severityClass}">
+                        ${escapeHtml(formatRiskScoreLine(notif))}
+                    </div>
+                    <dl class="pulse-alert-card__meta">
+                        <div><dt>Status</dt><dd>${escapeHtml(notif.case_status || 'Active')}</dd></div>
+                        <div><dt>Disease</dt><dd>${escapeHtml(notif.disease || '—')}</dd></div>
+                        <div><dt>Location</dt><dd>${escapeHtml(formatLocation(notif))}</dd></div>
+                        <div><dt>Officer</dt><dd>${escapeHtml(formatOfficer(notif))}</dd></div>
+                        <div><dt>Contact</dt><dd>${escapeHtml(formatContact(notif))}</dd></div>
+                    </dl>
+                    <div class="pulse-alert-card__recommendations">
+                        <strong>Recommended actions</strong>
+                        <p>${escapeHtml(notif.recommendations || 'Review case details and coordinate barangay response.')}</p>
+                    </div>
+                    ${queuedNote}
+                    <div class="toast-actions pulse-alert-card__actions">
+                        <button type="button" class="btn btn-secondary toast-dismiss-btn">Acknowledge</button>
+                        ${contactTel || notif.officer_email ? `<a href="${escapeHtml(contactHref)}" class="btn btn-outline pulse-alert-card__contact-btn">Contact Officer</a>` : ''}
+                        <a href="${escapeHtml(mapUrl)}" class="btn btn-primary pulse-alert-card__map-btn">View on Map</a>
+                    </div>
+                </div>
+            `;
+        }
+
+        toastContainer.appendChild(toast);
+        setTimeout(() => toast.classList.add('show'), 10);
 
         toast.querySelector('.toast-close').addEventListener('click', acknowledge);
         toast.querySelector('.toast-dismiss-btn').addEventListener('click', acknowledge);
@@ -300,6 +349,16 @@
                     badge.style.display = 'flex';
                 } else {
                     badge.style.display = 'none';
+                }
+
+                const sidebarTaskBadge = document.getElementById('sidebar-task-badge');
+                if (sidebarTaskBadge) {
+                    if (data.pending_task_count > 0) {
+                        sidebarTaskBadge.textContent = data.pending_task_count;
+                        sidebarTaskBadge.style.display = 'inline-flex';
+                    } else {
+                        sidebarTaskBadge.style.display = 'none';
+                    }
                 }
 
                 if (data.notifications.length === 0) {

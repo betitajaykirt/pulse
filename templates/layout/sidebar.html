@@ -101,7 +101,8 @@
     {% if session_role == 'barangay_health_worker' %}
     <a href="{% url 'bhw_tasks' %}" class="nav-item {% if 'bhw/tasks' in request.path %}active{% endif %}">
       <span class="nav-icon"><i data-lucide="check-square" class="lucide-icon lucide-icon--sm"></i></span>
-      <span>My Tasks</span>
+      <span style="flex: 1;">My Tasks</span>
+      <span id="sidebar-task-badge" class="nav-badge pill-badge badge-suspected" style="display:none; margin-left: auto;">0</span>
     </a>
     {% endif %}
     {% endif %}

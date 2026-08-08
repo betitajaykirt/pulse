@@ -402,6 +402,8 @@ def api_notifications(request):
 
     data = []
     unread_count = 0
+    pending_task_count = 0
+
     for notif in notifications_list:
         is_read = notif.id in read_notification_ids
         if not is_read:
@@ -415,6 +417,14 @@ def api_notifications(request):
         ).order_by('-created_at')[:10]
         for task in pending_tasks:
             nurse_name = f'{task.assigned_by.first_name} {task.assigned_by.last_name}' if task.assigned_by else 'Nurse'
+            # Attempt to extract location from associated report
+            map_url = '/map/'
+            if task.report:
+                if task.report.latitude and task.report.longitude:
+                    map_url = f'/map/?lat={task.report.latitude}&lng={task.report.longitude}'
+                elif task.report.barangay:
+                    map_url = f'/map/?barangay={task.report.barangay}'
+
             data.insert(0, {
                 'id': f'task-{task.id}',
                 'is_task': True,
@@ -428,8 +438,10 @@ def api_notifications(request):
                 'recommendations': task.description or 'Complete assigned field task.',
                 'task_title': task.title,
                 'task_nurse': nurse_name,
+                'map_url': map_url,
             })
             unread_count += 1
+            pending_task_count += 1
 
     if role == 'catchment_nurse' and user_id:
         completed_tasks = FieldTask.objects.select_related('assigned_to').filter(
@@ -453,7 +465,12 @@ def api_notifications(request):
             })
             unread_count += 1
 
-    return JsonResponse({'ok': True, 'unread_count': unread_count, 'notifications': data})
+    return JsonResponse({
+        'ok': True, 
+        'unread_count': unread_count, 
+        'pending_task_count': pending_task_count,
+        'notifications': data
+    })
 
 
 @login_required
@@ -652,5 +669,23 @@ def api_task_mark_done(request, task_id):
 
     task.status = 'Completed'
     task.save(update_fields=['status', 'updated_at'])
+
+    return JsonResponse({'ok': True})
+
+
+@login_required
+@role_required('barangay_health_worker')
+def api_task_acknowledge(request, task_id):
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+
+    uid = request.session.get('user_id')
+    task = FieldTask.objects.filter(id=task_id, assigned_to_id=uid).first()
+    if not task:
+        return JsonResponse({'ok': False, 'error': 'Task not found'}, status=404)
+
+    if task.status == 'Pending':
+        task.status = 'In Progress'
+        task.save(update_fields=['status', 'updated_at'])
 
     return JsonResponse({'ok': True})
