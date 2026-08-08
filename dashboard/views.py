@@ -31,6 +31,9 @@ def dashboard(request):
         'surveillance_officer':   'dashboard/surveillance_officer.html',
         'barangay_health_worker': 'dashboard/barangay_health_worker.html',
     }
+    if role == 'catchment_nurse':
+        return redirect('nurse_dashboard')
+
     template = template_map.get(role)
     if not template:
         return redirect('login')
