@@ -12,5 +12,7 @@ urlpatterns = [
     path('outbreak-thresholds/', views.outbreak_thresholds_view, name='outbreak_thresholds'),
     path('api/notifications/', views.api_notifications, name='api_notifications'),
     path('api/notifications/<int:notif_id>/read/', views.api_notification_read, name='api_notification_read'),
+    path('nurse/', views.nurse_dashboard_view, name='nurse_dashboard'),
+    path('nurse/api/dispatch-task/', views.api_dispatch_task, name='api_dispatch_task'),
 ]
 

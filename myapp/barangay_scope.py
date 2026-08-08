@@ -9,7 +9,7 @@ CITY_WIDE_ROLES = frozenset({
 
 # Localized roles are restricted to their assigned barangay
 BARANGAY_SCOPED_ROLES = frozenset({
-    'barangay_health_worker', 'encoder',
+    'barangay_health_worker', 'encoder', 'catchment_nurse',
 })
 
 

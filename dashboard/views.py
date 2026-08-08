@@ -7,7 +7,7 @@ from accounts.auth_utils import login_required
 from myapp.audit_utils import display_name_for_audit_log, display_name_for_system_log
 from myapp.models import (
     User, Admin, SuperAdmin, Barangay, SurveillanceReport,
-    Alert, SystemLog, AuditLog, NotificationLog,
+    Alert, SystemLog, AuditLog, NotificationLog, FieldTask,
 )
 from accounts.auth_utils import role_required
 from myapp.barangay_scope import (
@@ -428,3 +428,74 @@ def api_alert_acknowledge(request, alert_id):
         alert.status = 'acknowledged'
         alert.save(update_fields=['status'])
     return JsonResponse({'ok': True, 'new_status': alert.status})
+
+
+@login_required
+@role_required('catchment_nurse')
+def nurse_dashboard_view(request):
+    ctx = _get_stats('catchment_nurse', request.session.get('user_id'))
+    ctx['weather'] = fetch_bago_city_weather()
+    barangay_filter = resolve_aptas_barangay_filter(
+        'catchment_nurse', request.session.get('user_id'), ctx,
+    )
+    ctx.update(get_aptas_dashboard_context(barangay_name=barangay_filter))
+    if barangay_filter:
+        ctx['aptas_barangay_scope'] = barangay_filter
+    
+    # Active BHW List
+    user = User.objects.filter(id=request.session.get('user_id')).first()
+    barangay = resolve_user_barangay(user)
+    bhws = []
+    if barangay:
+        bhws = User.objects.filter(
+            role='barangay_health_worker',
+            barangay_text__iexact=barangay.barangay_name,
+            status='active'
+        )
+    ctx['active_bhws'] = bhws
+    
+    # Pre-fetch recent reports with 'submitted_by'
+    if barangay:
+        base_qs = SurveillanceReport.objects.select_related('submitted_by').filter(
+            barangay_id=barangay.id
+        ).exclude(status='Closed')
+        ctx['recent_reports'] = base_qs.order_by('-report_date')[:10]
+
+    return render(request, 'dashboard/nurse_dashboard.html', ctx)
+
+
+@login_required
+@role_required('catchment_nurse')
+def api_dispatch_task(request):
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+    
+    bhw_id = request.POST.get('bhw_id')
+    report_id = request.POST.get('report_id')
+    title = request.POST.get('title')
+    description = request.POST.get('description', '')
+    
+    if not bhw_id or not title:
+        return JsonResponse({'ok': False, 'error': 'Missing required fields'}, status=400)
+        
+    bhw = User.objects.filter(id=bhw_id, role='barangay_health_worker').first()
+    if not bhw:
+        return JsonResponse({'ok': False, 'error': 'Invalid BHW'}, status=404)
+        
+    report = None
+    if report_id:
+        report = SurveillanceReport.objects.filter(id=report_id).first()
+        
+    nurse = User.objects.filter(id=request.session.get('user_id')).first()
+    
+    task = FieldTask.objects.create(
+        assigned_to=bhw,
+        assigned_by=nurse,
+        report=report,
+        title=title,
+        description=description,
+        status='Pending'
+    )
+    
+    return JsonResponse({'ok': True, 'task_id': task.id})
+

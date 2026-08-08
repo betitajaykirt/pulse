@@ -1,0 +1,80 @@
+<!-- Dispatch Task Modal -->
+<div id="dispatchTaskModal" class="pulse-modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+  <div class="pulse-modal-content" style="background-color: #fff; margin: 10% auto; padding: 20px; border-radius: 8px; width: 80%; max-width: 500px;">
+    <span class="pulse-modal-close" style="color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer;" onclick="closeDispatchModal()">&times;</span>
+    <h3 style="margin-top: 0;">Dispatch Field Task</h3>
+    <p>Assigning to: <strong id="dispatchBhwName"></strong></p>
+    
+    <form id="dispatchTaskForm" onsubmit="submitDispatchTask(event)">
+      <input type="hidden" id="dispatchBhwId" name="bhw_id" value="">
+      <input type="hidden" id="dispatchReportId" name="report_id" value="">
+      
+      <div class="um-field-group">
+        <label class="um-label" for="taskTitle">Task Title *</label>
+        <select class="um-input" id="taskTitle" name="title" required>
+          <option value="">Select a task...</option>
+          <option value="Symptom Checking">Symptom Checking</option>
+          <option value="Mosquito Misting">Mosquito Misting</option>
+          <option value="Patient Follow-up">Patient Follow-up</option>
+          <option value="Environmental Assessment">Environmental Assessment</option>
+          <option value="Other">Other (Specify in description)</option>
+        </select>
+      </div>
+      
+      <div class="um-field-group" style="margin-top: 15px;">
+        <label class="um-label" for="taskDescription">Additional Instructions</label>
+        <textarea class="um-input" id="taskDescription" name="description" rows="3" placeholder="Enter any specific instructions or notes for the BHW..."></textarea>
+      </div>
+      
+      <div style="margin-top: 20px; text-align: right;">
+        <button type="button" class="btn btn-outline-secondary" onclick="closeDispatchModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Dispatch Task</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openDispatchModal(bhwId, bhwName, reportId) {
+  document.getElementById('dispatchBhwId').value = bhwId;
+  document.getElementById('dispatchBhwName').textContent = bhwName;
+  document.getElementById('dispatchReportId').value = reportId;
+  document.getElementById('dispatchTaskModal').style.display = 'block';
+}
+
+function closeDispatchModal() {
+  document.getElementById('dispatchTaskModal').style.display = 'none';
+  document.getElementById('dispatchTaskForm').reset();
+}
+
+function submitDispatchTask(event) {
+  event.preventDefault();
+  
+  const form = document.getElementById('dispatchTaskForm');
+  const formData = new FormData(form);
+  
+  // Add CSRF token
+  const csrfToken = document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1];
+  
+  fetch("{% url 'api_dispatch_task' %}", {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': csrfToken
+    },
+    body: formData
+  })
+  .then(response => response.json())
+  .then(data => {
+    if(data.ok) {
+      alert('Task dispatched successfully!');
+      closeDispatchModal();
+    } else {
+      alert('Error dispatching task: ' + data.error);
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('An unexpected error occurred.');
+  });
+}
+</script>

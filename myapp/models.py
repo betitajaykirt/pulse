@@ -68,6 +68,7 @@ class User(models.Model):
         ('encoder', 'Encoder'),
         ('health_officer', 'Health Officer'),
         ('surveillance_officer', 'Surveillance Officer'),
+        ('catchment_nurse', 'Catchment Nurse (OIC)'),
         ('barangay_health_worker', 'Barangay Health Worker'),
     ]
 
@@ -797,6 +798,45 @@ class AuditLog(models.Model):
 
     def __str__(self):
         return f"Audit #{self.pk} — {self.action}"
+
+
+# ── Field Tasks (table: myapp_fieldtask) ──────────────────────────
+
+class FieldTask(models.Model):
+    TASK_STATUS_CHOICES = [
+        ('Pending', 'Pending'),
+        ('In Progress', 'In Progress'),
+        ('Completed', 'Completed'),
+        ('Cancelled', 'Cancelled'),
+    ]
+    
+    assigned_to = models.ForeignKey(
+        User, on_delete=models.CASCADE,
+        related_name='assigned_tasks'
+    )
+    assigned_by = models.ForeignKey(
+        User, on_delete=models.CASCADE,
+        related_name='dispatched_tasks'
+    )
+    report = models.ForeignKey(
+        SurveillanceReport, on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name='tasks'
+    )
+    title = models.CharField(max_length=255)
+    description = models.TextField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=TASK_STATUS_CHOICES, default='Pending')
+    due_date = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = True
+        db_table = 'myapp_fieldtask'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Task #{self.pk} - {self.title}"
 
 
 # ── Legacy / prototype tables (pulse.sql — unused by active PULSE app) ──
