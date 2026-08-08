@@ -65,12 +65,18 @@
             <option value="encoder">Encoder</option>
             <option value="health_officer">Health Officer</option>
             <option value="surveillance_officer">Surveillance Officer</option>
+            <option value="catchment_nurse">Catchment Nurse</option>
             <option value="barangay_health_worker">Barangay Health Worker</option>
           </select>
         </div>
         <div class="form-group">
           <label for="create-password">Temporary Password *</label>
-          <input type="password" id="create-password" name="password" class="input-soft" required placeholder="Min. 8 characters">
+          <div class="input-icon-wrap" style="position: relative;">
+            <input type="password" id="create-password" name="password" class="input-soft" required placeholder="Min. 8 characters" style="padding-right: 40px;">
+            <button type="button" id="create-pw-toggle" class="pw-eye-btn" aria-label="Toggle password visibility" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 0;">
+              <i data-lucide="eye" class="lucide-icon lucide-icon--sm pw-eye-icon"></i>
+            </button>
+          </div>
         </div>
         <div class="form-group" id="barangay-field" style="display:none;">
           <label for="create-barangay">Assigned Barangay *</label>
@@ -202,6 +208,7 @@
                     <option value="encoder" {% if u.role == 'encoder' %}selected{% endif %}>Encoder</option>
                     <option value="health_officer" {% if u.role == 'health_officer' %}selected{% endif %}>Health Officer</option>
                     <option value="surveillance_officer" {% if u.role == 'surveillance_officer' %}selected{% endif %}>Surveillance Officer</option>
+                    <option value="catchment_nurse" {% if u.role == 'catchment_nurse' %}selected{% endif %}>Catchment Nurse</option>
                     <option value="barangay_health_worker" {% if u.role == 'barangay_health_worker' %}selected{% endif %}>Barangay Health Worker</option>
                   </select>
                   <button type="submit" class="nc-btn nc-btn--primary nc-btn--sm">Save</button>
@@ -246,6 +253,21 @@ document.addEventListener('DOMContentLoaded', function () {
       f.style.display = f.style.display === 'none' ? 'block' : 'none';
     });
   });
+
+  var createPwToggle = document.getElementById('create-pw-toggle');
+  var createPwInput = document.getElementById('create-password');
+  if (createPwToggle && createPwInput) {
+    createPwToggle.addEventListener('click', function () {
+      var show = createPwInput.type === 'password';
+      createPwInput.type = show ? 'text' : 'password';
+      var icon = createPwToggle.querySelector('.pw-eye-icon');
+      if (icon) {
+        icon.setAttribute('data-lucide', show ? 'eye-off' : 'eye');
+        if (window.lucide) { lucide.createIcons(); }
+      }
+      createPwToggle.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+    });
+  }
 });
 </script>
 {% endblock %}
