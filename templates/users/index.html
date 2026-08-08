@@ -239,7 +239,7 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   var roleSelect = document.getElementById('create-role');
-  var barangayRoles = ['barangay_health_worker', 'encoder', 'surveillance_officer', 'health_officer'];
+  var barangayRoles = ['barangay_health_worker', 'encoder', 'surveillance_officer', 'health_officer', 'catchment_nurse'];
   roleSelect.addEventListener('change', function () {
     var bf = document.getElementById('barangay-field');
     var needsBarangay = barangayRoles.indexOf(this.value) !== -1;
