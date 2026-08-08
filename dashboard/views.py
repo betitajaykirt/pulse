@@ -626,12 +626,36 @@ def environmental_intelligence_view(request):
         
     # Barangay Vector Risk Table
     seven_days_ago = now - timedelta(days=7)
-    recent_rain = EnvironmentalData.objects.filter(
+    
+    # 1. Global City-Wide Averages (Fallback for barangays without micro-sensors)
+    city_stats = EnvironmentalData.objects.filter(
+        recorded_at__gte=seven_days_ago
+    ).aggregate(
+        total_rain=Sum('rainfall'),
+        avg_temp=Avg('temperature'),
+        avg_hum=Avg('humidity')
+    )
+    global_rain = float(city_stats['total_rain'] or 0)
+    global_temp = float(city_stats['avg_temp'] or 28.0)
+    global_hum = float(city_stats['avg_hum'] or 75.0)
+
+    # 2. Per-Barangay Environmental Data (if any specific sensors exist)
+    brgy_env = EnvironmentalData.objects.filter(
         recorded_at__gte=seven_days_ago
     ).values('barangay_id').annotate(
-        total_rain=Sum('rainfall')
+        total_rain=Sum('rainfall'),
+        avg_temp=Avg('temperature'),
+        avg_hum=Avg('humidity')
     )
-    rain_map = {r['barangay_id']: r['total_rain'] for r in recent_rain if r['barangay_id']}
+    
+    env_map = {}
+    for r in brgy_env:
+        if r['barangay_id'] and r['total_rain'] is not None:
+            env_map[r['barangay_id']] = {
+                'rain': float(r['total_rain']),
+                'temp': float(r['avg_temp']),
+                'hum': float(r['avg_hum']),
+            }
     
     active_cases_by_brgy = SurveillanceReport.objects.exclude(status='Closed').values('barangay_id').annotate(
         cases=Count('id')
@@ -643,8 +667,25 @@ def environmental_intelligence_view(request):
     
     for b in barangays:
         cases = cases_map.get(b.id, 0)
-        rain = float(rain_map.get(b.id, 0) or 0)
-        risk_index = (cases * 15.0) + (rain * 0.5)
+        
+        # Apply specific micro-sensor data, otherwise inherit Bago City regional weather globally
+        local_env = env_map.get(b.id)
+        if local_env:
+            b_rain = local_env['rain']
+            b_temp = local_env['temp']
+            b_hum = local_env['hum']
+        else:
+            b_rain = global_rain
+            b_temp = global_temp
+            b_hum = global_hum
+            
+        # Purely environmental calculation decoupled from active cases
+        # Max 50 points for rain, 30 for optimal temp (~29C), 20 for humidity
+        rain_score = min(b_rain * 0.5, 50.0)
+        temp_score = max(0, 30.0 - abs(b_temp - 29.0) * 5.0)
+        hum_score = min((b_hum / 100.0) * 20.0, 20.0)
+        
+        risk_index = rain_score + temp_score + hum_score
         
         level = 'Low'
         if risk_index >= 75:
@@ -657,12 +698,13 @@ def environmental_intelligence_view(request):
         vector_risk_data.append({
             'barangay': b.barangay_name,
             'active_cases': cases,
-            'recent_rain_mm': round(rain, 2),
+            'recent_rain_mm': round(b_rain, 2),
             'risk_index': round(risk_index, 1),
             'risk_level': level
         })
         
-    vector_risk_data.sort(key=lambda x: x['risk_index'], reverse=True)
+    # Sort primarily by Vector Risk Index, then by active cases
+    vector_risk_data.sort(key=lambda x: (x['risk_index'], x['active_cases']), reverse=True)
     
     context = {
         'weather': weather,
