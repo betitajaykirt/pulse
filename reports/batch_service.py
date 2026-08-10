@@ -406,7 +406,7 @@ def save_batch_submission(*, payload, submitted_by_id, locked_barangay=None):
 
             case_classification=case_classif,
 
-            status='Probable',
+            status='Probable' if ml.get('classification_confidence', 0) >= 0.50 else 'Suspected',
 
             validation_status='validated',
 

@@ -366,17 +366,17 @@
 
       if (level === 'confirmed') {
 
-        return { color: '#a855f7', fillColor: '#d8b4fe', fillOpacity: 0.35, weight: 2 };
+        return { color: '#7f1d1d', fillColor: '#b91c1c', fillOpacity: 0.35, weight: 2 };
 
       }
 
       if (level === 'probable') {
 
-        return { color: '#ef4444', fillColor: '#fca5a5', fillOpacity: 0.35, weight: 2 };
+        return { color: '#c2410c', fillColor: '#ea580c', fillOpacity: 0.35, weight: 2 };
 
       }
 
-      return { color: '#f59e0b', fillColor: '#fde68a', fillOpacity: 0.35, weight: 2 };
+      return { color: '#ca8a04', fillColor: '#eab308', fillOpacity: 0.35, weight: 2 };
 
     }
 
@@ -384,11 +384,11 @@
 
       var isPending = c.validation_status === 'pending';
 
-      var classification = c.case_classification || 'suspected';
+      var classification = typeof mapPopupClassificationKey === 'function' ? mapPopupClassificationKey(c) : (c.case_classification || 'suspected');
 
-      var fillColor = classification === 'confirmed' ? '#a855f7'
+      var fillColor = classification === 'confirmed' ? '#991b1b'
 
-        : classification === 'probable' ? '#ef4444' : '#f59e0b';
+        : classification === 'probable' ? '#ea580c' : '#eab308';
 
       var radius = classification === 'confirmed' ? 10
 
