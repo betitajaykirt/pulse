@@ -64,7 +64,7 @@
   </div>
 
   <section class="dash-section" style="margin-top: 1.5rem; margin-bottom: 2rem;">
-    <div class="pulse-panel" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px;">
+    <a href="{% url 'environmental_intelligence' %}" class="pulse-panel cursor-pointer hover:text-primary" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; text-decoration: none; color: inherit; transition: border-color 0.2s ease, box-shadow 0.2s ease;" onmouseover="this.style.borderColor='var(--color-primary)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.05)';" onmouseout="this.style.borderColor='var(--color-border)'; this.style.boxShadow='none';">
       <div style="display: flex; align-items: center; gap: 2rem;">
         <div>
           <span style="display: block; font-size: 0.8rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Current Climate (Bago City)</span>
@@ -83,8 +83,8 @@
           <strong style="font-size: 1.1rem; color: var(--color-text);">-0.35 (Stable)</strong>
         </div>
       </div>
-      <a href="{% url 'environmental_intelligence' %}" class="btn btn-outline btn-sm">View Environmental Intelligence</a>
-    </div>
+      <span class="btn btn-outline btn-sm" style="pointer-events: none;">View Environmental Intelligence &rarr;</span>
+    </a>
   </section>
 
   <section class="dash-section">
@@ -129,6 +129,51 @@
     </div>
   </section>
 
+  <section class="dash-section" style="margin-top: 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.25rem;">
+      <h3 class="dash-section__title" style="margin-bottom: 0;">Analytics Overview</h3>
+      <a href="{% url 'analytics' %}" class="btn btn-outline btn-sm">View Full Detailed Analytics &rarr;</a>
+    </div>
+    <div class="row g-3">
+      <!-- Epi-Curve Chart -->
+      <div class="col-md-6">
+        <div class="pulse-panel" style="padding: 1.25rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px;">
+          <h4 style="margin-top:0; margin-bottom: 1rem; font-size: 1rem; color: var(--color-text);">Epidemic Curve</h4>
+          <div style="position: relative; height: 250px;">
+            <canvas id="overview-epi-chart"></canvas>
+          </div>
+        </div>
+      </div>
+      <!-- Disease Distribution -->
+      <div class="col-md-6">
+        <div class="pulse-panel" style="padding: 1.25rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px;">
+          <h4 style="margin-top:0; margin-bottom: 1rem; font-size: 1rem; color: var(--color-text);">Disease Distribution</h4>
+          <div style="position: relative; height: 250px;">
+            <canvas id="overview-disease-chart"></canvas>
+          </div>
+        </div>
+      </div>
+      <!-- Demographic Breakdown -->
+      <div class="col-md-6">
+        <div class="pulse-panel" style="padding: 1.25rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px;">
+          <h4 style="margin-top:0; margin-bottom: 1rem; font-size: 1rem; color: var(--color-text);">Demographic Breakdown</h4>
+          <div style="position: relative; height: 250px;">
+            <canvas id="overview-demo-chart"></canvas>
+          </div>
+        </div>
+      </div>
+      <!-- Top Hotspot Barangays -->
+      <div class="col-md-6">
+        <div class="pulse-panel" style="padding: 1.25rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px;">
+          <h4 style="margin-top:0; margin-bottom: 1rem; font-size: 1rem; color: var(--color-text);">Top Hotspot Barangays</h4>
+          <div style="position: relative; height: 250px;">
+            <canvas id="overview-hotspot-chart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="dash-section">
     <h3 class="dash-section__title">System Administration</h3>
     <div class="dash-widget-grid">
@@ -163,4 +208,106 @@
   </section>
 
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof Chart === 'undefined') return;
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'bottom', labels: { font: { family: 'Inter', size: 11 }, usePointStyle: true, color: '#64748B' } }
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B' } },
+      y: { grid: { color: 'rgba(241, 245, 249, 0.9)' }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B' }, border: { display: false } }
+    }
+  };
+  
+  const pieOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'bottom', labels: { font: { family: 'Inter', size: 11 }, usePointStyle: true, color: '#64748B' } }
+    }
+  };
+
+  // 1. Epi-Curve Chart (Line)
+  const epiCanvas = document.getElementById('overview-epi-chart');
+  if (epiCanvas) {
+    new Chart(epiCanvas.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5'],
+        datasets: [
+          { label: 'Active', data: [15, 22, 18, 30, 25], borderColor: '#00A6A6', backgroundColor: '#00A6A6', tension: 0.3, fill: false },
+          { label: 'Confirmed', data: [10, 15, 12, 22, 18], borderColor: '#0F4C81', backgroundColor: '#0F4C81', tension: 0.3, fill: false }
+        ]
+      },
+      options: chartOptions
+    });
+  }
+
+  // 2. Disease Distribution (Doughnut)
+  const diseaseCanvas = document.getElementById('overview-disease-chart');
+  if (diseaseCanvas) {
+    new Chart(diseaseCanvas.getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Dengue', 'Leptospirosis', 'Inconclusive'],
+        datasets: [{
+          data: [60, 25, 15],
+          backgroundColor: ['#0F4C81', '#00A6A6', '#CBD5E1'],
+          borderWidth: 0
+        }]
+      },
+      options: Object.assign({}, pieOptions, { cutout: '65%' })
+    });
+  }
+
+  // 3. Demographic Breakdown (Bar)
+  const demoCanvas = document.getElementById('overview-demo-chart');
+  if (demoCanvas) {
+    new Chart(demoCanvas.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: ['0-10', '11-20', '21-30', '31-40', '41-50', '51+'],
+        datasets: [
+          { label: 'Male', data: [12, 18, 25, 20, 15, 8], backgroundColor: '#0F4C81', borderRadius: 4 },
+          { label: 'Female', data: [10, 22, 20, 18, 12, 10], backgroundColor: '#00A6A6', borderRadius: 4 }
+        ]
+      },
+      options: chartOptions
+    });
+  }
+
+  // 4. Top Hotspot Barangays (Horizontal Bar)
+  const hotspotCanvas = document.getElementById('overview-hotspot-chart');
+  if (hotspotCanvas) {
+    new Chart(hotspotCanvas.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: ['Brgy Balingasag', 'Brgy Poblacion', 'Brgy Sampinit', 'Brgy Ma-ao', 'Brgy Taloc'],
+        datasets: [{
+          label: 'Total Cases',
+          data: [42, 38, 29, 21, 15],
+          backgroundColor: '#E11D48',
+          borderRadius: 4
+        }]
+      },
+      options: Object.assign({}, chartOptions, { 
+        indexAxis: 'y',
+        scales: {
+          x: { grid: { color: 'rgba(241, 245, 249, 0.9)' }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B' }, border: { display: false } },
+          y: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B' } }
+        }
+      })
+    });
+  }
+});
+</script>
 {% endblock %}
