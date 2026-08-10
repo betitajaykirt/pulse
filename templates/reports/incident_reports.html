@@ -145,7 +145,11 @@
             </td>
             <td data-label="Onset">{{ r.date_of_onset|default:"—" }}</td>
             <td data-label="Risk">
-              <span class="pill-badge {% if r.risk_status == 'critical' %}badge-danger{% elif r.risk_status == 'high' %}badge-warning{% elif r.risk_status == 'moderate' %}badge-info{% else %}badge-muted{% endif %}">{{ r.risk_status|title }}</span>
+              {% with risk=r.aptas_risk_level|default:r.risk_status|default:"Low"|lower %}
+                <span class="pill-badge {% if risk == 'critical' %}badge-risk-critical{% elif risk == 'high' %}badge-risk-high{% elif risk == 'moderate' %}badge-risk-moderate{% else %}badge-risk-low{% endif %}">
+                  {{ r.aptas_risk_level|default:r.risk_status|default:"Low"|title }}
+                </span>
+              {% endwith %}
             </td>
             <td data-label="Reporter">{{ r.reporter|default:"—" }}</td>
             <td data-label="Date"><span class="um-date">{{ r.report_date|date:"M d, Y" }}</span></td>
