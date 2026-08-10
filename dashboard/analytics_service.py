@@ -147,32 +147,40 @@ def build_demographics_data(qs):
 
 
 def build_disease_distribution_data(qs):
-    disease_counts = {
-        'Dengue': 0,
-        'Leptospirosis': 0,
-    }
+    rows = (
+        qs.exclude(
+            Q(surveillance_report__syndrome_type__isnull=True) |
+            Q(surveillance_report__syndrome_type__exact='') |
+            Q(surveillance_report__syndrome_type__iexact='inconclusive') |
+            Q(surveillance_report__syndrome_type__iexact='unclassified') |
+            Q(surveillance_report__syndrome_type__iexact='inconclusive syndromic pattern')
+        )
+        .values(disease=F('surveillance_report__syndrome_type'))
+        .annotate(count=Count('id'))
+        .order_by('-count')
+    )
+
+    labels = []
+    data = []
     
-    for case in qs.iterator(chunk_size=500):
-        # Infer disease from symptoms or syndrome type
-        # Check syndrome type from the associated report if available
-        # or use symptoms
-        syndrome_type = ''
-        if case.surveillance_report and case.surveillance_report.syndrome_type:
-            syndrome_type = case.surveillance_report.syndrome_type.lower()
-            
-        if 'dengue' in syndrome_type:
-            disease_counts['Dengue'] += 1
-        elif 'lepto' in syndrome_type:
-            disease_counts['Leptospirosis'] += 1
+    base_colors = ['#0F4C81', '#00A6A6', '#E11D48', '#f59e0b', '#8b5cf6', '#10b981', '#f43f5e']
+    background_colors = []
+
+    for i, row in enumerate(rows):
+        disease = row['disease']
+        # Optionally, format to title case if not already
+        labels.append(disease.title() if disease else 'Unknown')
+        data.append(row['count'])
+        background_colors.append(base_colors[i % len(base_colors)])
             
     datasets = [{
-        'data': [disease_counts['Dengue'], disease_counts['Leptospirosis']],
-        'backgroundColor': ['#0F4C81', '#00A6A6'],
+        'data': data,
+        'backgroundColor': background_colors,
         'borderWidth': 0
     }]
     
     return {
-        'labels': ['Dengue', 'Leptospirosis'],
+        'labels': labels,
         'datasets': datasets,
     }
 

@@ -137,6 +137,42 @@
         </div>
       </div>
     </div>
+
+    <!-- Disease Distribution -->
+    <div class="col-md-4">
+      <div class="chart-box">
+        <div class="chart-box__head">
+          <div class="chart-box__head-main">
+            <span class="chart-box__icon"><i data-lucide="pie-chart" class="lucide-icon lucide-icon--sm"></i></span>
+            <h3>Disease Distribution</h3>
+          </div>
+          <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
+        </div>
+        <p>Proportion of monitored diseases.</p>
+        <div class="chart-height-side" style="position: relative; height: 250px;">
+          <canvas id="disease-chart"></canvas>
+        </div>
+        <p id="disease-empty-msg" class="text-muted text-center mt-2" style="display:none;font-size:.82rem;">No disease data available.</p>
+      </div>
+    </div>
+
+    <!-- Top Hotspot Barangays -->
+    <div class="col-md-8">
+      <div class="chart-box">
+        <div class="chart-box__head">
+          <div class="chart-box__head-main">
+            <span class="chart-box__icon"><i data-lucide="map-pin" class="lucide-icon lucide-icon--sm"></i></span>
+            <h3>Top Hotspot Barangays</h3>
+          </div>
+          <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
+        </div>
+        <p>Highest case counts by area.</p>
+        <div class="chart-height-main" style="position: relative; height: 250px;">
+          <canvas id="hotspot-chart"></canvas>
+        </div>
+        <p id="hotspot-empty-msg" class="text-muted text-center mt-2" style="display:none;font-size:.82rem;">No hotspot data available.</p>
+      </div>
+    </div>
   </div>
 
 </div>
@@ -151,6 +187,8 @@ const CHART_SECONDARY = '#00A6A6';
 const CHART_GRID = 'rgba(241, 245, 249, 0.9)';
 let epiChart = null;
 let demoChart = null;
+let diseaseChart = null;
+let hotspotChart = null;
 
 function hasChartData(payload) {
   if (!payload || !Array.isArray(payload.labels) || !Array.isArray(payload.datasets)) return false;
@@ -248,6 +286,50 @@ function buildGroupedBarChart(ctx, payload, emptyMsgId) {
   });
 }
 
+function buildPieChart(ctx, payload, emptyMsgId) {
+  const isEmpty = !hasChartData(payload);
+  const el = document.getElementById(emptyMsgId);
+  if (el) el.style.display = isEmpty ? 'block' : 'none';
+
+  return new Chart(ctx, {
+    type: 'doughnut',
+    data: isEmpty ? emptyChartData() : { labels: payload.labels, datasets: payload.datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '65%',
+      plugins: {
+        legend: { display: !isEmpty, position: 'bottom', labels: { font: { family: 'Inter', size: 11 }, usePointStyle: true, color: '#64748B' } },
+        tooltip: { enabled: !isEmpty },
+      },
+    }
+  });
+}
+
+function buildHorizontalBarChart(ctx, payload, emptyMsgId) {
+  const isEmpty = !hasChartData(payload);
+  const el = document.getElementById(emptyMsgId);
+  if (el) el.style.display = isEmpty ? 'block' : 'none';
+
+  return new Chart(ctx, {
+    type: 'bar',
+    data: isEmpty ? emptyChartData() : { labels: payload.labels, datasets: payload.datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: !isEmpty, position: 'top', labels: { font: { family: 'Inter', size: 11 }, usePointStyle: true, color: '#64748B' } },
+        tooltip: { enabled: !isEmpty },
+      },
+      scales: {
+        x: { grid: { color: CHART_GRID }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B' }, border: { display: false }, beginAtZero: true },
+        y: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B' }, border: { display: false } }
+      }
+    }
+  });
+}
+
 function updateSummary(data) {
   document.getElementById('stat-total').textContent = data.total_cases ?? '—';
   document.getElementById('total-cases-badge').innerHTML =
@@ -278,10 +360,15 @@ async function loadAnalytics() {
 
     if (epiChart) epiChart.destroy();
     if (demoChart) demoChart.destroy();
+    if (diseaseChart) diseaseChart.destroy();
+    if (hotspotChart) hotspotChart.destroy();
 
     const epiCanvas = document.getElementById('epi-chart');
     const demoCanvas = document.getElementById('demo-chart');
-    if (!epiCanvas || !demoCanvas || typeof Chart === 'undefined') return;
+    const diseaseCanvas = document.getElementById('disease-chart');
+    const hotspotCanvas = document.getElementById('hotspot-chart');
+    
+    if (!epiCanvas || !demoCanvas || !diseaseCanvas || !hotspotCanvas || typeof Chart === 'undefined') return;
 
     epiChart = buildLineChart(
       epiCanvas.getContext('2d'),
@@ -292,6 +379,16 @@ async function loadAnalytics() {
       demoCanvas.getContext('2d'),
       data.demographics || {},
       'demo-empty-msg'
+    );
+    diseaseChart = buildPieChart(
+      diseaseCanvas.getContext('2d'),
+      data.disease_distribution || {},
+      'disease-empty-msg'
+    );
+    hotspotChart = buildHorizontalBarChart(
+      hotspotCanvas.getContext('2d'),
+      data.hotspots || {},
+      'hotspot-empty-msg'
     );
   } catch (err) {
     updateSummary({ total_cases: 'Error' });
