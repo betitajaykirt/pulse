@@ -9,13 +9,11 @@ from myapp.models import PatientCase, Barangay, SYMPTOM_CATEGORY_CODES, SYMPTOM_
 
 SYNDROME_CATEGORY_OPTIONS = SYMPTOM_CATEGORY_CHOICES
 
-STATUS_ORDER = ['Unclassified', 'Pending ML Analysis', 'Suspected', 'Probable', 'Confirmed']
+STATUS_ORDER = ['Suspected', 'Probable', 'Confirmed']
 AGE_BRACKETS = ['0-5', '6-12', '13-19', '20+']
 SEX_ORDER = ['Male', 'Female']
 
 STATUS_COLORS = {
-    'Unclassified': '#94a3b8',
-    'Pending ML Analysis': '#94a3b8',
     'Suspected': '#f59e0b',
     'Probable': '#f97316',
     'Confirmed': '#ef4444',
@@ -152,7 +150,6 @@ def build_disease_distribution_data(qs):
     disease_counts = {
         'Dengue': 0,
         'Leptospirosis': 0,
-        'Inconclusive': 0
     }
     
     for case in qs.iterator(chunk_size=500):
@@ -167,17 +164,15 @@ def build_disease_distribution_data(qs):
             disease_counts['Dengue'] += 1
         elif 'lepto' in syndrome_type:
             disease_counts['Leptospirosis'] += 1
-        else:
-            disease_counts['Inconclusive'] += 1
             
     datasets = [{
-        'data': [disease_counts['Dengue'], disease_counts['Leptospirosis'], disease_counts['Inconclusive']],
-        'backgroundColor': ['#0F4C81', '#00A6A6', '#CBD5E1'],
+        'data': [disease_counts['Dengue'], disease_counts['Leptospirosis']],
+        'backgroundColor': ['#0F4C81', '#00A6A6'],
         'borderWidth': 0
     }]
     
     return {
-        'labels': ['Dengue', 'Leptospirosis', 'Inconclusive'],
+        'labels': ['Dengue', 'Leptospirosis'],
         'datasets': datasets,
     }
 

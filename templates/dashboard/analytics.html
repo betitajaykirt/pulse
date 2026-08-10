@@ -172,14 +172,26 @@ function emptyChartData() {
   };
 }
 
-function buildStackedBarChart(ctx, payload, emptyMsgId) {
+function buildLineChart(ctx, payload, emptyMsgId) {
   const isEmpty = !hasChartData(payload);
   const el = document.getElementById(emptyMsgId);
   if (el) el.style.display = isEmpty ? 'block' : 'none';
 
+  var datasets = isEmpty ? emptyChartData().datasets : payload.datasets;
+  
+  if (!isEmpty) {
+    datasets = datasets.map(ds => ({
+      ...ds,
+      type: 'line',
+      tension: 0.3,
+      fill: false,
+      borderColor: ds.backgroundColor
+    }));
+  }
+
   return new Chart(ctx, {
-    type: 'bar',
-    data: isEmpty ? emptyChartData() : { labels: payload.labels, datasets: payload.datasets },
+    type: 'line',
+    data: isEmpty ? emptyChartData() : { labels: payload.labels, datasets: datasets },
     options: {
       responsive: true,
       maintainAspectRatio: false,
@@ -188,9 +200,8 @@ function buildStackedBarChart(ctx, payload, emptyMsgId) {
         tooltip: { enabled: !isEmpty, mode: 'index', intersect: false },
       },
       scales: {
-        x: { stacked: !isEmpty, grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B' } },
+        x: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B' } },
         y: {
-          stacked: !isEmpty,
           beginAtZero: true,
           ticks: { precision: 0, font: { family: 'Inter', size: 11 }, color: '#64748B' },
           grid: { color: CHART_GRID, drawBorder: false },
@@ -272,7 +283,7 @@ async function loadAnalytics() {
     const demoCanvas = document.getElementById('demo-chart');
     if (!epiCanvas || !demoCanvas || typeof Chart === 'undefined') return;
 
-    epiChart = buildStackedBarChart(
+    epiChart = buildLineChart(
       epiCanvas.getContext('2d'),
       data.epi_curve || {},
       'epi-empty-msg'
