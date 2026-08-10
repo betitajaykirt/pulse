@@ -923,27 +923,31 @@
 
 
     function mapPopupClassificationKey(c) {
+      var st = (c.status || '').toLowerCase();
+      if (st === 'confirmed') return 'confirmed';
+      if (st === 'probable') return 'probable';
+      if (st === 'suspected') return 'suspected';
 
-      var cl = (c.case_classification || 'suspected').toLowerCase();
-
-      if (cl === 'confirmed') return 'confirmed';
-
-      if (cl === 'probable') return 'probable';
-
-      if (cl === 'unassigned') return 'unassigned';
+      var cl = (c.case_classification || '').toLowerCase();
+      if (cl === 'unassigned' && !st) return 'unassigned';
 
       return 'suspected';
-
     }
 
-
-
     function mapPopupClassificationLabel(c) {
+      var st = (c.status || '').toString().trim();
+      var cl = (c.case_classification || '').toString().trim();
 
-      var raw = (c.case_classification || c.status || 'Suspected').toString().replace(/_/g, ' ').trim();
+      if (st.toLowerCase() === 'probable' || st.toLowerCase() === 'confirmed') {
+        return st.toUpperCase();
+      }
 
+      if (cl.toLowerCase() === 'unassigned') {
+        return st ? st.toUpperCase() : 'INCONCLUSIVE';
+      }
+
+      var raw = (cl || st || 'Suspected').replace(/_/g, ' ').trim();
       return raw.toUpperCase();
-
     }
 
 
