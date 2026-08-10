@@ -1,11 +1,14 @@
 {% load static %}
 <header class="nc-navbar" id="site-navbar">
   <div class="nc-navbar__inner">
-    <a href="{% url 'login' %}" class="nc-navbar__brand">
-      <span class="nc-navbar__logo" aria-hidden="true" style="background:transparent; padding:0; border:none; width:36px; height:36px;">
-        <img src="{% static 'images/pulse_logo.jpg' %}" alt="" style="width:100%; height:100%; object-fit:contain; border-radius:6px;">
+    <a href="{% url 'login' %}" class="nc-navbar__brand" style="display:flex; align-items:center; gap:0.75rem; text-decoration:none;">
+      <span class="nc-navbar__logo" aria-hidden="true" style="background:transparent; padding:0; border:none; width:40px; height:40px; display:flex; align-items:center; justify-content:center;">
+        <img src="{% static 'images/pulse_logo.jpg' %}" alt="" style="width:100%; height:100%; object-fit:contain; border-radius:8px;">
       </span>
-      <span class="nc-navbar__brand-text">PULSE</span>
+      <div style="display:flex; flex-direction:column; justify-content:center;">
+        <strong style="font-size:1.125rem; font-weight:700; color:var(--text-main); line-height:1.2;">PULSE</strong>
+        <span style="font-size:0.75rem; color:var(--text-muted); line-height:1;">Health Surveillance</span>
+      </div>
     </a>
 
     <button type="button" class="nc-navbar__toggle" id="navbar-toggle" aria-label="Toggle navigation" aria-expanded="false">
