@@ -71,15 +71,37 @@ def _local_barangay_stats(user):
         }
 
     base_qs = SurveillanceReport.objects.filter(barangay_id=barangay.id).exclude(status='Closed')
+    
+    active_cases_total = base_qs.count()
+    active_cases_dengue = base_qs.filter(syndrome_type__icontains='dengue').count()
+    active_cases_lepto = base_qs.filter(syndrome_type__icontains='lepto').count()
+    total_confirmed = base_qs.filter(status='Confirmed').count()
+    pending_reports = base_qs.filter(validation_status='pending').count()
+    
+    # Retrieve active alerts related to this barangay
+    notifications = NotificationLog.objects.select_related('alert').filter(
+        recipient_role=user.role,
+        message_summary__icontains=barangay.barangay_name,
+    )
+    alert_ids = {n.alert_id for n in notifications}
+    aptas_alerts = list(Alert.objects.filter(id__in=alert_ids, status='active'))
+    
     return {
         'barangay_name': barangay.barangay_name,
-        'total_reports': base_qs.count(),
+        'total_reports': active_cases_total,
         'my_reports_count': base_qs.filter(submitted_by_id=user.id).count(),
-        'pending_reports': base_qs.filter(validation_status='pending').count(),
+        'pending_reports': pending_reports,
         'suspected_count': base_qs.filter(status='Suspected').count(),
-        'confirmed_count': base_qs.filter(status='Confirmed').count(),
-        'active_alerts': base_qs.filter(status='Suspected').count(),
+        'confirmed_count': total_confirmed,
+        'active_alerts': len(aptas_alerts),
         'recent_reports': base_qs.order_by('-report_date')[:5],
+        
+        # Admin-style synced KPIs
+        'active_cases_total': active_cases_total,
+        'active_cases_dengue': active_cases_dengue,
+        'active_cases_lepto': active_cases_lepto,
+        'total_confirmed': total_confirmed,
+        'aptas_alerts': aptas_alerts,
     }
 
 

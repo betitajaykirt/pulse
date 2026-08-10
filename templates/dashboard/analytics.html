@@ -6,7 +6,7 @@
   <header class="dash-hero">
     <div class="dash-hero__text">
       <span class="pulse-eyebrow">Analysis</span>
-      <h2>Surveillance Analytics</h2>
+      <h2>Surveillance Analytics{% if is_barangay_scoped and barangays.0 %} — {{ barangays.0.barangay_name }}{% endif %}</h2>
       <p>Epidemic curves and demographic breakdowns from batch-reported patient cases</p>
     </div>
     <span class="dash-hero__date pill-badge badge-info" id="total-cases-badge">
@@ -141,7 +141,7 @@
     </div>
 
     <!-- Disease Distribution -->
-    <div class="col-md-4">
+    <div class="{% if is_barangay_scoped %}col-md-12{% else %}col-md-4{% endif %}">
       <div class="chart-box">
         <div class="chart-box__head">
           <div class="chart-box__head-main">
@@ -159,6 +159,7 @@
     </div>
 
     <!-- Top Hotspot Barangays -->
+    {% if not is_barangay_scoped %}
     <div class="col-md-8">
       <div class="chart-box">
         <div class="chart-box__head">
@@ -175,6 +176,7 @@
         <p id="hotspot-empty-msg" class="text-muted text-center mt-2" style="display:none;font-size:.82rem;">No hotspot data available.</p>
       </div>
     </div>
+    {% endif %}
   </div>
 
 </div>
