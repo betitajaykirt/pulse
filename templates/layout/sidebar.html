@@ -1,5 +1,5 @@
 {% load static %}
-<aside class="sidebar">
+<aside class="sidebar custom-scrollbar">
 
   <div class="sidebar-brand">
     <a href="{% url 'dashboard' %}" class="brand-logo">
@@ -13,7 +13,7 @@
     </a>
   </div>
 
-  <nav class="sidebar-nav">
+  <nav class="sidebar-nav custom-scrollbar">
     <div class="nav-section-label">Main</div>
     <a href="{% url 'dashboard' %}"
       class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
