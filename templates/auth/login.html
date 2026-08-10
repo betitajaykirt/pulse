@@ -42,7 +42,7 @@
           {% endfor %}
         {% endif %}
 
-        <form method="POST" action="{% url 'login' %}" class="auth-form" autocomplete="on">
+        <form method="POST" action="{% url 'login' %}" class="auth-form" autocomplete="on" onsubmit="window.showAuthOverlay('Signing in to PULSE...')">
           {% csrf_token %}
           <div class="form-group">
             <label for="email">Email Address</label>

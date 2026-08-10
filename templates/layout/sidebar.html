@@ -132,7 +132,7 @@
       <span class="nav-icon"><i data-lucide="user" class="lucide-icon lucide-icon--sm"></i></span>
       <span>My Profile</span>
     </a>
-    <a href="{% url 'logout' %}" class="nav-item nav-item--logout">
+    <a href="{% url 'logout' %}" class="nav-item nav-item--logout" onclick="window.showAuthOverlay('Logging out...')">
       <span class="nav-icon"><i data-lucide="log-out" class="lucide-icon lucide-icon--sm"></i></span>
       <span>Log Out</span>
     </a>

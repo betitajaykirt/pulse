@@ -16,5 +16,14 @@
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 <script src="{% static 'js/app.js' %}"></script>
 {% block extra_js %}{% endblock %}
+
+<div id="auth-loading-overlay" class="auth-overlay" style="opacity: 0; pointer-events: none;">
+  <div class="auth-spinner-container">
+    <div class="auth-spinner-outer"></div>
+    <div class="auth-spinner-inner"></div>
+  </div>
+  <p class="auth-loading-text" id="auth-loading-msg">Authenticating...</p>
+  <span class="auth-loading-subtext">Bago City Health Office</span>
+</div>
 </body>
 </html>

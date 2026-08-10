@@ -23,7 +23,7 @@
       <div class="nc-navbar__menu-actions">
         {% if session_user_id %}
           <a href="{% url 'dashboard' %}" class="nc-btn nc-btn--primary nc-btn--block">Dashboard</a>
-          <a href="{% url 'logout' %}" class="nc-btn nc-btn--outline nc-btn--block">Log Out</a>
+          <a href="{% url 'logout' %}" class="nc-btn nc-btn--outline nc-btn--block" onclick="window.showAuthOverlay('Logging out...')">Log Out</a>
         {% else %}
           <a href="{% url 'login' %}#sign-in" class="nc-btn nc-btn--primary nc-btn--block">Log In</a>
         {% endif %}

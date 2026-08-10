@@ -81,4 +81,15 @@ document.addEventListener('DOMContentLoaded', function () {
     lucide.createIcons();
   }
 
+  // ── Global Auth Overlay ─────────────────────────────────────────
+  window.showAuthOverlay = function(message) {
+    const overlay = document.getElementById('auth-loading-overlay');
+    const msgEl = document.getElementById('auth-loading-msg');
+    if (overlay && msgEl) {
+      msgEl.textContent = message || 'Authenticating...';
+      overlay.style.pointerEvents = 'auto';
+      overlay.style.opacity = '1';
+    }
+  };
+
 });
