@@ -187,11 +187,39 @@ def analytics_view(request):
     return render(request, 'dashboard/analytics.html', ctx)
 
 
+@login_required
+@role_required('catchment_nurse')
+def nurse_analytics_view(request):
+    user_id = request.session.get('user_id')
+    user = User.objects.filter(id=user_id).first()
+    barangay = resolve_user_barangay(user)
+    
+    ctx = _get_stats('catchment_nurse', user_id)
+    ctx.update({
+        'symptom_category_choices': SYNDROME_CATEGORY_OPTIONS,
+        'barangays': [barangay] if barangay else [],
+        'is_barangay_scoped': True,
+    })
+    
+    barangay_filter = resolve_aptas_barangay_filter('catchment_nurse', user_id, ctx)
+    ctx.update(get_aptas_dashboard_context(barangay_name=barangay_filter))
+    
+    return render(request, 'dashboard/analytics.html', ctx)
+
+
 @require_GET
-@role_required('surveillance_officer', 'admin', 'super_admin', 'health_officer')
+@role_required('surveillance_officer', 'admin', 'super_admin', 'health_officer', 'catchment_nurse')
 def api_analytics_data(request):
     symptom_category = request.GET.get('symptom_category', '').strip()
     barangay_id = request.GET.get('barangay', '').strip()
+    
+    role = request.session.get('role')
+    user = User.objects.filter(id=request.session.get('user_id')).first()
+    if role in BARANGAY_SCOPED_ROLES:
+        assigned_barangay = resolve_user_barangay(user)
+        if assigned_barangay:
+            barangay_id = str(assigned_barangay.id)
+
     time_range = request.GET.get('time_range', 'current_year').strip()
 
     if time_range not in ('current_year', 'last_3_months', 'last_6_months'):

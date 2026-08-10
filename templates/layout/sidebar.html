@@ -81,12 +81,19 @@
     </a>
     {% endif %}
 
-    {% if session_role == 'surveillance_officer' or session_role == 'admin' or session_role == 'super_admin' %}
+    {% if session_role == 'surveillance_officer' or session_role == 'admin' or session_role == 'super_admin' or session_role == 'catchment_nurse' %}
     <div class="nav-section-label">Analysis</div>
+    {% if session_role == 'catchment_nurse' %}
+    <a href="{% url 'nurse_analytics' %}" class="nav-item {% if 'analytics' in request.path %}active{% endif %}">
+      <span class="nav-icon"><i data-lucide="line-chart" class="lucide-icon lucide-icon--sm"></i></span>
+      <span>Analytics</span>
+    </a>
+    {% else %}
     <a href="{% url 'analytics' %}" class="nav-item {% if 'analytics' in request.path %}active{% endif %}">
       <span class="nav-icon"><i data-lucide="line-chart" class="lucide-icon lucide-icon--sm"></i></span>
       <span>Analytics</span>
     </a>
+    {% endif %}
     {% if session_role == 'surveillance_officer' %}
     <a href="{% url 'incident_reports' %}" class="nav-item {% if 'incidents' in request.path %}active{% endif %}">
       <span class="nav-icon"><i data-lucide="file-search" class="lucide-icon lucide-icon--sm"></i></span>

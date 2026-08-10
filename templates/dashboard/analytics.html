@@ -69,10 +69,12 @@
         <option value="{{ value }}">{% if not value %}All Syndromes{% else %}{{ label }}{% endif %}</option>
         {% endfor %}
       </select>
-      <select id="filter-barangay" class="input-soft input-soft--plain" aria-label="Barangay" style="max-width:220px;">
+      <select id="filter-barangay" class="input-soft input-soft--plain" aria-label="Barangay" style="max-width:220px;" {% if is_barangay_scoped %}disabled{% endif %}>
+        {% if not is_barangay_scoped %}
         <option value="">All Barangays (City-wide)</option>
+        {% endif %}
         {% for b in barangays %}
-        <option value="{{ b.id }}">{{ b.barangay_name }}</option>
+        <option value="{{ b.id }}" selected>{{ b.barangay_name }}</option>
         {% endfor %}
       </select>
       <select id="filter-time" class="input-soft input-soft--plain" aria-label="Time range" style="max-width:200px;">
