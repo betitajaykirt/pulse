@@ -68,6 +68,13 @@ def _local_barangay_stats(user):
             'confirmed_count': 0,
             'active_alerts': 0,
             'recent_reports': [],
+            
+            # Admin-style synced KPIs fallback
+            'active_cases_total': 0,
+            'active_cases_dengue': 0,
+            'active_cases_lepto': 0,
+            'total_confirmed': 0,
+            'aptas_alerts': [],
         }
 
     base_qs = SurveillanceReport.objects.filter(barangay_id=barangay.id).exclude(status='Closed')
@@ -241,6 +248,8 @@ def api_analytics_data(request):
         assigned_barangay = resolve_user_barangay(user)
         if assigned_barangay:
             barangay_id = str(assigned_barangay.id)
+        else:
+            barangay_id = '-1'
 
     time_range = request.GET.get('time_range', 'current_year').strip()
 
