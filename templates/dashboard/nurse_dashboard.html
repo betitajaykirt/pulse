@@ -39,7 +39,10 @@
         <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
       </div>
       <div class="dash-metric-card__value">{{ total_confirmed|default:0 }}</div>
-      <div class="dash-metric-card__label">Confirmed Cases (Lab-Verified)</div>
+      <div class="dash-metric-card__label">Confirmed Cases</div>
+      <div class="dash-metric-card__footer text-muted" style="font-size: 0.85rem; margin-top: 5px;">
+        Lab-Verified
+      </div>
     </article>
     <article class="dash-metric-card">
       <div class="dash-metric-card__head">
@@ -50,6 +53,9 @@
       </div>
       <div class="dash-metric-card__value">{{ aptas_alerts|length }}</div>
       <div class="dash-metric-card__label">High-Risk Hotspots</div>
+      <div class="dash-metric-card__footer text-muted" style="font-size: 0.85rem; margin-top: 5px;">
+        Local Spatial Clusters
+      </div>
     </article>
     <article class="dash-metric-card">
       <div class="dash-metric-card__head">
@@ -60,6 +66,9 @@
       </div>
       <div class="dash-metric-card__value">{{ pending_reports|default:0 }}</div>
       <div class="dash-metric-card__label">Pending Lab Confirmations</div>
+      <div class="dash-metric-card__footer text-muted" style="font-size: 0.85rem; margin-top: 5px;">
+        Awaiting Verification
+      </div>
     </article>
   </div>
 
