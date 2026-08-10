@@ -224,7 +224,7 @@
         </div>
 
         <div class="legend-item">
-          <div class="legend-dot" style="background:#7C3AED;"></div>Confirmed
+          <div class="legend-dot" style="background:#8B5CF6;"></div>Confirmed
         </div>
 
       </div>
@@ -366,17 +366,17 @@
 
       if (level === 'confirmed') {
 
-        return { color: '#7f1d1d', fillColor: '#b91c1c', fillOpacity: 0.35, weight: 2 };
+        return { color: '#7C3AED', fillColor: '#8B5CF6', fillOpacity: 0.35, weight: 2 };
 
       }
 
       if (level === 'probable') {
 
-        return { color: '#c2410c', fillColor: '#ea580c', fillOpacity: 0.35, weight: 2 };
+        return { color: '#DC2626', fillColor: '#EF4444', fillOpacity: 0.35, weight: 2 };
 
       }
 
-      return { color: '#ca8a04', fillColor: '#eab308', fillOpacity: 0.35, weight: 2 };
+      return { color: '#D97706', fillColor: '#F59E0B', fillOpacity: 0.35, weight: 2 };
 
     }
 
@@ -386,9 +386,9 @@
 
       var classification = typeof mapPopupClassificationKey === 'function' ? mapPopupClassificationKey(c) : (c.case_classification || 'suspected');
 
-      var fillColor = classification === 'confirmed' ? '#991b1b'
+      var fillColor = classification === 'confirmed' ? '#8B5CF6'
 
-        : classification === 'probable' ? '#ea580c' : '#eab308';
+        : classification === 'probable' ? '#EF4444' : '#F59E0B';
 
       var radius = classification === 'confirmed' ? 10
 
