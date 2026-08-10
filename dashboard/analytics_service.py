@@ -146,6 +146,21 @@ def build_demographics_data(qs):
     }
 
 
+def _normalize_disease_name(disease):
+    if not disease:
+        return 'Unknown'
+    clean_name = disease.strip().lower()
+    
+    if 'dengue' in clean_name:
+        return 'Dengue Fever'
+    if 'lepto' in clean_name:
+        return 'Leptospirosis'
+    if 'insufficient' in clean_name:
+        return 'Insufficient Data For Prediction'
+        
+    return disease.title()
+
+
 def build_disease_distribution_data(qs):
     rows = (
         qs.exclude(
@@ -157,8 +172,14 @@ def build_disease_distribution_data(qs):
         )
         .values(disease=F('surveillance_report__syndrome_type'))
         .annotate(count=Count('id'))
-        .order_by('-count')
     )
+
+    aggregated = {}
+    for row in rows:
+        norm_disease = _normalize_disease_name(row['disease'])
+        aggregated[norm_disease] = aggregated.get(norm_disease, 0) + row['count']
+        
+    sorted_items = sorted(aggregated.items(), key=lambda x: x[1], reverse=True)
 
     labels = []
     data = []
@@ -166,11 +187,9 @@ def build_disease_distribution_data(qs):
     base_colors = ['#0F4C81', '#00A6A6', '#E11D48', '#f59e0b', '#8b5cf6', '#10b981', '#f43f5e']
     background_colors = []
 
-    for i, row in enumerate(rows):
-        disease = row['disease']
-        # Optionally, format to title case if not already
-        labels.append(disease.title() if disease else 'Unknown')
-        data.append(row['count'])
+    for i, (disease, count) in enumerate(sorted_items):
+        labels.append(disease)
+        data.append(count)
         background_colors.append(base_colors[i % len(base_colors)])
             
     datasets = [{
