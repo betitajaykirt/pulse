@@ -172,10 +172,19 @@ def alerts_inbox_view(request):
 @role_required('surveillance_officer', 'admin', 'super_admin', 'health_officer')
 def analytics_view(request):
     barangays = get_barangay_options()
-    return render(request, 'dashboard/analytics.html', {
+    
+    role = request.session.get('role')
+    user_id = request.session.get('user_id')
+    ctx = _get_stats(role, user_id)
+    ctx.update({
         'symptom_category_choices': SYNDROME_CATEGORY_OPTIONS,
         'barangays': barangays,
     })
+    
+    barangay_filter = resolve_aptas_barangay_filter(role, user_id, ctx)
+    ctx.update(get_aptas_dashboard_context(barangay_name=barangay_filter))
+    
+    return render(request, 'dashboard/analytics.html', ctx)
 
 
 @require_GET

@@ -15,6 +15,52 @@
     </span>
   </header>
 
+  <div class="dash-metrics" style="margin-bottom: 1.5rem;">
+    <article class="dash-metric-card">
+      <div class="dash-metric-card__head">
+        <div class="dash-metric-card__icon dash-metric-card__icon--primary">
+          <i data-lucide="activity" class="lucide-icon lucide-icon--sm"></i>
+        </div>
+        <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
+      </div>
+      <div class="dash-metric-card__value">{{ active_cases_total|default:0 }}</div>
+      <div class="dash-metric-card__label">Total Active Cases</div>
+      <div class="dash-metric-card__footer text-muted" style="font-size: 0.85rem; margin-top: 5px;">
+        {{ active_cases_dengue|default:0 }} Dengue • {{ active_cases_lepto|default:0 }} Lepto
+      </div>
+    </article>
+    <article class="dash-metric-card">
+      <div class="dash-metric-card__head">
+        <div class="dash-metric-card__icon dash-metric-card__icon--warning">
+          <i data-lucide="flask-conical" class="lucide-icon lucide-icon--sm"></i>
+        </div>
+        <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
+      </div>
+      <div class="dash-metric-card__value">{{ total_confirmed|default:0 }}</div>
+      <div class="dash-metric-card__label">Confirmed Cases (Lab-Verified)</div>
+    </article>
+    <article class="dash-metric-card">
+      <div class="dash-metric-card__head">
+        <div class="dash-metric-card__icon dash-metric-card__icon--danger">
+          <i data-lucide="map-pin" class="lucide-icon lucide-icon--sm"></i>
+        </div>
+        <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
+      </div>
+      <div class="dash-metric-card__value">{{ aptas_alerts|length }}</div>
+      <div class="dash-metric-card__label">High-Risk Hotspots</div>
+    </article>
+    <article class="dash-metric-card">
+      <div class="dash-metric-card__head">
+        <div class="dash-metric-card__icon dash-metric-card__icon--accent">
+          <i data-lucide="clock" class="lucide-icon lucide-icon--sm"></i>
+        </div>
+        <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
+      </div>
+      <div class="dash-metric-card__value">{{ pending_reports|default:0 }}</div>
+      <div class="dash-metric-card__label">Pending Lab Confirmations</div>
+    </article>
+  </div>
+
   <div class="pulse-panel" style="padding:1.5rem 1.75rem;margin-bottom:1.25rem;">
     <div class="analytics-filters">
       <span class="analytics-filters__label">Filters</span>

@@ -63,29 +63,6 @@
     </article>
   </div>
 
-  <section class="dash-section" style="margin-top: 1.5rem; margin-bottom: 2rem;">
-    <a href="{% url 'environmental_intelligence' %}" class="pulse-panel cursor-pointer hover:text-primary" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px; text-decoration: none; color: inherit; transition: border-color 0.2s ease, box-shadow 0.2s ease;" onmouseover="this.style.borderColor='var(--color-primary)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.05)';" onmouseout="this.style.borderColor='var(--color-border)'; this.style.boxShadow='none';">
-      <div style="display: flex; align-items: center; gap: 2rem;">
-        <div>
-          <span style="display: block; font-size: 0.8rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Current Climate (Bago City)</span>
-          <strong style="font-size: 1.1rem; color: var(--color-text);">{{ weather.temperature_c }}°C <span style="margin: 0 4px; color: var(--color-border);">|</span> {{ weather.precipitation_mm }}mm Rain</strong>
-        </div>
-        <div>
-          <span style="display: block; font-size: 0.8rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Vector-Breeding Risk</span>
-          {% if weather.vector_breeding_risk %}
-          <span class="pill-badge badge-danger"><i data-lucide="alert-triangle" class="lucide-icon lucide-icon--xs" style="margin-right:4px;"></i> Active Risk Environment</span>
-          {% else %}
-          <span class="pill-badge badge-success"><i data-lucide="check-circle" class="lucide-icon lucide-icon--xs" style="margin-right:4px;"></i> Low Risk Environment</span>
-          {% endif %}
-        </div>
-        <div>
-          <span style="display: block; font-size: 0.8rem; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Temporal Anomaly Index</span>
-          <strong style="font-size: 1.1rem; color: var(--color-text);">-0.35 (Stable)</strong>
-        </div>
-      </div>
-      <span class="btn btn-outline btn-sm" style="pointer-events: none;">View Environmental Intelligence &rarr;</span>
-    </a>
-  </section>
 
   <section class="dash-section">
     <h3 class="dash-section__title">Surveillance Core Tools</h3>
@@ -213,7 +190,7 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
   if (typeof Chart === 'undefined') return;
 
   const chartOptions = {
@@ -236,77 +213,85 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   };
 
-  // 1. Epi-Curve Chart (Line)
-  const epiCanvas = document.getElementById('overview-epi-chart');
-  if (epiCanvas) {
-    new Chart(epiCanvas.getContext('2d'), {
-      type: 'line',
-      data: {
-        labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5'],
-        datasets: [
-          { label: 'Active', data: [15, 22, 18, 30, 25], borderColor: '#00A6A6', backgroundColor: '#00A6A6', tension: 0.3, fill: false },
-          { label: 'Confirmed', data: [10, 15, 12, 22, 18], borderColor: '#0F4C81', backgroundColor: '#0F4C81', tension: 0.3, fill: false }
-        ]
-      },
-      options: chartOptions
-    });
-  }
+  try {
+    const res = await fetch('{% url "api_analytics" %}');
+    const data = await res.json();
+    
+    if (!data.ok) {
+      console.error('Failed to load analytics data for dashboard');
+      return;
+    }
 
-  // 2. Disease Distribution (Doughnut)
-  const diseaseCanvas = document.getElementById('overview-disease-chart');
-  if (diseaseCanvas) {
-    new Chart(diseaseCanvas.getContext('2d'), {
-      type: 'doughnut',
-      data: {
-        labels: ['Dengue', 'Leptospirosis', 'Inconclusive'],
-        datasets: [{
-          data: [60, 25, 15],
-          backgroundColor: ['#0F4C81', '#00A6A6', '#CBD5E1'],
-          borderWidth: 0
-        }]
-      },
-      options: Object.assign({}, pieOptions, { cutout: '65%' })
-    });
-  }
+    // 1. Epi-Curve Chart (Line)
+    const epiCanvas = document.getElementById('overview-epi-chart');
+    if (epiCanvas && data.epi_curve) {
+      // Convert bar configuration to line if desired, or keep as bar from payload.
+      // Modifying payload datasets for line chart appearance
+      const epiDatasets = data.epi_curve.datasets.map(ds => ({
+        ...ds,
+        type: 'line',
+        tension: 0.3,
+        fill: false,
+        borderColor: ds.backgroundColor
+      }));
+      
+      new Chart(epiCanvas.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: data.epi_curve.labels,
+          datasets: epiDatasets
+        },
+        options: chartOptions
+      });
+    }
 
-  // 3. Demographic Breakdown (Bar)
-  const demoCanvas = document.getElementById('overview-demo-chart');
-  if (demoCanvas) {
-    new Chart(demoCanvas.getContext('2d'), {
-      type: 'bar',
-      data: {
-        labels: ['0-10', '11-20', '21-30', '31-40', '41-50', '51+'],
-        datasets: [
-          { label: 'Male', data: [12, 18, 25, 20, 15, 8], backgroundColor: '#0F4C81', borderRadius: 4 },
-          { label: 'Female', data: [10, 22, 20, 18, 12, 10], backgroundColor: '#00A6A6', borderRadius: 4 }
-        ]
-      },
-      options: chartOptions
-    });
-  }
+    // 2. Disease Distribution (Doughnut)
+    const diseaseCanvas = document.getElementById('overview-disease-chart');
+    if (diseaseCanvas && data.disease_distribution) {
+      new Chart(diseaseCanvas.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+          labels: data.disease_distribution.labels,
+          datasets: data.disease_distribution.datasets
+        },
+        options: Object.assign({}, pieOptions, { cutout: '65%' })
+      });
+    }
 
-  // 4. Top Hotspot Barangays (Horizontal Bar)
-  const hotspotCanvas = document.getElementById('overview-hotspot-chart');
-  if (hotspotCanvas) {
-    new Chart(hotspotCanvas.getContext('2d'), {
-      type: 'bar',
-      data: {
-        labels: ['Brgy Balingasag', 'Brgy Poblacion', 'Brgy Sampinit', 'Brgy Ma-ao', 'Brgy Taloc'],
-        datasets: [{
-          label: 'Total Cases',
-          data: [42, 38, 29, 21, 15],
-          backgroundColor: '#E11D48',
-          borderRadius: 4
-        }]
-      },
-      options: Object.assign({}, chartOptions, { 
-        indexAxis: 'y',
-        scales: {
-          x: { grid: { color: 'rgba(241, 245, 249, 0.9)' }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B' }, border: { display: false } },
-          y: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B' } }
-        }
-      })
-    });
+    // 3. Demographic Breakdown (Bar)
+    const demoCanvas = document.getElementById('overview-demo-chart');
+    if (demoCanvas && data.demographics) {
+      new Chart(demoCanvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: data.demographics.labels,
+          datasets: data.demographics.datasets
+        },
+        options: chartOptions
+      });
+    }
+
+    // 4. Top Hotspot Barangays (Horizontal Bar)
+    const hotspotCanvas = document.getElementById('overview-hotspot-chart');
+    if (hotspotCanvas && data.hotspots) {
+      new Chart(hotspotCanvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: data.hotspots.labels,
+          datasets: data.hotspots.datasets
+        },
+        options: Object.assign({}, chartOptions, { 
+          indexAxis: 'y',
+          scales: {
+            x: { grid: { color: 'rgba(241, 245, 249, 0.9)' }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B' }, border: { display: false }, beginAtZero: true },
+            y: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B' } }
+          }
+        })
+      });
+    }
+
+  } catch (e) {
+    console.error('Error fetching analytics overview:', e);
   }
 });
 </script>

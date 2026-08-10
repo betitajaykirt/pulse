@@ -148,6 +148,69 @@ def build_demographics_data(qs):
     }
 
 
+def build_disease_distribution_data(qs):
+    disease_counts = {
+        'Dengue': 0,
+        'Leptospirosis': 0,
+        'Inconclusive': 0
+    }
+    
+    for case in qs.iterator(chunk_size=500):
+        # Infer disease from symptoms or syndrome type
+        # Check syndrome type from the associated report if available
+        # or use symptoms
+        syndrome_type = ''
+        if case.surveillance_report and case.surveillance_report.syndrome_type:
+            syndrome_type = case.surveillance_report.syndrome_type.lower()
+            
+        if 'dengue' in syndrome_type:
+            disease_counts['Dengue'] += 1
+        elif 'lepto' in syndrome_type:
+            disease_counts['Leptospirosis'] += 1
+        else:
+            disease_counts['Inconclusive'] += 1
+            
+    datasets = [{
+        'data': [disease_counts['Dengue'], disease_counts['Leptospirosis'], disease_counts['Inconclusive']],
+        'backgroundColor': ['#0F4C81', '#00A6A6', '#CBD5E1'],
+        'borderWidth': 0
+    }]
+    
+    return {
+        'labels': ['Dengue', 'Leptospirosis', 'Inconclusive'],
+        'datasets': datasets,
+    }
+
+
+def build_top_hotspots_data(qs):
+    # Aggregate cases grouped by barangay_name, sort descending, get top 5
+    rows = (
+        qs.values(barangay_name=F('barangay__barangay_name'))
+        .annotate(count=Count('id'))
+        .order_by('-count')[:5]
+    )
+    
+    labels = []
+    data = []
+    
+    for row in rows:
+        name = row['barangay_name'] or 'Unassigned'
+        labels.append(name)
+        data.append(row['count'])
+        
+    datasets = [{
+        'label': 'Total Cases',
+        'data': data,
+        'backgroundColor': '#E11D48',
+        'borderRadius': 4
+    }]
+    
+    return {
+        'labels': labels,
+        'datasets': datasets,
+    }
+
+
 def build_summary_stats(qs, symptom_category_filter=''):
     category_labels = dict(SYMPTOM_CATEGORY_CHOICES)
 
@@ -202,6 +265,8 @@ def get_analytics_payload(*, symptom_category='', barangay_id='', time_range='cu
         'summary': build_summary_stats(qs, symptom_category_filter=symptom_category),
         'epi_curve': build_epi_curve_data(qs, time_range=time_range),
         'demographics': build_demographics_data(qs),
+        'disease_distribution': build_disease_distribution_data(qs),
+        'hotspots': build_top_hotspots_data(qs),
         'filters': {
             'symptom_category': symptom_category,
             'barangay_id': barangay_id,

@@ -1,14 +1,19 @@
 {% if weather %}
 <section class="dash-weather-widget" aria-label="Bago City environmental conditions">
-  <div class="dash-weather-widget__head">
+  <div class="dash-weather-widget__head" style="display: flex; justify-content: space-between; align-items: flex-start;">
     <div>
       <span class="pulse-eyebrow">Environmental Intelligence</span>
       <h3 class="dash-weather-widget__title">{{ weather.location }}</h3>
     </div>
-    <span class="pill-badge {% if weather.ok %}badge-active{% else %}badge-muted{% endif %}">
-      <i data-lucide="cloud" class="lucide-icon lucide-icon--xs"></i>
-      {% if weather.ok %}Live{% else %}Estimated{% endif %}
-    </span>
+    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem;">
+      <span class="pill-badge {% if weather.ok %}badge-active{% else %}badge-muted{% endif %}">
+        <i data-lucide="cloud" class="lucide-icon lucide-icon--xs"></i>
+        {% if weather.ok %}Live{% else %}Estimated{% endif %}
+      </span>
+      <a href="{% url 'environmental_intelligence' %}" class="cursor-pointer hover:text-primary" style="font-size: 0.75rem; text-decoration: none; color: var(--color-primary); font-weight: 500;">
+        View Full Environmental Intelligence &rarr;
+      </a>
+    </div>
   </div>
 
   <div class="dash-weather-widget__grid">
