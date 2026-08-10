@@ -21,6 +21,8 @@ OPEN_METEO_URL = (
     'https://api.open-meteo.com/v1/forecast'
     f'?latitude={BAGO_LATITUDE}&longitude={BAGO_LONGITUDE}'
     '&current=temperature_2m,relative_humidity_2m,precipitation'
+    '&daily=precipitation_sum'
+    '&timezone=Asia/Manila'
 )
 DATA_SOURCE = 'open-meteo-bago-city'
 PERSIST_INTERVAL_MINUTES = 30
@@ -80,7 +82,8 @@ def _save_environmental_snapshot(weather: Dict[str, Any]) -> None:
         return
 
     now = timezone.now()
-    rainfall = weather['precipitation_mm']
+    # Save hourly snapshot rate instead of daily total so that Sum() aggregations over time remain realistic
+    rainfall = weather.get('hourly_precipitation', weather['precipitation_mm'])
     note_parts = [
         f'Open-Meteo snapshot for Bago City ({BAGO_LATITUDE}, {BAGO_LONGITUDE}).',
         f'Temperature {weather["temperature_c"]}°C, humidity {weather["humidity_pct"]}%.',
@@ -118,21 +121,30 @@ def fetch_bago_city_weather(*, persist: bool = True) -> Dict[str, Any]:
         response.raise_for_status()
         payload = response.json()
         current = payload.get('current') or {}
+        daily = payload.get('daily') or {}
 
         temperature = current.get('temperature_2m')
         humidity = current.get('relative_humidity_2m')
-        precipitation = current.get('precipitation')
+        current_precip = current.get('precipitation')
+        
+        # Extract daily precipitation for UI display
+        precip_list = daily.get('precipitation_sum')
+        if precip_list and len(precip_list) > 0:
+            daily_precip = precip_list[0]
+        else:
+            daily_precip = current_precip
 
-        if temperature is None or humidity is None or precipitation is None:
+        if temperature is None or humidity is None or current_precip is None:
             raise ValueError('Open-Meteo response missing expected current weather fields.')
 
         weather = _build_payload(
             temperature_c=float(temperature),
             humidity_pct=float(humidity),
-            precipitation_mm=float(precipitation),
+            precipitation_mm=float(daily_precip),
             ok=True,
             source='open-meteo',
         )
+        weather['hourly_precipitation'] = float(current_precip)
     except Exception as exc:
         logger.warning('Weather fetch failed, using fallback values: %s', exc)
         weather = dict(FALLBACK_WEATHER)
