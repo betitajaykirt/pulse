@@ -253,7 +253,20 @@ class SurveillanceReport(models.Model):
     def computed_risk_level(self):
         if hasattr(self, 'aptas_risk_level') and self.aptas_risk_level:
             return self.aptas_risk_level
-        score = self.ml_anomaly_score or 0
+        
+        score = self.ml_anomaly_score
+        
+        # Extract confidence numerical value from remarks (e.g. "ML Confidence: 56.8%")
+        if score is None and self.remarks:
+            import re
+            match = re.search(r'ML Confidence:\s*([\d.]+)%', self.remarks, re.IGNORECASE)
+            if match:
+                try:
+                    score = float(match.group(1)) / 100.0
+                except ValueError:
+                    pass
+                    
+        score = score or 0
         if score >= 0.85: return 'Critical'
         if score >= 0.65: return 'High'
         if score >= 0.45: return 'Moderate'
