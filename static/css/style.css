@@ -1261,10 +1261,10 @@ select {
 .badge-probable { background: rgba(245, 158, 11, 0.12); color: #C2410C; }
 
 /* Dynamic Risk Level Badges */
-.pill-badge.badge-risk-critical { background: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe; }
-.pill-badge.badge-risk-high { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
-.pill-badge.badge-risk-moderate { background: #fef3c7; color: #b45309; border: 1px solid #fcd34d; }
-.pill-badge.badge-risk-low { background: #d1fae5; color: #047857; border: 1px solid #6ee7b7; }
+.pill-badge.badge-risk-critical { background: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe; border-radius: 9999px; padding: 0.125rem 0.625rem; font-weight: 600; font-size: 0.75rem; }
+.pill-badge.badge-risk-high { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; border-radius: 9999px; padding: 0.125rem 0.625rem; font-weight: 600; font-size: 0.75rem; }
+.pill-badge.badge-risk-moderate { background: #fef3c7; color: #b45309; border: 1px solid #fcd34d; border-radius: 9999px; padding: 0.125rem 0.625rem; font-weight: 600; font-size: 0.75rem; }
+.pill-badge.badge-risk-low { background: #d1fae5; color: #047857; border: 1px solid #6ee7b7; border-radius: 9999px; padding: 0.125rem 0.625rem; font-weight: 600; font-size: 0.75rem; }
 
 /* ── Tables ─────────────────────────────────────────────────────── */
 .table-wrapper { overflow-x: auto; }
