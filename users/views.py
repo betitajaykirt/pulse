@@ -2,8 +2,17 @@ import secrets
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.db.models import Q
+from django.http import JsonResponse
 from django.utils import timezone
+from django.views.decorators.http import require_GET
 from accounts.auth_utils import role_required, hash_password, build_full_name
+from accounts.identity_utils import (
+    contact_in_use,
+    email_in_use,
+    is_valid_contact_number,
+    normalize_contact_number,
+    normalize_email,
+)
 from myapp.date_utils import parse_user_date
 from myapp.models import User, Barangay
 
@@ -41,11 +50,12 @@ def create(request):
     middle   = request.POST.get('middle_initial', '').strip()
     suffix   = request.POST.get('suffix', '').strip()
     bdate    = request.POST.get('birthdate', '').strip()
-    email    = request.POST.get('email', '').strip()
+    email    = normalize_email(request.POST.get('email', ''))
     role     = request.POST.get('role', '').strip()
     password = request.POST.get('password', '')
     barangay = request.POST.get('barangay_text', '').strip()
     contact  = request.POST.get('contact_number', '').strip()
+    contact_normalized = normalize_contact_number(contact)
 
     valid_roles = ['health_officer', 'barangay_health_worker', 'catchment_nurse']
     errors = []
@@ -58,14 +68,17 @@ def create(request):
         errors.append('Barangay is required for the selected role.')
     if bdate and not parse_user_date(bdate):
         errors.append('Enter date of birth as mm/dd/yyyy.')
+    if email and email_in_use(email):
+        errors.append('Email is already registered.')
+    if contact:
+        if not is_valid_contact_number(contact):
+            errors.append('Enter a valid contact number (at least 10 digits).')
+        elif contact_in_use(contact):
+            errors.append('Contact number is already registered.')
 
     if errors:
         for e in errors:
             messages.error(request, e)
-        return redirect('users_index')
-
-    if User.objects.filter(email=email).exists():
-        messages.error(request, 'Email already exists.')
         return redirect('users_index')
 
     username = f"{first.lower()}.{last.lower()}.{secrets.token_hex(4)}"
@@ -83,12 +96,29 @@ def create(request):
         role=role,
         status='active',
         barangay_text=barangay or None,
-        contact_number=contact or None,
+        contact_number=contact_normalized or None,
         created_at=now,
         updated_at=now,
     )
     messages.success(request, f'Account for {first} {last} ({role}) created.')
     return redirect('users_index')
+
+
+@role_required('admin', 'super_admin')
+@require_GET
+def check_identity(request):
+    """AJAX helper for create-user duplicate checks."""
+    email = request.GET.get('email', '').strip()
+    contact = request.GET.get('contact_number', '').strip()
+    payload = {}
+    if email:
+        payload['email_taken'] = email_in_use(email)
+    if contact:
+        payload['contact_invalid'] = not is_valid_contact_number(contact)
+        payload['contact_taken'] = (
+            is_valid_contact_number(contact) and contact_in_use(contact)
+        )
+    return JsonResponse(payload)
 
 
 @role_required('admin', 'super_admin')

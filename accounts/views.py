@@ -4,6 +4,7 @@ from django.conf import settings
 from django.utils import timezone
 from myapp.models import SuperAdmin, Admin, User, PulseSession
 from myapp.audit_utils import log_system
+from accounts.identity_utils import normalize_email
 from .auth_utils import (
     verify_password, hash_password, build_full_name,
     check_lockout, record_attempt, login_required, get_current_user
@@ -14,7 +15,7 @@ from .auth_utils import (
 
 def login_view(request):
     if request.method == 'POST':
-        email    = request.POST.get('email', '').strip()
+        email    = normalize_email(request.POST.get('email', ''))
         password = request.POST.get('password', '')
         ip       = request.META.get('REMOTE_ADDR')
 
@@ -30,17 +31,17 @@ def login_view(request):
         utype = None
 
         # Check SuperAdmin
-        sa = SuperAdmin.objects.filter(email=email).first()
+        sa = SuperAdmin.objects.filter(email__iexact=email).first()
         if sa and verify_password(password, sa.password_hash):
             user_obj, utype = sa, 'super_admin'
 
         if not user_obj:
-            a = Admin.objects.filter(email=email).first()
+            a = Admin.objects.filter(email__iexact=email).first()
             if a and verify_password(password, a.password_hash):
                 user_obj, utype = a, 'admin'
 
         if not user_obj:
-            u = User.objects.filter(email=email).first()
+            u = User.objects.filter(email__iexact=email).first()
             if u and verify_password(password, u.password_hash):
                 user_obj, utype = u, 'user'
 

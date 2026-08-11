@@ -57,7 +57,8 @@
         </div>
         <div class="form-group">
           <label for="create-email">Email *</label>
-          <input type="email" id="create-email" name="email" class="input-soft" required>
+          <input type="email" id="create-email" name="email" class="input-soft" required autocomplete="off">
+          <p id="create-email-error" class="form-hint form-hint--error" style="display:none;"></p>
         </div>
         <div class="form-group">
           <label for="create-role">Role *</label>
@@ -88,7 +89,8 @@
         </div>
         <div class="form-group">
           <label for="create-contact">Contact Number</label>
-          <input type="text" id="create-contact" name="contact_number" class="input-soft" placeholder="e.g. 09171234567">
+          <input type="tel" id="create-contact" name="contact_number" class="input-soft" placeholder="e.g. 09171234567" autocomplete="off">
+          <p id="create-contact-error" class="form-hint form-hint--error" style="display:none;"></p>
         </div>
       </div>
       <div class="um-form-actions">
@@ -265,6 +267,77 @@ document.addEventListener('DOMContentLoaded', function () {
         if (window.lucide) { lucide.createIcons(); }
       }
       createPwToggle.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+    });
+  }
+
+  var identityCheckUrl = '{% url "users_check_identity" %}';
+  var emailInput = document.getElementById('create-email');
+  var contactInput = document.getElementById('create-contact');
+  var emailError = document.getElementById('create-email-error');
+  var contactError = document.getElementById('create-contact-error');
+  var createAccountForm = document.querySelector('.um-form');
+  var identityState = { emailTaken: false, contactTaken: false, contactInvalid: false };
+
+  function setFieldError(el, messageEl, message) {
+    if (!el || !messageEl) return;
+    if (message) {
+      messageEl.textContent = message;
+      messageEl.style.display = 'block';
+      el.setAttribute('aria-invalid', 'true');
+    } else {
+      messageEl.textContent = '';
+      messageEl.style.display = 'none';
+      el.removeAttribute('aria-invalid');
+    }
+  }
+
+  function checkIdentity(field) {
+    var params = new URLSearchParams();
+    if (field === 'email' && emailInput && emailInput.value.trim()) {
+      params.set('email', emailInput.value.trim());
+    }
+    if (field === 'contact' && contactInput && contactInput.value.trim()) {
+      params.set('contact_number', contactInput.value.trim());
+    }
+    if (!params.toString()) return;
+
+    fetch(identityCheckUrl + '?' + params.toString(), {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (field === 'email') {
+          identityState.emailTaken = !!data.email_taken;
+          setFieldError(
+            emailInput,
+            emailError,
+            data.email_taken ? 'This email is already registered.' : ''
+          );
+        }
+        if (field === 'contact') {
+          identityState.contactInvalid = !!data.contact_invalid;
+          identityState.contactTaken = !!data.contact_taken;
+          var contactMessage = '';
+          if (data.contact_invalid) contactMessage = 'Enter a valid contact number (at least 10 digits).';
+          else if (data.contact_taken) contactMessage = 'This contact number is already registered.';
+          setFieldError(contactInput, contactError, contactMessage);
+        }
+      })
+      .catch(function () {});
+  }
+
+  if (emailInput) {
+    emailInput.addEventListener('blur', function () { checkIdentity('email'); });
+  }
+  if (contactInput) {
+    contactInput.addEventListener('blur', function () { checkIdentity('contact'); });
+  }
+  if (createAccountForm) {
+    createAccountForm.addEventListener('submit', function (event) {
+      if (identityState.emailTaken || identityState.contactTaken || identityState.contactInvalid) {
+        event.preventDefault();
+        return;
+      }
     });
   }
 });

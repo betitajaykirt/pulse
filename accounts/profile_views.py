@@ -5,6 +5,13 @@ from django.contrib import messages
 from django.http import FileResponse, Http404
 from django.conf import settings
 from myapp.models import SuperAdmin, Admin, User
+from accounts.identity_utils import (
+    contact_in_use,
+    email_in_use,
+    is_valid_contact_number,
+    normalize_contact_number,
+    normalize_email,
+)
 from .auth_utils import login_required, get_current_user, verify_password, hash_password
 
 
@@ -21,31 +28,32 @@ def profile_update(request):
 
     uid   = request.session['user_id']
     utype = request.session.get('user_type', 'user')
-    email   = request.POST.get('email', '').strip()
+    email   = normalize_email(request.POST.get('email', ''))
     contact = request.POST.get('contact_number', '').strip()
+    contact_normalized = normalize_contact_number(contact)
 
     if not email:
         messages.error(request, 'Email is required.')
         return redirect('profile')
 
-    # Check uniqueness using ORM
-    if utype == 'super_admin':
-        existing = SuperAdmin.objects.filter(email=email).exclude(id=uid).exists()
-    elif utype == 'admin':
-        existing = Admin.objects.filter(email=email).exclude(id=uid).exists()
-    else:
-        existing = User.objects.filter(email=email).exclude(id=uid).exists()
-
-    if existing:
+    if email_in_use(email, exclude_user_type=utype, exclude_id=uid):
         messages.error(request, 'That email is already in use.')
         return redirect('profile')
 
+    if contact:
+        if not is_valid_contact_number(contact):
+            messages.error(request, 'Enter a valid contact number (at least 10 digits).')
+            return redirect('profile')
+        if contact_in_use(contact, exclude_user_type=utype, exclude_id=uid):
+            messages.error(request, 'That contact number is already in use.')
+            return redirect('profile')
+
     if utype == 'user':
-        User.objects.filter(id=uid).update(email=email, contact_number=contact)
+        User.objects.filter(id=uid).update(email=email, contact_number=contact_normalized or None)
     elif utype == 'admin':
-        Admin.objects.filter(id=uid).update(email=email)
+        Admin.objects.filter(id=uid).update(email=email, contact_number=contact_normalized or None)
     elif utype == 'super_admin':
-        SuperAdmin.objects.filter(id=uid).update(email=email)
+        SuperAdmin.objects.filter(id=uid).update(email=email, contact_number=contact_normalized or None)
 
     request.session['email'] = email
     messages.success(request, 'Profile updated.')
