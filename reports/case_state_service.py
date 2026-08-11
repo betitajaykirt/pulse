@@ -118,6 +118,13 @@ def resolve_all_barangay_alerts(barangay_name: str) -> int:
     resolved = Alert.objects.filter(id__in=alert_ids, status='active').update(status='resolved')
     if resolved:
         logger.info('Resolved %s active alert(s) for barangay %s', resolved, barangay)
+    try:
+        from dashboard.notification_service import dismiss_app_notifications
+
+        dismiss_app_notifications(alert_ids=alert_ids)
+        dismiss_app_notifications(barangay_name=barangay)
+    except Exception:
+        logger.debug('AppNotification cleanup skipped during barangay-wide resolution', exc_info=True)
     return resolved
 
 
@@ -176,6 +183,14 @@ def resolve_alerts_for_barangay_syndrome(barangay_name: str, syndrome_name: str)
             barangay,
             syndrome or 'all syndromes',
         )
+    try:
+        from dashboard.notification_service import dismiss_app_notifications
+
+        dismiss_app_notifications(alert_ids=alert_ids)
+        if barangay and syndrome:
+            dismiss_app_notifications(barangay_name=barangay, disease=syndrome)
+    except Exception:
+        logger.debug('AppNotification cleanup skipped during alert resolution', exc_info=True)
     return resolved
 
 

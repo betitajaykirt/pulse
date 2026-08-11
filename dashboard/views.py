@@ -423,25 +423,29 @@ def outbreak_thresholds_view(request):
 @require_GET
 def api_notifications(request):
     from dashboard.models import AppNotification, AppNotificationRead
+    from dashboard.notification_service import prune_stale_app_notifications, relevant_app_notifications
     from myapp.models import RiskAssessment
+    from reports.aptas_service import ACTIVE_SURVEILLANCE_STATUSES
+
+    prune_stale_app_notifications()
 
     role = request.session.get('role')
     user_id = request.session.get('user_id')
     user_type = request.session.get('user_type', role)
 
     if is_city_wide_role(role):
-        notifications = AppNotification.objects.order_by('-created_at')[:20]
+        base_qs = AppNotification.objects.all()
     elif role in BARANGAY_SCOPED_ROLES:
         user = User.objects.filter(id=user_id).first()
         barangay = resolve_user_barangay(user)
         if barangay:
-            notifications = AppNotification.objects.filter(barangay_name__iexact=barangay.barangay_name).order_by('-created_at')[:20]
+            base_qs = AppNotification.objects.filter(barangay_name__iexact=barangay.barangay_name)
         else:
-            notifications = AppNotification.objects.none()
+            base_qs = AppNotification.objects.none()
     else:
-        notifications = AppNotification.objects.none()
+        base_qs = AppNotification.objects.none()
 
-    notifications_list = list(notifications)
+    notifications_list = relevant_app_notifications(base_qs, limit=20)
     notification_ids = [n.id for n in notifications_list]
 
     read_notification_ids = set(AppNotificationRead.objects.filter(
@@ -475,6 +479,7 @@ def api_notifications(request):
     def _resolve_context_report(notif):
         qs = SurveillanceReport.objects.select_related('submitted_by', 'barangay').filter(
             barangay__barangay_name__iexact=notif.barangay_name,
+            status__in=ACTIVE_SURVEILLANCE_STATUSES,
         ).order_by('-report_date')
         if notif.disease:
             by_disease = qs.filter(syndrome_type__icontains=notif.disease.split()[0])
