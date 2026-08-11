@@ -922,6 +922,22 @@
 
 
 
+    function mapPopupDateRows(c, rowClass) {
+
+      rowClass = rowClass || 'map-case-popup__row';
+
+      var html = '';
+
+      html += '<div class="' + rowClass + '"><strong>Onset Date:</strong> ' + escapeMapPopupHtml(c.date_of_onset) + '</div>';
+
+      html += '<div class="' + rowClass + '"><strong>Reported Date:</strong> ' + escapeMapPopupHtml(c.report_date) + '</div>';
+
+      return html;
+
+    }
+
+
+
     function mapPopupClassificationKey(c) {
       var st = (c.status || '').toLowerCase();
       if (st === 'confirmed') return 'confirmed';
@@ -1104,7 +1120,6 @@
       var classKey = mapPopupClassificationKey(c);
       var classLabel = mapPopupClassificationLabel(c);
       var caseStatus = (c.status || '').trim();
-      var onsetDate = c.date_of_onset || c.report_date || '—';
 
       var html = '<div class="map-case-popup">';
 
@@ -1135,7 +1150,7 @@
 
       html += '<div class="map-case-popup__row"><strong>Cases:</strong> ' + escapeMapPopupHtml(c.case_count) + '</div>';
 
-      html += '<div class="map-case-popup__row"><strong>Onset Date:</strong> ' + escapeMapPopupHtml(onsetDate) + '</div>';
+      html += mapPopupDateRows(c);
 
       html += '<div class="map-case-popup__row"><strong>Status:</strong> ' + escapeMapPopupHtml(caseStatus || '—') + '</div>';
 
@@ -1247,7 +1262,6 @@
       cases.forEach(function (c, idx) {
         var classKey = mapPopupClassificationKey(c);
         var classLabel = mapPopupClassificationLabel(c);
-        var onset = c.date_of_onset || c.report_date || '\u2014';
         var patientName = escapeMapPopupHtml(c.patient_name || 'Unknown Resident');
 
         html += '<details class="cluster-accordion">';
@@ -1261,7 +1275,9 @@
 
         html += '<div class="cluster-accordion__body">';
         html += '<div class="cluster-accordion__detail-row"><strong>Disease:</strong> ' + mapPopupMlDiseaseDisplay(c) + '</div>';
-        html += '<div class="cluster-accordion__detail-row"><strong>Onset Date:</strong> ' + escapeMapPopupHtml(onset) + '</div>';
+
+        html += mapPopupDateRows(c, 'cluster-accordion__detail-row');
+
         html += '<div class="cluster-accordion__detail-row"><strong>Barangay:</strong> ' + escapeMapPopupHtml(c.barangay_name || '\u2014') + '</div>';
         if (c.purok) {
             html += '<div class="cluster-accordion__detail-row"><strong>Purok:</strong> ' + escapeMapPopupHtml(c.purok) + '</div>';
