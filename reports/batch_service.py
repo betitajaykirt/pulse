@@ -132,9 +132,24 @@ def _parse_optional_date(raw):
     return parse_user_date(s)
 
 
+def _build_patient_name(case) -> str:
+    from accounts.auth_utils import build_full_name
+
+    first = (case.get('first_name') or '').strip()
+    last = (case.get('last_name') or '').strip()
+    if first or last:
+        return build_full_name({
+            'first_name': first,
+            'middle_name': (case.get('middle_name') or case.get('middle_initial') or '').strip(),
+            'last_name': last,
+            'suffix': (case.get('suffix') or '').strip(),
+        }) or 'Unknown Resident'
+    return (case.get('patient_name') or '').strip() or 'Unknown Resident'
+
+
 def _extract_demographics(case):
 
-    patient_name = (case.get('patient_name') or '').strip() or 'Unknown Resident'
+    patient_name = _build_patient_name(case)
 
     civil_status = (case.get('civil_status') or '').strip() or None
 
@@ -290,7 +305,16 @@ def save_batch_submission(*, payload, submitted_by_id, locked_barangay=None):
 
         demographics['detailed_address'] = purok
 
-
+        first_name = (case.get('first_name') or '').strip()
+        last_name = (case.get('last_name') or '').strip()
+        legacy_name = (case.get('patient_name') or '').strip()
+        if first_name or last_name:
+            if not first_name:
+                raise ValueError(f'Patient #{idx}: first name is required.')
+            if not last_name:
+                raise ValueError(f'Patient #{idx}: last name is required.')
+        elif not legacy_name:
+            raise ValueError(f'Patient #{idx}: first and last name are required.')
 
         age_raw = case.get('age')
 

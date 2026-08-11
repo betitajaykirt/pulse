@@ -88,6 +88,7 @@ const SYMPTOM_GROUPS = {{ symptom_groups_json|safe }};
 
 const ALL_SYMPTOM_KEYS = SYMPTOM_GROUPS.flatMap(g => g.items.map(i => i.key));
 const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Divorced', 'Annulled'];
+const NAME_SUFFIX_OPTIONS = ['Jr.', 'Sr.', 'II', 'III'];
 
 let patientSeq = 0;
 let activePatientId = null;
@@ -100,6 +101,10 @@ function createPatient() {
   ALL_SYMPTOM_KEYS.forEach(key => { symptoms[key] = false; });
   return {
     id,
+    first_name: '',
+    last_name: '',
+    middle_name: '',
+    suffix: '',
     patient_name: '',
     civil_status: '',
     date_of_birth: '',
@@ -202,22 +207,67 @@ function otherSymptomsSectionHtml(p) {
   `;
 }
 
+function formatPatientFullName(p) {
+  const parts = [
+    (p.first_name || '').trim(),
+    (p.middle_name || '').trim(),
+    (p.last_name || '').trim(),
+    (p.suffix || '').trim(),
+  ].filter(Boolean);
+  return parts.join(' ');
+}
+
 function demographicsSectionHtml(p) {
   const studentDisplay = p.is_student ? 'block' : 'none';
+  const suffixOptions = ['<option value="">— None —</option>']
+    .concat(NAME_SUFFIX_OPTIONS.map(suffix => {
+      const selected = p.suffix === suffix ? 'selected' : '';
+      return `<option value="${suffix}" ${selected}>${suffix}</option>`;
+    }))
+    .join('');
   return `
     <div class="demographic-section">
       <h4 class="demographic-section__title">A. Demographic Data</h4>
       <div class="demographic-grid demographic-grid--two-col">
-        <div class="form-group demographic-grid__full">
-          <label for="patient_name_${p.id}">Full Name <span class="text-danger">*</span></label>
+        <div class="form-group">
+          <label for="first_name_${p.id}">First Name <span class="text-danger">*</span></label>
           <input type="text"
-            id="patient_name_${p.id}"
-            name="patient_name"
-            class="field-name input-soft input-soft--plain"
+            id="first_name_${p.id}"
+            name="first_name"
+            class="field-first-name input-soft input-soft--plain"
             data-pid="${p.id}"
-            value="${escapeTextarea(p.patient_name)}"
-            placeholder="e.g. Juan Dela Cruz"
-            autocomplete="name">
+            value="${escapeTextarea(p.first_name)}"
+            placeholder="e.g. Juan"
+            autocomplete="given-name">
+        </div>
+        <div class="form-group">
+          <label for="last_name_${p.id}">Last Name <span class="text-danger">*</span></label>
+          <input type="text"
+            id="last_name_${p.id}"
+            name="last_name"
+            class="field-last-name input-soft input-soft--plain"
+            data-pid="${p.id}"
+            value="${escapeTextarea(p.last_name)}"
+            placeholder="e.g. Dela Cruz"
+            autocomplete="family-name">
+        </div>
+        <div class="form-group">
+          <label for="middle_name_${p.id}">Middle Initial</label>
+          <input type="text"
+            id="middle_name_${p.id}"
+            name="middle_name"
+            class="field-middle-name input-soft input-soft--plain"
+            data-pid="${p.id}"
+            value="${escapeTextarea(p.middle_name)}"
+            maxlength="10"
+            placeholder="e.g. M."
+            autocomplete="additional-name">
+        </div>
+        <div class="form-group">
+          <label for="suffix_${p.id}">Suffix</label>
+          <select id="suffix_${p.id}" name="suffix" class="field-suffix input-soft input-soft--plain" data-pid="${p.id}">
+            ${suffixOptions}
+          </select>
         </div>
         <div class="form-group">
           <label for="date_of_birth_${p.id}">Date of Birth <span class="text-danger">*</span></label>
@@ -312,7 +362,7 @@ function demographicsSectionHtml(p) {
 
 function patientSummary(p) {
   const parts = [];
-  const name = (p.patient_name || '').trim();
+  const name = formatPatientFullName(p);
   if (name) parts.push(name);
   if (p.age !== '' && p.age != null) parts.push('Age ' + p.age);
   if (p.sex) parts.push(p.sex);
@@ -415,14 +465,21 @@ function bindPatientEvents() {
   document.querySelectorAll('.field-purok').forEach(inp => {
     inp.oninput = () => { const p = patients.find(x => x.id === inp.dataset.pid); if (p) p.purok_street = inp.value; };
   });
-  document.querySelectorAll('.field-name').forEach(inp => {
-    inp.oninput = () => {
-      const p = patients.find(x => x.id === inp.dataset.pid);
-      if (!p) return;
-      p.patient_name = inp.value;
-      updatePatientHeader(p);
-    };
-  });
+  function bindNameField(selector, field) {
+    document.querySelectorAll(selector).forEach(inp => {
+      inp.oninput = inp.onchange = () => {
+        const p = patients.find(x => x.id === inp.dataset.pid);
+        if (!p) return;
+        p[field] = inp.value;
+        p.patient_name = formatPatientFullName(p);
+        updatePatientHeader(p);
+      };
+    });
+  }
+  bindNameField('.field-first-name', 'first_name');
+  bindNameField('.field-last-name', 'last_name');
+  bindNameField('.field-middle-name', 'middle_name');
+  bindNameField('.field-suffix', 'suffix');
   document.querySelectorAll('.field-civil-status').forEach(sel => {
     sel.onchange = () => { const p = patients.find(x => x.id === sel.dataset.pid); if (p) p.civil_status = sel.value; };
   });
@@ -696,7 +753,10 @@ document.getElementById('clear-pin').addEventListener('click', () => {
 
 function syncPatientsFromDom() {
   patients.forEach(p => {
-    const name = document.querySelector(`.field-name[data-pid="${p.id}"]`);
+    const firstName = document.querySelector(`.field-first-name[data-pid="${p.id}"]`);
+    const lastName = document.querySelector(`.field-last-name[data-pid="${p.id}"]`);
+    const middleName = document.querySelector(`.field-middle-name[data-pid="${p.id}"]`);
+    const suffix = document.querySelector(`.field-suffix[data-pid="${p.id}"]`);
     const purok = document.querySelector(`.field-purok[data-pid="${p.id}"]`);
     const onset = document.querySelector(`.field-onset[data-pid="${p.id}"]`);
     const dob = document.querySelector(`.field-dob[data-pid="${p.id}"]`);
@@ -707,7 +767,11 @@ function syncPatientsFromDom() {
     const isStudent = document.querySelector(`.field-is-student[data-pid="${p.id}"]`);
     const grade = document.querySelector(`.field-grade[data-pid="${p.id}"]`);
     const school = document.querySelector(`.field-school[data-pid="${p.id}"]`);
-    if (name) p.patient_name = name.value;
+    if (firstName) p.first_name = firstName.value;
+    if (lastName) p.last_name = lastName.value;
+    if (middleName) p.middle_name = middleName.value;
+    if (suffix) p.suffix = suffix.value;
+    p.patient_name = formatPatientFullName(p);
     if (purok) p.purok_street = purok.value;
     if (onset) p.date_of_onset = onset.value;
     if (dob) p.date_of_birth = dob.value;
@@ -733,7 +797,8 @@ function validatePatients() {
   for (let i = 0; i < patients.length; i++) {
     const p = patients[i];
     const n = i + 1;
-    if (!(p.patient_name || '').trim()) return `Patient #${n}: full name is required.`;
+    if (!(p.first_name || '').trim()) return `Patient #${n}: first name is required.`;
+    if (!(p.last_name || '').trim()) return `Patient #${n}: last name is required.`;
     if (!p.date_of_birth) return `Patient #${n}: date of birth is required.`;
     if (!p.date_of_onset) return `Patient #${n}: date of onset is required.`;
     const dobDate = parsePatientDate(p.date_of_birth);
@@ -762,7 +827,12 @@ function buildPayload() {
     cases: patients.map(p => {
       const address = p.purok_street.trim();
       return {
-      patient_name: (p.patient_name || '').trim(),
+      first_name: (p.first_name || '').trim(),
+      last_name: (p.last_name || '').trim(),
+      middle_name: (p.middle_name || '').trim(),
+      middle_initial: (p.middle_name || '').trim(),
+      suffix: (p.suffix || '').trim(),
+      patient_name: formatPatientFullName(p),
       civil_status: (p.civil_status || '').trim() || null,
       date_of_birth: p.date_of_birth || null,
       detailed_address: address,
