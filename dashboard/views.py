@@ -32,7 +32,7 @@ def dashboard(request):
         'super_admin':            'dashboard/super_admin.html',
         'admin':                  'dashboard/admin.html',
         'encoder':                'dashboard/encoder.html',
-        'health_officer':         'dashboard/health_officer.html',
+        'health_officer':         'dashboard/admin.html',
         'surveillance_officer':   'dashboard/surveillance_officer.html',
         'barangay_health_worker': 'dashboard/barangay_health_worker.html',
     }
@@ -45,6 +45,13 @@ def dashboard(request):
 
     ctx = _get_stats(role, request.session.get('user_id'))
     ctx['weather'] = fetch_bago_city_weather()
+    if template == 'dashboard/admin.html':
+        ctx['can_manage_users'] = role in ('admin', 'super_admin')
+        ctx['dashboard_subtitle'] = (
+            'Health Officer — Bago City Health Office'
+            if role == 'health_officer'
+            else 'Administrator — Bago City Health Office'
+        )
     barangay_filter = resolve_aptas_barangay_filter(
         role, request.session.get('user_id'), ctx,
     )
@@ -114,22 +121,22 @@ def _local_barangay_stats(user):
 
 def _get_stats(role, user_id=None):
     ctx = {}
-    if role in ('admin', 'super_admin'):
-        ctx['total_users']     = User.objects.count()
-        ctx['total_barangays'] = Barangay.objects.count()
-
-        # Surveillance & Epidemiological KPIs
+    if role in ('admin', 'super_admin', 'health_officer'):
         active_qs = SurveillanceReport.objects.exclude(status='Closed')
         ctx['active_cases_total'] = active_qs.count()
         ctx['active_cases_dengue'] = active_qs.filter(syndrome_type__icontains='dengue').count()
         ctx['active_cases_lepto'] = active_qs.filter(syndrome_type__icontains='lepto').count()
         ctx['total_confirmed'] = SurveillanceReport.objects.filter(status='Confirmed').count()
         ctx['pending_reports'] = active_qs.filter(validation_status='pending').count()
-        
+
+    if role in ('admin', 'super_admin'):
+        ctx['total_users'] = User.objects.count()
+        ctx['total_barangays'] = Barangay.objects.count()
+
     if role == 'super_admin':
-        ctx['total_admins']  = Admin.objects.count()
+        ctx['total_admins'] = Admin.objects.count()
         ctx['total_reports'] = SurveillanceReport.objects.exclude(status='Closed').count()
-    if role in ('health_officer', 'surveillance_officer'):
+    if role == 'surveillance_officer':
         ctx['active_alerts'] = Alert.objects.filter(status='active').count()
         ctx['pending_reports'] = SurveillanceReport.objects.filter(validation_status='pending').exclude(status='Closed').count()
         ctx['suspected_count'] = SurveillanceReport.objects.filter(status='Suspected').count()
@@ -141,7 +148,7 @@ def _get_stats(role, user_id=None):
     return ctx
 
 
-@role_required('admin', 'super_admin')
+@role_required('admin', 'super_admin', 'health_officer')
 def system_logs_view(request):
     system_logs = list(SystemLog.objects.order_by('-created_at')[:100])
     audit_logs = list(AuditLog.objects.order_by('-created_at')[:100])
@@ -364,7 +371,7 @@ def api_alerts_aptas(request):
     })
 
 
-@role_required('admin', 'super_admin')
+@role_required('admin', 'super_admin', 'health_officer')
 def outbreak_thresholds_view(request):
     from myapp.models import OutbreakThreshold
     

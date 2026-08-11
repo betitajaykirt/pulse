@@ -1,5 +1,5 @@
 {% extends "dashboard/base_dashboard.html" %}
-{% block page_title %}Admin Dashboard{% endblock %}
+{% block page_title %}{% if can_manage_users %}Admin Dashboard{% else %}Health Officer Dashboard{% endif %}{% endblock %}
 {% block content %}
 <div class="pulse-page dash-home">
 
@@ -7,7 +7,7 @@
     <div class="dash-hero__text">
       <span class="pulse-eyebrow">Overview</span>
       <h2>Welcome back, {{ session_full_name|truncatewords:1 }}</h2>
-      <p>Administrator — Bago City Health Office</p>
+      <p>{{ dashboard_subtitle|default:"Administrator — Bago City Health Office" }}</p>
     </div>
     <span class="dash-hero__date pill-badge badge-info">
       <i data-lucide="calendar" class="lucide-icon lucide-icon--xs"></i>
@@ -152,8 +152,9 @@
   </section>
 
   <section class="dash-section">
-    <h3 class="dash-section__title">System Administration</h3>
+    <h3 class="dash-section__title">{% if can_manage_users %}System Administration{% else %}Reports &amp; Oversight{% endif %}</h3>
     <div class="dash-widget-grid">
+      {% if can_manage_users %}
       <a href="{% url 'users_index' %}" class="dash-widget-card">
         <div class="dash-widget-card__head">
           <div class="dash-widget-card__icon dash-widget-card__icon--primary"><i data-lucide="users" class="lucide-icon lucide-icon--sm"></i></div>
@@ -163,6 +164,7 @@
         <p>Manage accounts, roles, and access levels</p>
         <span class="dash-widget-card__link">Open <i data-lucide="arrow-right" class="lucide-icon lucide-icon--xs"></i></span>
       </a>
+      {% endif %}
       <a href="{% url 'incident_reports' %}" class="dash-widget-card">
         <div class="dash-widget-card__head">
           <div class="dash-widget-card__icon dash-widget-card__icon--teal"><i data-lucide="file-text" class="lucide-icon lucide-icon--sm"></i></div>

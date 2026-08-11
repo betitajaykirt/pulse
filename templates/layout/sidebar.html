@@ -21,7 +21,7 @@
       <span>Dashboard</span>
     </a>
 
-    {% if session_role == 'super_admin' or session_role == 'admin' %}
+    {% if session_role == 'super_admin' or session_role == 'admin' or session_role == 'health_officer' %}
     <div class="nav-section-label">Administration</div>
     {% if session_role == 'super_admin' %}
     <a href="{% url 'users_index' %}" class="nav-item {% if 'users' in request.path %}active{% endif %}">
@@ -29,10 +29,12 @@
       <span>Admin Management</span>
     </a>
     {% endif %}
+    {% if session_role == 'admin' or session_role == 'super_admin' %}
     <a href="{% url 'users_index' %}" class="nav-item {% if 'users' in request.path %}active{% endif %}">
       <span class="nav-icon"><i data-lucide="users" class="lucide-icon lucide-icon--sm"></i></span>
       <span>Users</span>
     </a>
+    {% endif %}
     {% if session_role == 'super_admin' %}
     <a href="{% url 'system_logs' %}" class="nav-item {% if 'logs' in request.path %}active{% endif %}">
       <span class="nav-icon"><i data-lucide="settings" class="lucide-icon lucide-icon--sm"></i></span>
@@ -81,7 +83,7 @@
     </a>
     {% endif %}
 
-    {% if session_role == 'surveillance_officer' or session_role == 'admin' or session_role == 'super_admin' or session_role == 'catchment_nurse' %}
+    {% if session_role == 'surveillance_officer' or session_role == 'admin' or session_role == 'super_admin' or session_role == 'catchment_nurse' or session_role == 'health_officer' %}
     <div class="nav-section-label">Analysis</div>
     {% if session_role == 'catchment_nurse' %}
     <a href="{% url 'nurse_analytics' %}" class="nav-item {% if 'analytics' in request.path %}active{% endif %}">
@@ -102,7 +104,7 @@
     {% endif %}
     {% endif %}
 
-    {% if session_role == 'health_officer' or session_role == 'encoder' or session_role == 'barangay_health_worker' or session_role == 'catchment_nurse' %}
+    {% if session_role == 'encoder' or session_role == 'barangay_health_worker' or session_role == 'catchment_nurse' %}
     <div class="nav-section-label">Data Entry</div>
     <a href="{% url 'submit_report' %}" class="nav-item {% if 'submit' in request.path %}active{% endif %}">
       <span class="nav-icon"><i data-lucide="file-plus" class="lucide-icon lucide-icon--sm"></i></span>
@@ -114,7 +116,7 @@
     </a>
     {% endif %}
 
-    {% if session_role == 'admin' or session_role == 'super_admin' %}
+    {% if session_role == 'admin' or session_role == 'super_admin' or session_role == 'health_officer' %}
     <div class="nav-section-label">Reports</div>
     <a href="{% url 'incident_reports' %}" class="nav-item {% if 'incidents' in request.path %}active{% endif %}">
       <span class="nav-icon"><i data-lucide="file-text" class="lucide-icon lucide-icon--sm"></i></span>

@@ -519,7 +519,7 @@ def _perform_case_confirmation(
     return threshold_result
 
 
-@role_required('admin', 'super_admin')
+@role_required('admin', 'super_admin', 'health_officer')
 def admin_confirmation_panel(request):
     """Dedicated queue for admin lab confirmation of ML-classified probable cases."""
     search = request.GET.get('search', '').strip()
@@ -743,7 +743,7 @@ def _update_barangay_risk(barangay_id):
 
 # ── Incident Reports (Admin) ──────────────────────────────────────
 
-@role_required('admin', 'super_admin', 'surveillance_officer')
+@role_required('admin', 'super_admin', 'surveillance_officer', 'health_officer')
 def incident_reports(request):
     """Generate structured health incident reports from validated data."""
     date_from = request.GET.get('date_from', '')
