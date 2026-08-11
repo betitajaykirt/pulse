@@ -75,7 +75,7 @@
       <summary>
         <i data-lucide="chevron-right" class="lucide-icon lucide-icon--xs filter-drawer__chevron"></i>
         Advanced Filters
-        <span class="pill-badge badge-info" id="analytics-filter-active" style="margin-left:.35rem;display:none;">Active</span>
+        <span class="pill-badge badge-info" id="analytics-filter-active" style="margin-left:.35rem;display:none;">Applied</span>
       </summary>
       <div class="filter-drawer__panel">
         <div class="filter-drawer__grid">
@@ -110,6 +110,7 @@
         <div class="filter-drawer__actions">
           <button type="button" id="apply-analytics-filters" class="nc-btn nc-btn--primary nc-btn--sm">Apply Filters</button>
           <button type="button" id="clear-analytics-filters" class="nc-btn nc-btn--outline nc-btn--sm">Clear</button>
+          <span class="filter-applied-note" id="analytics-filter-applied-note" style="display:none;">Filters applied</span>
         </div>
       </div>
     </details>
@@ -382,9 +383,9 @@ function updateSummary(data) {
 
 async function loadAnalytics() {
   const params = new URLSearchParams({
-    symptom_category: document.getElementById('filter-syndrome').value,
-    barangay: document.getElementById('filter-barangay').value,
-    time_range: document.getElementById('filter-time').value,
+    symptom_category: appliedAnalyticsFilters.syndrome,
+    barangay: appliedAnalyticsFilters.barangay,
+    time_range: appliedAnalyticsFilters.time_range,
   });
 
   try {
@@ -438,22 +439,56 @@ async function loadAnalytics() {
   }
 }
 
-['filter-syndrome', 'filter-barangay', 'filter-time'].forEach(function(id) {
-  var el = document.getElementById(id);
-  if (el) el.addEventListener('change', updateAnalyticsFilterState);
-});
+var appliedAnalyticsFilters = {
+  syndrome: '',
+  barangay: '',
+  time_range: 'current_year',
+};
 
-function updateAnalyticsFilterState() {
-  var syndrome = document.getElementById('filter-syndrome').value;
-  var time = document.getElementById('filter-time').value;
-  var active = Boolean(syndrome) || time !== 'current_year';
-  var badge = document.getElementById('analytics-filter-active');
-  var drawer = document.getElementById('analytics-filter-drawer');
-  if (badge) badge.style.display = active ? 'inline-flex' : 'none';
-  if (drawer && active) drawer.open = true;
+function readAnalyticsFilterControls() {
+  var barangayEl = document.getElementById('filter-barangay');
+  var barangay = '';
+  if (barangayEl && !barangayEl.disabled) {
+    barangay = barangayEl.value || '';
+  } else if (barangayEl && barangayEl.disabled) {
+    barangay = barangayEl.value || '';
+  }
+  return {
+    syndrome: document.getElementById('filter-syndrome').value,
+    barangay: barangay,
+    time_range: document.getElementById('filter-time').value,
+  };
 }
 
-document.getElementById('apply-analytics-filters').addEventListener('click', loadAnalytics);
+function hasActiveAnalyticsFilters(filters) {
+  var barangayEl = document.getElementById('filter-barangay');
+  var barangayActive = barangayEl && !barangayEl.disabled && filters.barangay;
+  return Boolean(filters.syndrome) || filters.time_range !== 'current_year' || Boolean(barangayActive);
+}
+
+function updateAnalyticsFilterState() {
+  var active = hasActiveAnalyticsFilters(appliedAnalyticsFilters);
+  var badge = document.getElementById('analytics-filter-active');
+  var note = document.getElementById('analytics-filter-applied-note');
+  if (badge) badge.style.display = active ? 'inline-flex' : 'none';
+  if (note) note.style.display = active ? 'inline' : 'none';
+}
+
+document.getElementById('apply-analytics-filters').addEventListener('click', function() {
+  appliedAnalyticsFilters = readAnalyticsFilterControls();
+  updateAnalyticsFilterState();
+  loadAnalytics();
+  var btn = document.getElementById('apply-analytics-filters');
+  if (btn) {
+    var original = btn.textContent;
+    btn.textContent = 'Applied';
+    btn.disabled = true;
+    setTimeout(function() {
+      btn.textContent = original;
+      btn.disabled = false;
+    }, 1200);
+  }
+});
 
 document.getElementById('clear-analytics-filters').addEventListener('click', function() {
   document.getElementById('filter-syndrome').value = '';
@@ -462,11 +497,18 @@ document.getElementById('clear-analytics-filters').addEventListener('click', fun
   if (barangay && !barangay.disabled && barangay.options.length) {
     barangay.selectedIndex = 0;
   }
+  appliedAnalyticsFilters = readAnalyticsFilterControls();
+  appliedAnalyticsFilters.syndrome = '';
+  appliedAnalyticsFilters.time_range = 'current_year';
+  if (barangay && !barangay.disabled) {
+    appliedAnalyticsFilters.barangay = '';
+  }
   updateAnalyticsFilterState();
   loadAnalytics();
 });
 
 document.addEventListener('DOMContentLoaded', function() {
+  appliedAnalyticsFilters = readAnalyticsFilterControls();
   updateAnalyticsFilterState();
   loadAnalytics();
 });

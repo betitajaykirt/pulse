@@ -29,7 +29,7 @@
           <i data-lucide="chevron-right" class="lucide-icon lucide-icon--xs filter-drawer__chevron"></i>
           Advanced Filters
           {% if date_from or date_to or syndrome or barangay %}
-            <span class="pill-badge badge-info" style="margin-left:.35rem;">Active</span>
+            <span class="pill-badge badge-info" style="margin-left:.35rem;">Applied</span>
           {% endif %}
         </summary>
         <div class="filter-drawer__panel">
@@ -58,8 +58,11 @@
             </div>
           </div>
           <div class="filter-drawer__actions">
-            <button type="submit" class="nc-btn nc-btn--primary nc-btn--sm">Generate Report</button>
+            <button type="submit" class="nc-btn nc-btn--primary nc-btn--sm">Apply Filters</button>
             <a href="{% url 'incident_reports' %}" class="nc-btn nc-btn--outline nc-btn--sm">Clear</a>
+            {% if date_from or date_to or syndrome or barangay %}
+            <span class="filter-applied-note">Filters applied</span>
+            {% endif %}
           </div>
         </div>
       </details>

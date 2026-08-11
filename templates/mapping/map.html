@@ -137,109 +137,87 @@
         <summary>
           <i data-lucide="chevron-right" class="lucide-icon lucide-icon--xs filter-drawer__chevron"></i>
           Advanced Filters
-          <span class="pill-badge badge-info" id="map-filter-active" style="margin-left:.35rem;display:none;">Active</span>
+          <span class="pill-badge badge-info" id="map-filter-active" style="margin-left:.35rem;display:none;">Applied</span>
         </summary>
 
         <div class="filter-drawer__panel">
 
-          <div class="filter-drawer__grid">
+          <div class="filter-drawer__grid map-filter-grid">
 
-      {% if user_role == 'admin' or user_role == 'super_admin' or user_role == 'surveillance_officer' %}
+            {% if user_role == 'admin' or user_role == 'super_admin' or user_role == 'surveillance_officer' %}
 
             <div class="form-group">
               <label for="filter-barangay">Barangay</label>
-      <select id="filter-barangay" class="input-soft input-soft--plain" onchange="onBarangayFilterChange()">
-
-        <option value="">All Barangays</option>
-
-        {% for b in barangays %}<option value="{{ b.barangay_name }}">{{ b.barangay_name }}</option>{% endfor %}
-
-      </select>
+              <select id="filter-barangay" class="input-soft input-soft--plain">
+                <option value="">All Barangays</option>
+                {% for b in barangays %}<option value="{{ b.barangay_name }}">{{ b.barangay_name }}</option>{% endfor %}
+              </select>
             </div>
 
             <div class="form-group">
               <label for="filter-disease">Disease</label>
-      <select id="filter-disease" class="input-soft input-soft--plain" onchange="loadMapData(false)">
-
-        {% for value, label in disease_choices %}
-
-        <option value="{{ value }}">{{ label }}</option>
-
-        {% endfor %}
-
-      </select>
+              <select id="filter-disease" class="input-soft input-soft--plain">
+                {% for value, label in disease_choices %}
+                <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+              </select>
             </div>
 
             <div class="form-group">
               <label for="filter-classif">Classification</label>
-      <select id="filter-classif" class="input-soft input-soft--plain" onchange="loadMapData(false)">
-
-        <option value="">All Classifications</option>
-
-        <option value="suspected">Suspected</option>
-
-        <option value="probable">Probable</option>
-
-        <option value="confirmed">Confirmed</option>
-
-      </select>
+              <select id="filter-classif" class="input-soft input-soft--plain">
+                <option value="">All Classifications</option>
+                <option value="suspected">Suspected</option>
+                <option value="probable">Probable</option>
+                <option value="confirmed">Confirmed</option>
+              </select>
             </div>
 
-      {% elif barangay_scoped and user_barangay %}
+            {% elif barangay_scoped and user_barangay %}
 
             <div class="form-group">
               <label for="filter-barangay">Barangay</label>
-      <select id="filter-barangay" class="input-soft input-soft--plain" disabled
-        aria-label="Assigned barangay (locked)">
-
-        <option value="{{ user_barangay }}" selected>{{ user_barangay }}</option>
-
-      </select>
+              <select id="filter-barangay" class="input-soft input-soft--plain" disabled aria-label="Assigned barangay (locked)">
+                <option value="{{ user_barangay }}" selected>{{ user_barangay }}</option>
+              </select>
             </div>
 
             <div class="form-group">
               <label for="filter-disease">Disease</label>
-      <select id="filter-disease" class="input-soft input-soft--plain" onchange="loadMapData(false)">
-
-        {% for value, label in disease_choices %}
-
-        <option value="{{ value }}">{{ label }}</option>
-
-        {% endfor %}
-
-      </select>
+              <select id="filter-disease" class="input-soft input-soft--plain">
+                {% for value, label in disease_choices %}
+                <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+              </select>
             </div>
 
             <div class="form-group">
               <label for="filter-classif">Classification</label>
-      <select id="filter-classif" class="input-soft input-soft--plain" onchange="loadMapData(false)">
-
-        <option value="">All Classifications</option>
-
-        <option value="suspected">Suspected</option>
-
-        <option value="probable">Probable</option>
-
-        <option value="confirmed">Confirmed</option>
-
-      </select>
+              <select id="filter-classif" class="input-soft input-soft--plain">
+                <option value="">All Classifications</option>
+                <option value="suspected">Suspected</option>
+                <option value="probable">Probable</option>
+                <option value="confirmed">Confirmed</option>
+              </select>
             </div>
 
-      {% endif %}
+            {% endif %}
 
             <div class="form-group">
               <label for="filter-disease-category">Disease Category</label>
-      <select id="filter-disease-category" class="input-soft input-soft--plain" onchange="loadMapData(false)">
-
-        {% for value, label in disease_category_choices %}
-
-        <option value="{{ value }}">{% if not value %}{{ label }}{% else %}{{ label }}{% endif %}</option>
-
-        {% endfor %}
-
-      </select>
+              <select id="filter-disease-category" class="input-soft input-soft--plain">
+                {% for value, label in disease_category_choices %}
+                <option value="{{ value }}">{% if not value %}{{ label }}{% else %}{{ label }}{% endif %}</option>
+                {% endfor %}
+              </select>
             </div>
 
+          </div>
+
+          <div class="filter-drawer__actions">
+            <button type="button" id="apply-map-filters" class="nc-btn nc-btn--primary nc-btn--sm">Apply Filters</button>
+            <button type="button" id="clear-map-filters" class="nc-btn nc-btn--outline nc-btn--sm">Clear</button>
+            <span class="map-filter-applied-note filter-applied-note" id="map-filter-applied-note" style="display:none;">Filters applied</span>
           </div>
 
         </div>
@@ -747,6 +725,16 @@
 
       boundaryApi.selectBarangay(barangayParam, { silent: true });
 
+      mapAppliedFilters = readAdvancedFilterControls();
+
+      updateMapFilterState();
+
+      var drawer = document.getElementById('map-filter-drawer');
+
+      if (drawer && hasActiveMapFilters(mapAppliedFilters)) drawer.open = true;
+
+      loadMapData(false);
+
     }
 
 
@@ -767,19 +755,55 @@
 
 
 
-    function onBarangayFilterChange() {
+    var mapAppliedFilters = {
+      barangay: '',
+      disease: '',
+      classif: '',
+      diseaseCategory: '',
+    };
 
-      var filterSelect = document.getElementById('filter-barangay');
 
-      var value = filterSelect ? filterSelect.value : '';
 
-      selectedBarangayName = value || null;
+    function readAdvancedFilterControls() {
+
+      var barangayEl = document.getElementById('filter-barangay');
+
+      var barangay = '';
+
+      if (barangayEl && !barangayEl.disabled) {
+
+        barangay = barangayEl.value || '';
+
+      }
+
+      return {
+        barangay: barangay,
+        disease: (document.getElementById('filter-disease') || {}).value || '',
+        classif: (document.getElementById('filter-classif') || {}).value || '',
+        diseaseCategory: (document.getElementById('filter-disease-category') || {}).value || '',
+      };
+
+    }
+
+
+
+    function hasActiveMapFilters(filters) {
+
+      return !!(filters.barangay || filters.disease || filters.classif || filters.diseaseCategory);
+
+    }
+
+
+
+    function syncMapBoundarySelection(barangayValue) {
+
+      selectedBarangayName = barangayValue || null;
 
       if (boundaryApi) {
 
-        if (value) {
+        if (barangayValue) {
 
-          boundaryApi.selectBarangay(value, { silent: true });
+          boundaryApi.selectBarangay(barangayValue, { silent: true });
 
         } else {
 
@@ -789,11 +813,101 @@
 
       }
 
+    }
+
+
+
+    function updateMapFilterState() {
+
+      var active = hasActiveMapFilters(mapAppliedFilters);
+
+      var badge = document.getElementById('map-filter-active');
+
+      var note = document.getElementById('map-filter-applied-note');
+
+      if (badge) badge.style.display = active ? 'inline-flex' : 'none';
+
+      if (note) note.style.display = active ? 'inline' : 'none';
+
+    }
+
+
+
+    function applyMapFilters() {
+
+      mapAppliedFilters = readAdvancedFilterControls();
+
+      syncMapBoundarySelection(mapAppliedFilters.barangay);
+
+      updateMapFilterState();
+
+      loadMapData(false);
+
+      var btn = document.getElementById('apply-map-filters');
+
+      if (btn) {
+
+        var original = btn.textContent;
+
+        btn.textContent = 'Applied';
+
+        btn.disabled = true;
+
+        setTimeout(function () {
+
+          btn.textContent = original;
+
+          btn.disabled = false;
+
+        }, 1200);
+
+      }
+
+    }
+
+
+
+    function clearMapFilters() {
+
+      var barangayEl = document.getElementById('filter-barangay');
+
+      var diseaseEl = document.getElementById('filter-disease');
+
+      var classifEl = document.getElementById('filter-classif');
+
+      var categoryEl = document.getElementById('filter-disease-category');
+
+      if (barangayEl && !barangayEl.disabled) barangayEl.value = '';
+
+      if (diseaseEl) diseaseEl.value = '';
+
+      if (classifEl) classifEl.value = '';
+
+      if (categoryEl) categoryEl.value = '';
+
+      mapAppliedFilters = { barangay: '', disease: '', classif: '', diseaseCategory: '' };
+
+      syncMapBoundarySelection('');
+
+      updateMapFilterState();
+
       loadMapData(false);
 
     }
 
+
+
+    function onBarangayFilterChange() {
+
+      applyMapFilters();
+
+    }
+
     window.onBarangayFilterChange = onBarangayFilterChange;
+
+    window.applyMapFilters = applyMapFilters;
+
+    window.clearMapFilters = clearMapFilters;
 
 
 
@@ -1696,53 +1810,19 @@
 
 
 
-    function updateMapFilterState() {
-
-      var disease = document.getElementById('filter-disease');
-
-      var classif = document.getElementById('filter-classif');
-
-      var category = document.getElementById('filter-disease-category');
-
-      var barangay = document.getElementById('filter-barangay');
-
-      var active = false;
-
-      if (disease && disease.value) active = true;
-
-      if (classif && classif.value) active = true;
-
-      if (category && category.value) active = true;
-
-      if (barangay && !barangay.disabled && barangay.value) active = true;
-
-      var badge = document.getElementById('map-filter-active');
-
-      var drawer = document.getElementById('map-filter-drawer');
-
-      if (badge) badge.style.display = active ? 'inline-flex' : 'none';
-
-      if (drawer && active) drawer.open = true;
-
-    }
-
-
-
     function loadMapData(reloadBoundaries) {
-
-      updateMapFilterState();
 
       const requestId = ++mapDataRequestId;
 
       const time = document.getElementById('filter-time').value;
 
-      const barangayF = document.getElementById('filter-barangay') ? document.getElementById('filter-barangay').value : '';
+      const barangayF = mapAppliedFilters.barangay || '';
 
-      const diseaseF = document.getElementById('filter-disease') ? document.getElementById('filter-disease').value : '';
+      const diseaseF = mapAppliedFilters.disease || '';
 
-      const diseaseCategoryF = document.getElementById('filter-disease-category') ? document.getElementById('filter-disease-category').value : '';
+      const diseaseCategoryF = mapAppliedFilters.diseaseCategory || '';
 
-      const classifF = document.getElementById('filter-classif') ? document.getElementById('filter-classif').value : '';
+      const classifF = mapAppliedFilters.classif || '';
 
       const casesUrl = "{% url 'api_cases' %}";
 
@@ -1808,7 +1888,9 @@
 
     window.loadMapData = loadMapData;
 
+    document.getElementById('apply-map-filters').addEventListener('click', applyMapFilters);
 
+    document.getElementById('clear-map-filters').addEventListener('click', clearMapFilters);
 
     loadMapData(true);
 
