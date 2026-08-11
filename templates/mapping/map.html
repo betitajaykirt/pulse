@@ -142,11 +142,11 @@
 
       </select>
 
-      <select id="filter-syndrome" class="input-soft input-soft--plain" onchange="loadMapData(false)">
+      <select id="filter-disease" class="input-soft input-soft--plain" onchange="loadMapData(false)">
 
-        {% for value, label in symptom_category_choices %}
+        {% for value, label in disease_choices %}
 
-        <option value="{{ value }}">{% if not value %}All Syndromes{% else %}{{ label }}{% endif %}</option>
+        <option value="{{ value }}">{{ label }}</option>
 
         {% endfor %}
 
@@ -1620,7 +1620,7 @@
 
       const barangayF = document.getElementById('filter-barangay') ? document.getElementById('filter-barangay').value : '';
 
-      const syndromeF = document.getElementById('filter-syndrome') ? document.getElementById('filter-syndrome').value : '';
+      const diseaseF = document.getElementById('filter-disease') ? document.getElementById('filter-disease').value : '';
 
       const diseaseCategoryF = document.getElementById('filter-disease-category') ? document.getElementById('filter-disease-category').value : '';
 
@@ -1634,7 +1634,7 @@
 
       if (barangayF) params.set('barangay', barangayF);
 
-      if (syndromeF) params.set('symptom_category', syndromeF);
+      if (diseaseF) params.set('disease', diseaseF);
 
       if (diseaseCategoryF) params.set('disease_category', diseaseCategoryF);
 

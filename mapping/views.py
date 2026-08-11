@@ -7,8 +7,8 @@ from django.utils import timezone
 from datetime import timedelta
 from accounts.auth_utils import login_required
 from myapp.models import (
-    Barangay, User, SurveillanceReport, PatientCase, RiskAssessment,
-    SYMPTOM_CATEGORY_CHOICES, SYMPTOM_CATEGORY_CODES, BarangayEpidemicStatus,
+    Barangay, User, SurveillanceReport, RiskAssessment,
+    BarangayEpidemicStatus,
 )
 from myapp.barangay_scope import (
     is_city_wide_role, get_request_barangay, resolve_user_barangay,
@@ -23,8 +23,11 @@ from reports.ml_display import (
 from reports.aptas_service import compute_aptas_breakdown, normalize_anomaly_score
 from reports.disease_category_data import (
     DISEASE_CATEGORY_CHOICES,
+    MONITORED_DISEASE_CHOICES,
     VALID_DISEASE_CATEGORIES,
+    VALID_MONITORED_DISEASES,
     filter_surveillance_reports_by_disease_category,
+    filter_surveillance_reports_by_disease_label,
 )
 
 
@@ -142,7 +145,7 @@ def map_view(request):
             'barangays':     barangays,
             'city_wide':     is_city_wide_role(role),
             'barangay_scoped': is_barangay_scoped_role(role),
-            'symptom_category_choices': SYMPTOM_CATEGORY_CHOICES,
+            'disease_choices': MONITORED_DISEASE_CHOICES,
             'disease_category_choices': DISEASE_CATEGORY_CHOICES,
         })
     except Exception as e:
@@ -234,7 +237,7 @@ def api_barangay_data(request):
 @login_required
 def api_cases(request):
     time_range = request.GET.get('time_range', '30')
-    symptom_category = request.GET.get('symptom_category', '').strip()
+    disease_label = request.GET.get('disease', '').strip()
     disease_category = request.GET.get('disease_category', '').strip()
     barangay_name = request.GET.get('barangay', '').strip()
     case_classif = request.GET.get('case_classification', '').strip()
@@ -262,20 +265,10 @@ def api_cases(request):
     else:
         base_qs = base_qs.none()
 
-    if symptom_category:
-        if symptom_category not in SYMPTOM_CATEGORY_CODES:
-            return JsonResponse({'ok': False, 'error': 'Invalid syndrome category filter.'}, status=400)
-        filter_barangay_id = scoped_barangay.id if scoped_barangay else None
-        if barangay_name and not scoped_barangay:
-            filter_barangay_id = (
-                Barangay.objects.filter(barangay_name=barangay_name)
-                .values_list('id', flat=True).first()
-            )
-        report_ids = PatientCase.surveillance_report_ids_for_category(
-            symptom_category,
-            barangay_id=filter_barangay_id,
-        )
-        base_qs = base_qs.filter(id__in=report_ids)
+    if disease_label:
+        if disease_label not in VALID_MONITORED_DISEASES:
+            return JsonResponse({'ok': False, 'error': 'Invalid disease filter.'}, status=400)
+        base_qs = filter_surveillance_reports_by_disease_label(base_qs, disease_label)
 
     if disease_category:
         if disease_category not in VALID_DISEASE_CATEGORIES:

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from django.db.models import Q
 
-from reports.pidsr_schema import LEGACY_DISEASE_LABEL_MAP, normalize_disease_label
+from reports.pidsr_schema import LEGACY_DISEASE_LABEL_MAP, DISEASE_LABELS, normalize_disease_label
 
 DISEASE_CATEGORY_CHOICES = [
     ('', 'All Disease Categories'),
@@ -17,6 +17,12 @@ DISEASE_CATEGORY_CHOICES = [
 VALID_DISEASE_CATEGORIES = frozenset(
     value for value, _ in DISEASE_CATEGORY_CHOICES if value
 )
+
+MONITORED_DISEASE_CHOICES = [('', 'All Diseases')] + [
+    (label, label) for label in DISEASE_LABELS
+]
+
+VALID_MONITORED_DISEASES = frozenset(DISEASE_LABELS)
 
 # Monitored + legacy labels grouped by transmission route
 CATEGORY_DISEASE_LABELS: dict[str, tuple[str, ...]] = {
@@ -112,6 +118,37 @@ def disease_category_filter_q(disease_category: str) -> Q:
 def filter_surveillance_reports_by_disease_category(qs, disease_category: str):
     """Filter a ``SurveillanceReport`` queryset by transmission category."""
     clause = disease_category_filter_q(disease_category)
+    if not clause:
+        return qs
+    return qs.filter(clause).distinct()
+
+
+def _legacy_aliases_for_disease(canonical_label: str) -> tuple[str, ...]:
+    """Return legacy syndrome labels that map to the canonical PIDSR disease."""
+    aliases: set[str] = set()
+    canonical = normalize_disease_label(canonical_label)
+    for legacy, mapped in LEGACY_DISEASE_LABEL_MAP.items():
+        if mapped == canonical:
+            aliases.add(legacy)
+    return tuple(aliases)
+
+
+def disease_label_filter_q(disease_label: str) -> Q:
+    """Build a queryset ``Q`` object for a single monitored disease."""
+    label = (disease_label or '').strip()
+    if not label or label not in VALID_MONITORED_DISEASES:
+        return Q()
+
+    canonical = normalize_disease_label(label)
+    combined = Q()
+    for match_label in (canonical, *_legacy_aliases_for_disease(canonical)):
+        combined |= _disease_label_match_q(match_label)
+    return combined
+
+
+def filter_surveillance_reports_by_disease_label(qs, disease_label: str):
+    """Filter a ``SurveillanceReport`` queryset by monitored disease label."""
+    clause = disease_label_filter_q(disease_label)
     if not clause:
         return qs
     return qs.filter(clause).distinct()
