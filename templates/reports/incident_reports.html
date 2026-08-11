@@ -24,31 +24,45 @@
 
   <div class="pulse-panel">
     <form method="GET" action="{% url 'incident_reports' %}">
-      <div class="pulse-form-grid" style="grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); align-items:end;">
-        <div class="form-group" style="margin:0;">
-          <label for="date-from">Date From</label>
-          <input type="text" id="date-from" name="date_from" class="input-soft input-soft--plain date-input-md" value="{{ date_from }}" placeholder="mm/dd/yyyy">
+      <details class="filter-drawer" {% if date_from or date_to or syndrome or barangay %}open{% endif %}>
+        <summary>
+          <i data-lucide="chevron-right" class="lucide-icon lucide-icon--xs filter-drawer__chevron"></i>
+          Advanced Filters
+          {% if date_from or date_to or syndrome or barangay %}
+            <span class="pill-badge badge-info" style="margin-left:.35rem;">Active</span>
+          {% endif %}
+        </summary>
+        <div class="filter-drawer__panel">
+          <div class="filter-drawer__grid">
+            <div class="form-group">
+              <label for="date-from">Date From</label>
+              <input type="text" id="date-from" name="date_from" class="input-soft input-soft--plain date-input-md" value="{{ date_from }}" placeholder="mm/dd/yyyy">
+            </div>
+            <div class="form-group">
+              <label for="date-to">Date To</label>
+              <input type="text" id="date-to" name="date_to" class="input-soft input-soft--plain date-input-md" value="{{ date_to }}" placeholder="mm/dd/yyyy">
+            </div>
+            <div class="form-group">
+              <label for="filter-syndrome">Disease</label>
+              <select id="filter-syndrome" name="syndrome" class="input-soft input-soft--plain">
+                <option value="">All Diseases</option>
+                {% for s in syndrome_types %}<option value="{{ s }}" {% if syndrome == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="filter-barangay">Barangay</label>
+              <select id="filter-barangay" name="barangay" class="input-soft input-soft--plain">
+                <option value="">All Barangays</option>
+                {% for b in barangays %}<option value="{{ b.id }}" {% if barangay == b.id|stringformat:"s" %}selected{% endif %}>{{ b.barangay_name }}</option>{% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="filter-drawer__actions">
+            <button type="submit" class="nc-btn nc-btn--primary nc-btn--sm">Generate Report</button>
+            <a href="{% url 'incident_reports' %}" class="nc-btn nc-btn--outline nc-btn--sm">Clear</a>
+          </div>
         </div>
-        <div class="form-group" style="margin:0;">
-          <label for="date-to">Date To</label>
-          <input type="text" id="date-to" name="date_to" class="input-soft input-soft--plain date-input-md" value="{{ date_to }}" placeholder="mm/dd/yyyy">
-        </div>
-        <div class="form-group" style="margin:0;">
-          <label for="filter-syndrome">Disease</label>
-          <select id="filter-syndrome" name="syndrome" class="input-soft input-soft--plain">
-            <option value="">All Diseases</option>
-            {% for s in syndrome_types %}<option value="{{ s }}" {% if syndrome == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
-          </select>
-        </div>
-        <div class="form-group" style="margin:0;">
-          <label for="filter-barangay">Barangay</label>
-          <select id="filter-barangay" name="barangay" class="input-soft input-soft--plain">
-            <option value="">All Barangays</option>
-            {% for b in barangays %}<option value="{{ b.id }}" {% if barangay == b.id|stringformat:"s" %}selected{% endif %}>{{ b.barangay_name }}</option>{% endfor %}
-          </select>
-        </div>
-        <button type="submit" class="nc-btn nc-btn--primary">Generate</button>
-      </div>
+      </details>
     </form>
   </div>
 

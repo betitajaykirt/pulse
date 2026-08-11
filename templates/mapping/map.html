@@ -122,7 +122,7 @@
 
     <div class="map-controls">
 
-      <select id="filter-time" class="input-soft input-soft--plain">
+      <select id="filter-time" class="input-soft input-soft--plain" onchange="loadMapData(false)">
 
         <option value="7">Last 7 days</option>
 
@@ -132,8 +132,22 @@
 
       </select>
 
+      <details class="filter-drawer map-filter-drawer" id="map-filter-drawer" style="margin-bottom:0;">
+
+        <summary>
+          <i data-lucide="chevron-right" class="lucide-icon lucide-icon--xs filter-drawer__chevron"></i>
+          Advanced Filters
+          <span class="pill-badge badge-info" id="map-filter-active" style="margin-left:.35rem;display:none;">Active</span>
+        </summary>
+
+        <div class="filter-drawer__panel">
+
+          <div class="filter-drawer__grid">
+
       {% if user_role == 'admin' or user_role == 'super_admin' or user_role == 'surveillance_officer' %}
 
+            <div class="form-group">
+              <label for="filter-barangay">Barangay</label>
       <select id="filter-barangay" class="input-soft input-soft--plain" onchange="onBarangayFilterChange()">
 
         <option value="">All Barangays</option>
@@ -141,7 +155,10 @@
         {% for b in barangays %}<option value="{{ b.barangay_name }}">{{ b.barangay_name }}</option>{% endfor %}
 
       </select>
+            </div>
 
+            <div class="form-group">
+              <label for="filter-disease">Disease</label>
       <select id="filter-disease" class="input-soft input-soft--plain" onchange="loadMapData(false)">
 
         {% for value, label in disease_choices %}
@@ -151,7 +168,10 @@
         {% endfor %}
 
       </select>
+            </div>
 
+            <div class="form-group">
+              <label for="filter-classif">Classification</label>
       <select id="filter-classif" class="input-soft input-soft--plain" onchange="loadMapData(false)">
 
         <option value="">All Classifications</option>
@@ -163,18 +183,52 @@
         <option value="confirmed">Confirmed</option>
 
       </select>
+            </div>
 
       {% elif barangay_scoped and user_barangay %}
 
+            <div class="form-group">
+              <label for="filter-barangay">Barangay</label>
       <select id="filter-barangay" class="input-soft input-soft--plain" disabled
         aria-label="Assigned barangay (locked)">
 
         <option value="{{ user_barangay }}" selected>{{ user_barangay }}</option>
 
       </select>
+            </div>
+
+            <div class="form-group">
+              <label for="filter-disease">Disease</label>
+      <select id="filter-disease" class="input-soft input-soft--plain" onchange="loadMapData(false)">
+
+        {% for value, label in disease_choices %}
+
+        <option value="{{ value }}">{{ label }}</option>
+
+        {% endfor %}
+
+      </select>
+            </div>
+
+            <div class="form-group">
+              <label for="filter-classif">Classification</label>
+      <select id="filter-classif" class="input-soft input-soft--plain" onchange="loadMapData(false)">
+
+        <option value="">All Classifications</option>
+
+        <option value="suspected">Suspected</option>
+
+        <option value="probable">Probable</option>
+
+        <option value="confirmed">Confirmed</option>
+
+      </select>
+            </div>
 
       {% endif %}
 
+            <div class="form-group">
+              <label for="filter-disease-category">Disease Category</label>
       <select id="filter-disease-category" class="input-soft input-soft--plain" onchange="loadMapData(false)">
 
         {% for value, label in disease_category_choices %}
@@ -184,6 +238,13 @@
         {% endfor %}
 
       </select>
+            </div>
+
+          </div>
+
+        </div>
+
+      </details>
 
       <div class="map-layer-group">
 
@@ -1635,7 +1696,41 @@
 
 
 
+    function updateMapFilterState() {
+
+      var disease = document.getElementById('filter-disease');
+
+      var classif = document.getElementById('filter-classif');
+
+      var category = document.getElementById('filter-disease-category');
+
+      var barangay = document.getElementById('filter-barangay');
+
+      var active = false;
+
+      if (disease && disease.value) active = true;
+
+      if (classif && classif.value) active = true;
+
+      if (category && category.value) active = true;
+
+      if (barangay && !barangay.disabled && barangay.value) active = true;
+
+      var badge = document.getElementById('map-filter-active');
+
+      var drawer = document.getElementById('map-filter-drawer');
+
+      if (badge) badge.style.display = active ? 'inline-flex' : 'none';
+
+      if (drawer && active) drawer.open = true;
+
+    }
+
+
+
     function loadMapData(reloadBoundaries) {
+
+      updateMapFilterState();
 
       const requestId = ++mapDataRequestId;
 

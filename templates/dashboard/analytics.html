@@ -71,27 +71,48 @@
   </div>
 
   <div class="pulse-panel" style="padding:1.5rem 1.75rem;margin-bottom:1.25rem;">
-    <div class="analytics-filters">
-      <span class="analytics-filters__label">Filters</span>
-      <select id="filter-syndrome" class="input-soft input-soft--plain" aria-label="Syndrome category" style="max-width:240px;">
-        {% for value, label in symptom_category_choices %}
-        <option value="{{ value }}">{% if not value %}All Syndromes{% else %}{{ label }}{% endif %}</option>
-        {% endfor %}
-      </select>
-      <select id="filter-barangay" class="input-soft input-soft--plain" aria-label="Barangay" style="max-width:220px;" {% if is_barangay_scoped %}disabled{% endif %}>
-        {% if not is_barangay_scoped %}
-        <option value="">All Barangays (City-wide)</option>
-        {% endif %}
-        {% for b in barangays %}
-        <option value="{{ b.id }}" selected>{{ b.barangay_name }}</option>
-        {% endfor %}
-      </select>
-      <select id="filter-time" class="input-soft input-soft--plain" aria-label="Time range" style="max-width:200px;">
-        <option value="current_year">Current Year</option>
-        <option value="last_6_months">Last 6 Months</option>
-        <option value="last_3_months">Last 3 Months (Weekly)</option>
-      </select>
-    </div>
+    <details class="filter-drawer" id="analytics-filter-drawer" style="margin-bottom:0;">
+      <summary>
+        <i data-lucide="chevron-right" class="lucide-icon lucide-icon--xs filter-drawer__chevron"></i>
+        Advanced Filters
+        <span class="pill-badge badge-info" id="analytics-filter-active" style="margin-left:.35rem;display:none;">Active</span>
+      </summary>
+      <div class="filter-drawer__panel">
+        <div class="filter-drawer__grid">
+          <div class="form-group">
+            <label for="filter-syndrome">Disease</label>
+            <select id="filter-syndrome" class="input-soft input-soft--plain" aria-label="Disease">
+              {% for value, label in symptom_category_choices %}
+              <option value="{{ value }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="filter-barangay">Barangay</label>
+            <select id="filter-barangay" class="input-soft input-soft--plain" aria-label="Barangay" {% if is_barangay_scoped %}disabled{% endif %}>
+              {% if not is_barangay_scoped %}
+              <option value="">All Barangays (City-wide)</option>
+              {% endif %}
+              {% for b in barangays %}
+              <option value="{{ b.id }}" selected>{{ b.barangay_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="filter-time">Time Range</label>
+            <select id="filter-time" class="input-soft input-soft--plain" aria-label="Time range">
+              <option value="current_year">Current Year</option>
+              <option value="last_6_months">Last 6 Months</option>
+              <option value="last_3_months">Last 3 Months (Weekly)</option>
+            </select>
+          </div>
+        </div>
+        <div class="filter-drawer__actions">
+          <button type="button" id="apply-analytics-filters" class="nc-btn nc-btn--primary nc-btn--sm">Apply Filters</button>
+          <button type="button" id="clear-analytics-filters" class="nc-btn nc-btn--outline nc-btn--sm">Clear</button>
+        </div>
+      </div>
+    </details>
   </div>
 
   <div class="row g-3">
@@ -418,9 +439,36 @@ async function loadAnalytics() {
 }
 
 ['filter-syndrome', 'filter-barangay', 'filter-time'].forEach(function(id) {
-  document.getElementById(id).addEventListener('change', loadAnalytics);
+  var el = document.getElementById(id);
+  if (el) el.addEventListener('change', updateAnalyticsFilterState);
 });
 
-document.addEventListener('DOMContentLoaded', loadAnalytics);
+function updateAnalyticsFilterState() {
+  var syndrome = document.getElementById('filter-syndrome').value;
+  var time = document.getElementById('filter-time').value;
+  var active = Boolean(syndrome) || time !== 'current_year';
+  var badge = document.getElementById('analytics-filter-active');
+  var drawer = document.getElementById('analytics-filter-drawer');
+  if (badge) badge.style.display = active ? 'inline-flex' : 'none';
+  if (drawer && active) drawer.open = true;
+}
+
+document.getElementById('apply-analytics-filters').addEventListener('click', loadAnalytics);
+
+document.getElementById('clear-analytics-filters').addEventListener('click', function() {
+  document.getElementById('filter-syndrome').value = '';
+  document.getElementById('filter-time').value = 'current_year';
+  var barangay = document.getElementById('filter-barangay');
+  if (barangay && !barangay.disabled && barangay.options.length) {
+    barangay.selectedIndex = 0;
+  }
+  updateAnalyticsFilterState();
+  loadAnalytics();
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+  updateAnalyticsFilterState();
+  loadAnalytics();
+});
 </script>
 {% endblock %}
