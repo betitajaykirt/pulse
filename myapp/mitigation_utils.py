@@ -26,8 +26,13 @@ PRIORITY_TIER_MAP = {
 
 def normalize_disease_label(disease_label: str) -> str:
     if not disease_label:
-        return ''
-    label = disease_label.strip()
+        return 'Unknown'
+    label = str(disease_label).strip()
+    cleaned = label.lower()
+    
+    if cleaned in ('dengue', 'dengue fever'):
+        return 'Dengue Fever'
+        
     return DISEASE_LABEL_ALIASES.get(label, label)
 
 

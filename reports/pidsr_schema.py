@@ -298,5 +298,12 @@ def normalize_symptom_codes(codes: Sequence[str]) -> list[str]:
 
 
 def normalize_disease_label(label: str) -> str:
-    text = (label or '').strip()
+    if not label:
+        return 'Unknown'
+    text = str(label).strip()
+    cleaned = text.lower()
+    
+    if cleaned in ('dengue', 'dengue fever'):
+        return 'Dengue Fever'
+        
     return LEGACY_DISEASE_LABEL_MAP.get(text, text)
