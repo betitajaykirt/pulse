@@ -14,6 +14,7 @@ from myapp.models import (
     BarangayEpidemicStatus, OutbreakThresholdLog,
 )
 from myapp.threshold_data import resolve_pidsr_category
+from reports.pidsr_schema import normalize_disease_label
 from reports.risk_service import trigger_threshold_outbreak_alert
 
 
@@ -92,15 +93,16 @@ def evaluate_confirmed_thresholds(
     # Check for specific disease threshold first
     from myapp.models import OutbreakThreshold
     if disease_label:
+        normalized_label = normalize_disease_label(disease_label)
         specific_threshold = OutbreakThreshold.objects.filter(
-            disease_label__iexact=disease_label,
+            disease_label__iexact=normalized_label,
             is_active=True
         ).first()
 
         if specific_threshold:
             confirmed_count = _count_confirmed_cases(
                 barangay,
-                disease_label=disease_label,
+                disease_label=normalized_label,
                 window_days=specific_threshold.rolling_window_days,
             )
             
@@ -121,7 +123,7 @@ def evaluate_confirmed_thresholds(
                 'warning_threshold': specific_threshold.case_threshold,
                 'outbreak_threshold': specific_threshold.case_threshold,
                 'time_window_days': specific_threshold.rolling_window_days,
-                'disease_label': disease_label,
+                'disease_label': normalized_label,
                 'barangay_id': barangay.id,
                 'barangay_name': barangay.barangay_name,
             }

@@ -198,6 +198,25 @@ def alerts_inbox_view(request):
     return render(request, 'dashboard/alerts_inbox.html', ctx)
 
 
+def get_dynamic_disease_choices():
+    from myapp.models import SurveillanceReport
+    from reports.pidsr_schema import normalize_disease_label
+    
+    raw_diseases = SurveillanceReport.objects.exclude(
+        syndrome_type__in=['', 'Inconclusive', 'Unclassified']
+    ).values_list('syndrome_type', flat=True).distinct()
+    
+    disease_set = set()
+    for d in raw_diseases:
+        if d:
+            norm = normalize_disease_label(d)
+            lower_norm = norm.lower()
+            if 'insufficient data' not in lower_norm and 'pending' not in lower_norm and 'inconclusive' not in lower_norm and 'unclassified' not in lower_norm:
+                disease_set.add(norm)
+                
+    return [('', 'All Diseases')] + [(d, d) for d in sorted(disease_set)]
+
+
 @role_required('surveillance_officer', 'admin', 'super_admin', 'health_officer')
 def analytics_view(request):
     barangays = get_barangay_options()
@@ -206,7 +225,7 @@ def analytics_view(request):
     user_id = request.session.get('user_id')
     ctx = _get_stats(role, user_id)
     ctx.update({
-        'symptom_category_choices': SYNDROME_CATEGORY_OPTIONS,
+        'symptom_category_choices': get_dynamic_disease_choices(),
         'barangays': barangays,
     })
     
@@ -225,7 +244,7 @@ def nurse_analytics_view(request):
     
     ctx = _get_stats('catchment_nurse', user_id)
     ctx.update({
-        'symptom_category_choices': SYNDROME_CATEGORY_OPTIONS,
+        'symptom_category_choices': get_dynamic_disease_choices(),
         'barangays': [barangay] if barangay else [],
         'is_barangay_scoped': True,
     })
@@ -379,9 +398,17 @@ def outbreak_thresholds_view(request):
                     )
         return redirect('outbreak_thresholds')
 
-    thresholds = OutbreakThreshold.objects.all().order_by('disease_label')
+    from myapp.threshold_data import outbreak_threshold_display_order
+    from reports.pidsr_schema import DISEASE_LABELS
+
+    order = {label: idx for idx, label in enumerate(outbreak_threshold_display_order())}
+    thresholds = sorted(
+        OutbreakThreshold.objects.filter(disease_label__in=DISEASE_LABELS),
+        key=lambda t: order.get(t.disease_label, 999),
+    )
     return render(request, 'dashboard/outbreak_thresholds.html', {
         'thresholds': thresholds,
+        'monitored_diseases': DISEASE_LABELS,
     })
 
 

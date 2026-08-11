@@ -17,10 +17,14 @@ if __name__ == '__main__':
 
     from myapp.symptom_data import seed_all_symptoms
     from myapp.mitigation_data import seed_mitigation_protocols
-    from myapp.threshold_data import seed_disease_category_thresholds
+    from myapp.threshold_data import (
+        seed_disease_category_thresholds,
+        seed_outbreak_thresholds,
+    )
 
     print('=== PULSE-AI Reference Data Seed ===')
     seed_all_symptoms()
     seed_mitigation_protocols()
     seed_disease_category_thresholds()
+    seed_outbreak_thresholds()
     print('=== Seed complete ===')

@@ -2,6 +2,8 @@
 PIDSR disease → category mapping and default threshold seed data.
 """
 
+from reports.pidsr_schema import DISEASE_LABELS
+
 # Maps ML / syndrome labels to PIDSR surveillance category levels
 DISEASE_PIDSR_CATEGORY = {
     'Dengue Fever': 'Category 2',
@@ -71,3 +73,66 @@ def seed_disease_category_thresholds(verbose=True):
             f'({DiseaseCategoryThreshold.objects.count()} active configs).'
         )
     return created, updated
+
+
+# Legacy outbreak-threshold labels superseded by the 7 PIDSR disease targets
+LEGACY_OUTBREAK_LABELS = (
+    'Acute Gastroenteritis',
+    'Acute Gastroenteritis (AGE)',
+    'Dengue',
+    'Influenza-like Illness (ILI)',
+    'Respiratory Illness',
+    'Hand, Foot and Mouth Disease (HFMD)',
+)
+
+# Default per-disease outbreak thresholds (case count / rolling window days)
+DEFAULT_OUTBREAK_THRESHOLDS = [
+    {'disease_label': 'Dengue Fever', 'case_threshold': 3, 'rolling_window_days': 7},
+    {'disease_label': 'Leptospirosis', 'case_threshold': 3, 'rolling_window_days': 7},
+    {'disease_label': 'Typhoid Fever', 'case_threshold': 3, 'rolling_window_days': 7},
+    {'disease_label': 'Anthrax', 'case_threshold': 1, 'rolling_window_days': 7},
+    {'disease_label': 'Meningococcal Disease', 'case_threshold': 2, 'rolling_window_days': 7},
+    {'disease_label': 'Diarrheal Disease', 'case_threshold': 3, 'rolling_window_days': 7},
+    {
+        'disease_label': 'Hand, Foot, and Mouth Disease',
+        'case_threshold': 5,
+        'rolling_window_days': 7,
+    },
+]
+
+
+def seed_outbreak_thresholds(verbose=True):
+    """Sync disease-specific outbreak thresholds to the 7 PIDSR disease targets."""
+    from myapp.models import OutbreakThreshold
+
+    removed, _ = OutbreakThreshold.objects.filter(
+        disease_label__in=LEGACY_OUTBREAK_LABELS,
+    ).delete()
+
+    created = updated = 0
+    for row in DEFAULT_OUTBREAK_THRESHOLDS:
+        _, was_created = OutbreakThreshold.objects.update_or_create(
+            disease_label=row['disease_label'],
+            defaults={
+                'case_threshold': row['case_threshold'],
+                'rolling_window_days': row['rolling_window_days'],
+                'is_active': True,
+            },
+        )
+        if was_created:
+            created += 1
+        else:
+            updated += 1
+
+    if verbose:
+        print(
+            f'Outbreak threshold seed complete: {created} created, {updated} updated, '
+            f'{removed} legacy rows removed '
+            f'({OutbreakThreshold.objects.count()} total configs).'
+        )
+    return created, updated, removed
+
+
+def outbreak_threshold_display_order():
+    """Return disease labels in canonical PIDSR display order."""
+    return list(DISEASE_LABELS)

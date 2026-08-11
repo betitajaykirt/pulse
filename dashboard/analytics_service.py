@@ -38,13 +38,7 @@ def _age_bracket(age):
 def _apply_symptom_category_filter(qs, symptom_category=''):
     if not symptom_category:
         return qs
-    codes = SYMPTOM_CATEGORY_CODES.get(symptom_category)
-    if not codes:
-        return qs.none()
-    symptom_q = Q()
-    for code in codes:
-        symptom_q |= Q(symptoms_json__contains=f'"{code}"')
-    return qs.filter(symptom_q)
+    return qs.filter(surveillance_report__syndrome_type__icontains=symptom_category)
 
 
 def _base_queryset(symptom_category='', barangay_id='', time_range='current_year'):
@@ -235,21 +229,18 @@ def build_top_hotspots_data(qs):
 
 
 def build_summary_stats(qs, symptom_category_filter=''):
-    category_labels = dict(SYMPTOM_CATEGORY_CHOICES)
-
     if symptom_category_filter:
-        dominant_syndrome = category_labels.get(symptom_category_filter, symptom_category_filter)
+        dominant_syndrome = symptom_category_filter
     else:
-        category_counts = {cat: 0 for cat in SYMPTOM_CATEGORY_CODES}
-        for case in qs.iterator(chunk_size=500):
-            case_symptoms = set(case.symptoms_list())
-            for cat, codes in SYMPTOM_CATEGORY_CODES.items():
-                if case_symptoms & codes:
-                    category_counts[cat] += 1
-        dominant_syndrome = '—'
-        if category_counts and max(category_counts.values()) > 0:
-            top_cat = max(category_counts, key=category_counts.get)
-            dominant_syndrome = category_labels.get(top_cat, top_cat)
+        top_disease = qs.exclude(
+            Q(surveillance_report__syndrome_type__isnull=True) |
+            Q(surveillance_report__syndrome_type__exact='') |
+            Q(surveillance_report__syndrome_type__icontains='inconclusive') |
+            Q(surveillance_report__syndrome_type__icontains='unclassified') |
+            Q(surveillance_report__syndrome_type__icontains='insufficient data') |
+            Q(surveillance_report__syndrome_type__icontains='pending')
+        ).values('surveillance_report__syndrome_type').annotate(c=Count('id')).order_by('-c').first()
+        dominant_syndrome = top_disease['surveillance_report__syndrome_type'] if top_disease else '—'
 
     bracket_sex = {}
     for case in qs.iterator(chunk_size=500):

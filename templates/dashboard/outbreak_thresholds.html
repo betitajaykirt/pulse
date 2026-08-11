@@ -81,8 +81,13 @@
       <input type="hidden" name="threshold_id" id="thresholdId">
       
       <div class="form-group mb-3">
-        <label for="diseaseLabel" class="form-label">Disease Label (Exact Match)</label>
-        <input type="text" class="form-control" id="diseaseLabel" name="disease_label" required placeholder="e.g. Dengue Fever">
+        <label for="diseaseLabel" class="form-label">Disease</label>
+        <select class="form-control" id="diseaseLabel" name="disease_label" required>
+          <option value="">Select a monitored disease…</option>
+          {% for disease in monitored_diseases %}
+          <option value="{{ disease }}">{{ disease }}</option>
+          {% endfor %}
+        </select>
       </div>
       
       <div class="row mb-3">
