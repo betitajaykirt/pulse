@@ -183,46 +183,63 @@
 
 <!-- Detailed Record Viewer Modal -->
 <div id="record-modal" class="pulse-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
-  <div class="pulse-modal-content" style="background: white; border-radius: 12px; padding: 2rem; max-width: 500px; width: 90%; box-shadow: 0 10px 25px rgba(0,0,0,0.1); position: relative;">
+  <div class="pulse-modal-content" style="background: white; border-radius: 12px; padding: 2rem; max-width: 500px; width: 90%; box-shadow: 0 10px 25px rgba(0,0,0,0.1); position: relative; max-height: 90vh; overflow-y: auto;">
     <button onclick="closeRecordModal()" style="position: absolute; top: 1rem; right: 1rem; background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: #64748b;">&times;</button>
-    <h3 style="margin-top: 0; color: #0f4c81; display: flex; align-items: center; gap: 0.5rem;">
-      <i data-lucide="file-text" class="lucide-icon"></i> Record Details
-    </h3>
-    <hr style="border: 0; height: 1px; background: #e2e8f0; margin: 1rem 0;">
     
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
-      <div>
-        <small style="color: #64748b; font-weight: 600; text-transform: uppercase;">Disease</small>
-        <div id="modal-disease" style="font-weight: 500; color: #1e293b;"></div>
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+      <h3 style="margin: 0; color: #0f4c81; display: flex; align-items: center; gap: 0.5rem;">
+        <i data-lucide="file-text" class="lucide-icon"></i> Record Details
+      </h3>
+      <div style="margin-right: 2rem;">
+        <span id="modal-risk"></span>
       </div>
-      <div>
-        <small style="color: #64748b; font-weight: 600; text-transform: uppercase;">Risk Level</small>
-        <div><span id="modal-risk"></span></div>
+    </div>
+    <hr style="border: 0; height: 1px; background: #e2e8f0; margin-bottom: 1.25rem;">
+    
+    <div style="font-size: 0.875rem; color: #334155; display: flex; flex-direction: column; gap: 1rem;">
+      <!-- 1. PATIENT PROFILE CARD -->
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.75rem; padding: 1rem;">
+        <h4 style="font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0; margin-bottom: 0.5rem;">Patient Profile</h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+          <div>
+            <span style="font-size: 0.75rem; color: #64748b; display: block;">Full Name</span>
+            <span id="modal-patient-name" style="font-weight: 500; color: #1e293b;"></span>
+          </div>
+          <div>
+            <span style="font-size: 0.75rem; color: #64748b; display: block;">Age / Sex</span>
+            <span id="modal-patient-age-sex" style="font-weight: 500; color: #1e293b;"></span>
+          </div>
+          <div style="grid-column: span 2;">
+            <span style="font-size: 0.75rem; color: #64748b; display: block;">Address</span>
+            <span id="modal-patient-address" style="font-weight: 500; color: #1e293b;"></span>
+          </div>
+        </div>
       </div>
-      <div>
-        <small style="color: #64748b; font-weight: 600; text-transform: uppercase;">Barangay</small>
-        <div id="modal-barangay" style="font-weight: 500; color: #1e293b;"></div>
+
+      <!-- 2. DIAGNOSTIC & ML PREDICTION CARD -->
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.75rem; padding: 1rem;">
+        <h4 style="font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0; margin-bottom: 0.5rem;">ML Diagnostic Intelligence</h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+          <div>
+            <span style="font-size: 0.75rem; color: #64748b; display: block;">ML Top Prediction</span>
+            <span id="modal-ml-prediction" style="font-weight: 600; color: #1d4ed8;"></span>
+          </div>
+          <div>
+            <span style="font-size: 0.75rem; color: #64748b; display: block;">Model Confidence</span>
+            <span id="modal-ml-confidence" style="font-weight: 600; color: #047857;"></span>
+          </div>
+        </div>
       </div>
-      <div>
-        <small style="color: #64748b; font-weight: 600; text-transform: uppercase;">Cases</small>
-        <div id="modal-cases" style="font-weight: 500; color: #1e293b;"></div>
-      </div>
-      <div>
-        <small style="color: #64748b; font-weight: 600; text-transform: uppercase;">Classification</small>
-        <div id="modal-classification" style="font-weight: 500; color: #1e293b;"></div>
-      </div>
-      <div>
-        <small style="color: #64748b; font-weight: 600; text-transform: uppercase;">Onset Date</small>
-        <div id="modal-onset" style="font-weight: 500; color: #1e293b;"></div>
+
+      <!-- 3. SYMPTOMS & OBSERVATIONS BADGES -->
+      <div id="modal-symptoms-container" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0.75rem; padding: 1rem; display: none;">
+        <h4 style="font-size: 0.75rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0; margin-bottom: 0.625rem;">Reported Symptoms & Notes</h4>
+        <div id="modal-symptoms-list" style="display: flex; flex-wrap: wrap; gap: 0.375rem;">
+        </div>
       </div>
     </div>
     
-    <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-      <small style="color: #64748b; font-weight: 600; text-transform: uppercase;">Remarks</small>
-      <p id="modal-remarks" style="margin: 0.25rem 0 0; color: #334155; font-size: 0.9rem; line-height: 1.5;"></p>
-    </div>
-    
-    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 1rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 1rem; margin-top: 1.25rem;">
       <small style="color: #94a3b8;">Reported by: <span id="modal-reporter"></span></small>
       <small style="color: #94a3b8;" id="modal-date"></small>
     </div>
@@ -236,25 +253,65 @@
     window.location.href = window.location.pathname + '?' + urlParams.toString();
   }
 
+  function parseRemarksData(remarks) {
+    if (!remarks || remarks === 'No remarks provided.') return {};
+    const data = {};
+    remarks.split('|').forEach(part => {
+      const idx = part.indexOf(':');
+      if (idx !== -1) {
+        const key = part.substring(0, idx).trim();
+        const val = part.substring(idx + 1).trim();
+        data[key] = val;
+      }
+    });
+    return data;
+  }
+
   function openRecordModal(rowElement) {
-    document.getElementById('modal-disease').textContent = rowElement.dataset.disease;
-    
-    // Set Risk color
+    // Set Risk color badge
     const risk = rowElement.dataset.risk;
     const riskEl = document.getElementById('modal-risk');
     riskEl.textContent = risk;
-    
     riskEl.className = '';
     if (risk === 'Critical') riskEl.className = 'pill-badge badge-risk-critical';
     else if (risk === 'High') riskEl.className = 'pill-badge badge-risk-high';
     else if (risk === 'Moderate') riskEl.className = 'pill-badge badge-risk-moderate';
     else riskEl.className = 'pill-badge badge-risk-low';
 
-    document.getElementById('modal-barangay').textContent = rowElement.dataset.barangay;
-    document.getElementById('modal-cases').textContent = rowElement.dataset.cases;
-    document.getElementById('modal-classification').textContent = rowElement.dataset.classification;
-    document.getElementById('modal-onset').textContent = rowElement.dataset.onset;
-    document.getElementById('modal-remarks').textContent = rowElement.dataset.remarks;
+    // Parse remarks
+    const parsed = parseRemarksData(rowElement.dataset.remarks);
+    
+    // 1. Patient Profile
+    document.getElementById('modal-patient-name').textContent = parsed['Patient'] || 'N/A';
+    const age = parsed['Age'] ? `${parsed['Age']} yrs` : 'N/A';
+    const sex = parsed['Sex'] || 'N/A';
+    document.getElementById('modal-patient-age-sex').textContent = `${age} • ${sex}`;
+    document.getElementById('modal-patient-address').textContent = parsed['Address'] || rowElement.dataset.barangay || 'N/A';
+
+    // 2. ML Diagnostic
+    document.getElementById('modal-ml-prediction').textContent = parsed['ML Top Prediction'] || parsed['ML Classification'] || rowElement.dataset.disease || 'N/A';
+    document.getElementById('modal-ml-confidence').textContent = parsed['ML Confidence'] || 'N/A';
+
+    // 3. Symptoms
+    const symptomsStr = parsed['Symptoms'] || '';
+    const symptomsList = symptomsStr ? symptomsStr.split(',') : [];
+    const symContainer = document.getElementById('modal-symptoms-container');
+    const symListEl = document.getElementById('modal-symptoms-list');
+    
+    if (symptomsList.length > 0) {
+      symContainer.style.display = 'block';
+      symListEl.innerHTML = '';
+      symptomsList.forEach(sym => {
+        const span = document.createElement('span');
+        span.textContent = sym.trim();
+        span.style.cssText = 'padding: 0.25rem 0.625rem; background: rgba(219, 234, 254, 0.7); color: #1e40af; border: 1px solid #bfdbfe; font-size: 0.75rem; font-weight: 500; border-radius: 0.5rem;';
+        symListEl.appendChild(span);
+      });
+    } else {
+      symContainer.style.display = 'none';
+    }
+
+    // Reporter and Date
     document.getElementById('modal-reporter').textContent = rowElement.dataset.reporter;
     document.getElementById('modal-date').textContent = rowElement.dataset.date;
     
