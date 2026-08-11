@@ -119,6 +119,127 @@
     <div class="pulse-table-panel__head">
       <h3>Detailed Incident Records</h3>
       <span class="pulse-count-badge">{{ reports|length }} record{{ reports|length|pluralize }}</span>
+{% extends "dashboard/base_dashboard.html" %}
+{% block page_title %}Health Incident Reports{% endblock %}
+{% block content %}
+<div class="pulse-page">
+
+  <header class="pulse-page-header">
+    <div class="pulse-page-header__text">
+      <span class="pulse-eyebrow">Analytics</span>
+      <h2>Health Incident Reports</h2>
+      <p>Structured reports generated from validated surveillance data</p>
+    </div>
+    <div style="display: flex; gap: 1rem;">
+      <button type="button" onclick="exportToExcel()" class="nc-btn nc-btn--outline">
+        <i data-lucide="download" class="lucide-icon lucide-icon--sm"></i>
+        Export Excel
+      </button>
+      <button type="button" onclick="window.print()" class="nc-btn nc-btn--primary">
+        <i data-lucide="printer" class="lucide-icon lucide-icon--sm"></i>
+        Print Report
+      </button>
+    </div>
+  </header>
+
+  <div class="pulse-panel">
+    <form method="GET" action="{% url 'incident_reports' %}">
+      <div class="pulse-form-grid" style="grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); align-items:end;">
+        <div class="form-group" style="margin:0;">
+          <label for="date-from">Date From</label>
+          <input type="date" id="date-from" name="date_from" class="input-soft input-soft--plain" value="{{ date_from }}" placeholder="mm/dd/yyyy">
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label for="date-to">Date To</label>
+          <input type="date" id="date-to" name="date_to" class="input-soft input-soft--plain" value="{{ date_to }}" placeholder="mm/dd/yyyy">
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label for="filter-syndrome">Disease</label>
+          <select id="filter-syndrome" name="syndrome" class="input-soft input-soft--plain">
+            <option value="">All Diseases</option>
+            {% for s in syndrome_types %}<option value="{{ s }}" {% if syndrome == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label for="filter-barangay">Barangay</label>
+          <select id="filter-barangay" name="barangay" class="input-soft input-soft--plain">
+            <option value="">All Barangays</option>
+            {% for b in barangays %}<option value="{{ b.id }}" {% if barangay == b.id|stringformat:"s" %}selected{% endif %}>{{ b.barangay_name }}</option>{% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="nc-btn nc-btn--primary">Generate</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="pulse-stat-grid">
+    <div class="pulse-stat-card">
+      <div class="pulse-stat-card__icon pulse-stat-card__icon--primary">
+        <i data-lucide="clipboard-list" class="lucide-icon lucide-icon--sm"></i>
+      </div>
+      <div>
+        <div class="pulse-stat-card__value">{{ reports|length }}</div>
+        <div class="pulse-stat-card__label">Total Reports</div>
+      </div>
+    </div>
+    <div class="pulse-stat-card">
+      <div class="pulse-stat-card__icon pulse-stat-card__icon--warning">
+        <i data-lucide="users" class="lucide-icon lucide-icon--sm"></i>
+      </div>
+      <div>
+        <div class="pulse-stat-card__value">{{ total_cases }}</div>
+        <div class="pulse-stat-card__label">Total Cases</div>
+      </div>
+    </div>
+    <div class="pulse-stat-card">
+      <div class="pulse-stat-card__icon pulse-stat-card__icon--danger">
+        <i data-lucide="alert-triangle" class="lucide-icon lucide-icon--sm"></i>
+      </div>
+      <div>
+        <div class="pulse-stat-card__value">{{ by_classif.confirmed }}</div>
+        <div class="pulse-stat-card__label">Confirmed</div>
+      </div>
+    </div>
+    <div class="pulse-stat-card">
+      <div class="pulse-stat-card__icon pulse-stat-card__icon--teal">
+        <i data-lucide="bar-chart-3" class="lucide-icon lucide-icon--sm"></i>
+      </div>
+      <div>
+        <div class="pulse-stat-card__value">{{ by_disease|length }}</div>
+        <div class="pulse-stat-card__label">Diseases Reported</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pulse-breakdown-grid">
+    <div class="pulse-breakdown-card">
+      <div class="pulse-breakdown-card__head">Cases by Disease</div>
+      <div class="pulse-breakdown-card__body">
+        {% for name, count in by_disease %}
+        <div class="pulse-breakdown-row">
+          <span>{{ name }}</span>
+          <span class="pill-badge badge-warning">{{ count }}</span>
+        </div>
+        {% empty %}<p class="text-muted" style="font-size:.84rem;padding:.5rem 0;">No data</p>{% endfor %}
+      </div>
+    </div>
+    <div class="pulse-breakdown-card">
+      <div class="pulse-breakdown-card__head">Cases by Barangay</div>
+      <div class="pulse-breakdown-card__body">
+        {% for name, count in by_barangay %}
+        <div class="pulse-breakdown-row">
+          <span>{{ name }}</span>
+          <span class="pill-badge badge-info">{{ count }}</span>
+        </div>
+        {% empty %}<p class="text-muted" style="font-size:.84rem;padding:.5rem 0;">No data</p>{% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="pulse-panel pulse-table-panel">
+    <div class="pulse-table-panel__head">
+      <h3>Detailed Incident Records</h3>
+      <span class="pulse-count-badge">{{ reports|length }} record{{ reports|length|pluralize }}</span>
     </div>
     <div class="pulse-table-wrap table-wrapper">
       <table class="pulse-table">
@@ -128,9 +249,134 @@
         <tbody>
         {% if not reports %}
           <tr>
-            <td colspan="8">
+            <td colspan="9">
               <div class="pulse-empty">
                 <i data-lucide="inbox" class="lucide-icon"></i>
+                <p>No validated reports match the selected filters.</p>
+              </div>
+            </td>
+          </tr>
+        {% else %}
+          {% for r in reports %}
+          <tr class="pulse-table__row"
+              data-id="{{ r.id }}"
+              data-barangay="{{ r.barangay_name|default:'—' }}"
+              data-disease="{{ r.syndrome_type }}"
+              data-cases="{{ r.case_count }}"
+              data-classification="{{ r.case_classification|title }}"
+              data-onset="{{ r.date_of_onset|default:'—' }}"
+              data-risk="{{ r.computed_risk_level }}"
+              data-reporter="{{ r.reporter|default:'—' }}"
+              data-date="{{ r.report_date|date:'M d, Y H:i' }}"
+              data-remarks="{{ r.remarks|default:'No remarks provided.' }}">
+            <td data-label="Barangay">{{ r.barangay_name|default:"—" }}</td>
+            <td data-label="Disease">
+              {{ r.syndrome_type }}
+              {% if r.remarks %}
+                <br><small class="um-muted">{{ r.remarks|truncatechars:80 }}</small>
+              {% endif %}
+            </td>
+            <td data-label="Cases"><strong>{{ r.case_count }}</strong></td>
+            <td data-label="Classification">
+              <span class="pill-badge {% if r.case_classification == 'confirmed' %}badge-danger{% elif r.case_classification == 'probable' %}badge-probable{% else %}badge-info{% endif %}">{{ r.case_classification|title }}</span>
+            </td>
+            <td data-label="Onset">{{ r.date_of_onset|default:"—" }}</td>
+            <td data-label="Risk">
+              {% with risk=r.computed_risk_level|lower %}
+                <span class="pill-badge {% if risk == 'critical' %}badge-risk-critical{% elif risk == 'high' %}badge-risk-high{% elif risk == 'moderate' %}badge-risk-moderate{% else %}badge-risk-low{% endif %}">
+                  {{ r.computed_risk_level }}
+                </span>
+              {% endwith %}
+            </td>
+            <td data-label="Reporter">{{ r.reporter|default:"—" }}</td>
+            <td data-label="Date"><span class="um-date">{{ r.report_date|date:"M d, Y" }}</span></td>
+            <td data-label="Actions">
+              <button type="button" class="nc-btn nc-btn--outline" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" onclick="openRecordModal(this.closest('tr'))">View</button>
+            </td>
+          </tr>
+          {% endfor %}
+        {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Detailed Record Viewer Modal -->
+<div id="record-modal" class="pulse-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+  <div class="pulse-modal-content" style="background: white; border-radius: 12px; padding: 2rem; max-width: 500px; width: 90%; box-shadow: 0 10px 25px rgba(0,0,0,0.1); position: relative;">
+    <button onclick="closeRecordModal()" style="position: absolute; top: 1rem; right: 1rem; background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: #64748b;">&times;</button>
+    <h3 style="margin-top: 0; color: #0f4c81; display: flex; align-items: center; gap: 0.5rem;">
+      <i data-lucide="file-text" class="lucide-icon"></i> Record Details
+    </h3>
+    <hr style="border: 0; height: 1px; background: #e2e8f0; margin: 1rem 0;">
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+      <div>
+        <small style="color: #64748b; font-weight: 600; text-transform: uppercase;">Disease</small>
+        <div id="modal-disease" style="font-weight: 500; color: #1e293b;"></div>
+      </div>
+      <div>
+        <small style="color: #64748b; font-weight: 600; text-transform: uppercase;">Risk Level</small>
+        <div><span id="modal-risk"></span></div>
+      </div>
+      <div>
+        <small style="color: #64748b; font-weight: 600; text-transform: uppercase;">Barangay</small>
+        <div id="modal-barangay" style="font-weight: 500; color: #1e293b;"></div>
+      </div>
+      <div>
+        <small style="color: #64748b; font-weight: 600; text-transform: uppercase;">Cases</small>
+        <div id="modal-cases" style="font-weight: 500; color: #1e293b;"></div>
+      </div>
+      <div>
+        <small style="color: #64748b; font-weight: 600; text-transform: uppercase;">Classification</small>
+        <div id="modal-classification" style="font-weight: 500; color: #1e293b;"></div>
+      </div>
+      <div>
+        <small style="color: #64748b; font-weight: 600; text-transform: uppercase;">Onset Date</small>
+        <div id="modal-onset" style="font-weight: 500; color: #1e293b;"></div>
+      </div>
+    </div>
+    
+    <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+      <small style="color: #64748b; font-weight: 600; text-transform: uppercase;">Remarks</small>
+      <p id="modal-remarks" style="margin: 0.25rem 0 0; color: #334155; font-size: 0.9rem; line-height: 1.5;"></p>
+    </div>
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; padding-top: 1rem;">
+      <small style="color: #94a3b8;">Reported by: <span id="modal-reporter"></span></small>
+      <small style="color: #94a3b8;" id="modal-date"></small>
+    </div>
+  </div>
+</div>
+
+<script>
+  function exportToExcel() {
+    const urlParams = new URLSearchParams(window.location.search);
+    urlParams.set('export', 'excel');
+    window.location.href = window.location.pathname + '?' + urlParams.toString();
+  }
+
+  function openRecordModal(rowElement) {
+    document.getElementById('modal-disease').textContent = rowElement.dataset.disease;
+    
+    // Set Risk color
+    const risk = rowElement.dataset.risk;
+    const riskEl = document.getElementById('modal-risk');
+    riskEl.textContent = risk;
+    
+    riskEl.className = '';
+    if (risk === 'Critical') riskEl.className = 'pill-badge badge-risk-critical';
+    else if (risk === 'High') riskEl.className = 'pill-badge badge-risk-high';
+    else if (risk === 'Moderate') riskEl.className = 'pill-badge badge-risk-moderate';
+    else riskEl.className = 'pill-badge badge-risk-low';
+
+    document.getElementById('modal-barangay').textContent = rowElement.dataset.barangay;
+    document.getElementById('modal-cases').textContent = rowElement.dataset.cases;
+    document.getElementById('modal-classification').textContent = rowElement.dataset.classification;
+    document.getElementById('modal-onset').textContent = rowElement.dataset.onset;
+    document.getElementById('modal-remarks').textContent = rowElement.dataset.remarks;
+    document.getElementById('modal-reporter').textContent = rowElement.dataset.reporter;
     document.getElementById('modal-date').textContent = rowElement.dataset.date;
     
     const modal = document.getElementById('record-modal');
