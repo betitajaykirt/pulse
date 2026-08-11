@@ -226,6 +226,7 @@ function demographicsSectionHtml(p) {
             name="date_of_birth"
             class="form-control field-dob date-input-md input-soft input-soft--plain"
             data-pid="${p.id}"
+            data-max-today="true"
             value="${formatPatientDate(p.date_of_birth)}"
             placeholder="mm/dd/yyyy"
             required>
@@ -267,6 +268,7 @@ function demographicsSectionHtml(p) {
             name="onset_date"
             class="form-control field-onset date-input-md input-soft input-soft--plain"
             data-pid="${p.id}"
+            data-max-today="true"
             value="${formatPatientDate(p.date_of_onset)}"
             placeholder="mm/dd/yyyy"
             required>

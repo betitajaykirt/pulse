@@ -449,6 +449,62 @@ body {
   box-shadow: 0 0 0 4px rgba(0, 166, 166, 0.18);
 }
 .input-soft--plain { padding: .65rem .9rem; }
+
+.pulse-date-field {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+}
+.pulse-date-field > .date-input-md,
+.pulse-date-field > input[data-input] {
+  flex: 1;
+  min-width: 0;
+  padding-right: 2.75rem;
+}
+.pulse-date-field__toggle {
+  position: absolute;
+  top: 50%;
+  right: .55rem;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.pulse-date-field__toggle:hover,
+.pulse-date-field__toggle:focus {
+  color: var(--secondary);
+  background: rgba(0, 166, 166, 0.08);
+  outline: none;
+}
+.flatpickr-calendar {
+  border-radius: 12px;
+  border: 1px solid var(--border-light);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
+  font-family: inherit;
+}
+.flatpickr-day.selected,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.flatpickr-day.today {
+  border-color: var(--secondary);
+}
+.flatpickr-day:hover {
+  background: rgba(0, 166, 166, 0.12);
+  border-color: rgba(0, 166, 166, 0.12);
+}
+
 select.input-soft,
 select.input-soft--plain {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2364748B' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
