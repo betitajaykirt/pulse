@@ -755,7 +755,7 @@ def incident_reports(request):
     if barangay:
         q &= Q(barangay_id=barangay)
 
-    reports = SurveillanceReport.objects.filter(q).select_related('barangay', 'submitted_by').annotate(
+    reports = list(SurveillanceReport.objects.filter(q).select_related('barangay', 'submitted_by').annotate(
         barangay_name=F('barangay__barangay_name'),
         risk_status=Value('low', output_field=CharField()),
         reporter=Concat(
@@ -764,7 +764,45 @@ def incident_reports(request):
             F('submitted_by__last_name'),
             output_field=CharField()
         )
-    ).order_by('-report_date')
+    ).order_by('-report_date'))
+
+    # Retrieve and calculate APTAS metrics for all fetched reports
+    from myapp.models import RiskAssessment
+    from reports.aptas_service import compute_aptas_breakdown
+    
+    report_ids = [r.id for r in reports]
+    assessments = {a.report_id: a for a in RiskAssessment.objects.filter(report_id__in=report_ids)}
+    
+    aptas_cache = {}
+    for r in reports:
+        assessment = assessments.get(r.id)
+        raw_anomaly = None
+        if assessment and assessment.anomaly_score is not None:
+            raw_anomaly = float(assessment.anomaly_score)
+        elif r.ml_anomaly_score is not None:
+            raw_anomaly = float(r.ml_anomaly_score)
+            
+        b_name = r.barangay_name if r.barangay_name else ''
+        syndrome = (r.syndrome_type or r.suspected_disease or '').strip()
+        
+        cache_key = (b_name.lower(), syndrome.lower(), r.id, round(raw_anomaly or 0.0, 4))
+        if cache_key not in aptas_cache:
+            try:
+                aptas_cache[cache_key] = compute_aptas_breakdown(b_name, syndrome, raw_anomaly, report=r)
+            except Exception:
+                aptas_cache[cache_key] = {
+                    'anomaly_score': raw_anomaly or 0.0,
+                    'temporal_score': 0.0,
+                    'spatial_score': 0.0,
+                    'environmental_score': 0.0,
+                    'final_risk_score': 0.0,
+                }
+        breakdown = aptas_cache[cache_key]
+        r.final_score = float(breakdown['final_risk_score']) / 100.0 if breakdown.get('final_risk_score') is not None else None
+        r.anomaly_score = float(breakdown['anomaly_score']) if breakdown.get('anomaly_score') is not None else None
+        r.temporal_score = float(breakdown['temporal_score']) if breakdown.get('temporal_score') is not None else None
+        r.spatial_score = float(breakdown['spatial_score']) if breakdown.get('spatial_score') is not None else None
+        r.environmental_score = float(breakdown['environmental_score']) if breakdown.get('environmental_score') is not None else None
 
     if request.GET.get('export') == 'excel':
         response = HttpResponse(content_type='text/csv')
