@@ -277,28 +277,66 @@ def api_alerts_aptas(request):
         role, request.session.get('user_id'), {},
     )
     ctx = get_aptas_dashboard_context(barangay_name=barangay_filter)
-    alerts = []
+    from reports.pidsr_schema import normalize_disease_label
+    merged_map = {}
+    
     for card in ctx['aptas_alerts']:
-        alerts.append({
-            'source': card.get('alert_source'),
-            'is_pidsr_threshold': card.get('is_pidsr_threshold', False),
-            'risk_level': card.get('risk_level'),
-            'barangay': card.get('barangay'),
-            'syndrome': card.get('syndrome'),
-            'final_risk_score': card.get('final_risk_score'),
-            'anomaly_score': card.get('anomaly_score'),
-            'temporal_score': card.get('temporal_score'),
-            'spatial_score': card.get('spatial_score'),
-            'environmental_score': card.get('environmental_score'),
-            'threshold_status': card.get('threshold_status'),
-            'threshold_headline': card.get('threshold_headline'),
-            'threshold_summary': card.get('threshold_summary'),
-            'confirmed_count': card.get('confirmed_count'),
-            'time_window_days': card.get('time_window_days'),
-            'map_url': card.get('map_url'),
-            'is_active_alert': card.get('is_active_alert', False),
-            'created_at': card.get('created_at').isoformat() if card.get('created_at') else None,
-        })
+        raw_disease = card.get('syndrome') or card.get('disease') or ''
+        normalized_disease = normalize_disease_label(raw_disease)
+        
+        barangay = card.get('barangay') or ''
+        purok = card.get('purok') or ''
+        key = f"{barangay}-{purok}-{normalized_disease}"
+        
+        if key not in merged_map:
+            merged_map[key] = {
+                'source': card.get('alert_source'),
+                'is_pidsr_threshold': card.get('is_pidsr_threshold', False),
+                'risk_level': card.get('risk_level'),
+                'barangay': barangay,
+                'purok': purok,
+                'syndrome': normalized_disease,
+                'disease': normalized_disease,
+                'final_risk_score': card.get('final_risk_score') or 0.0,
+                'anomaly_score': card.get('anomaly_score'),
+                'temporal_score': card.get('temporal_score'),
+                'spatial_score': card.get('spatial_score'),
+                'environmental_score': card.get('environmental_score'),
+                'threshold_status': card.get('threshold_status'),
+                'threshold_headline': card.get('threshold_headline'),
+                'threshold_summary': card.get('threshold_summary'),
+                'confirmed_count': card.get('confirmed_count') or 1,
+                'active_cases': card.get('confirmed_count') or card.get('active_cases') or 1,
+                'time_window_days': card.get('time_window_days'),
+                'map_url': card.get('map_url'),
+                'is_active_alert': card.get('is_active_alert', False),
+                'created_at': card.get('created_at'),
+            }
+        else:
+            existing = merged_map[key]
+            # Merge duplicate alert into the existing one
+            existing['confirmed_count'] = (existing['confirmed_count'] or 0) + (card.get('confirmed_count') or 1)
+            existing['active_cases'] = existing['confirmed_count']
+            
+            # Keep highest final risk score
+            current_risk = card.get('final_risk_score') or 0.0
+            if current_risk > existing['final_risk_score']:
+                existing['final_risk_score'] = current_risk
+                existing['risk_level'] = card.get('risk_level') or existing['risk_level']
+                
+            # Keep most recent timestamp
+            card_date = card.get('created_at')
+            if card_date and existing['created_at']:
+                if card_date > existing['created_at']:
+                    existing['created_at'] = card_date
+            elif card_date:
+                existing['created_at'] = card_date
+
+    alerts = []
+    for existing in merged_map.values():
+        if existing['created_at']:
+            existing['created_at'] = existing['created_at'].isoformat()
+        alerts.append(existing)
     return JsonResponse({
         'ok': True,
         'alerts': alerts,
