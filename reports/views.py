@@ -6,8 +6,9 @@ Covers:
   - Health Incident Reporting (admin incident report generation)
 """
 import json
+import csv
 from django.shortcuts import render, redirect
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST, require_GET
 from django.contrib import messages
 from django.utils import timezone
@@ -764,6 +765,24 @@ def incident_reports(request):
             output_field=CharField()
         )
     ).order_by('-report_date')
+
+    if request.GET.get('export') == 'excel':
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="incident_reports.csv"'
+        writer = csv.writer(response)
+        writer.writerow(['Barangay', 'Disease', 'Cases', 'Classification', 'Onset Date', 'Risk Level', 'Reporter', 'Report Date'])
+        for r in reports:
+            writer.writerow([
+                r.barangay_name or '—',
+                r.syndrome_type,
+                r.case_count,
+                r.case_classification.title(),
+                r.date_of_onset or '—',
+                r.computed_risk_level,
+                r.reporter or '—',
+                r.report_date.strftime("%Y-%m-%d") if r.report_date else '—'
+            ])
+        return response
 
     # Summary stats
     total_cases = sum(r.case_count for r in reports)

@@ -248,6 +248,16 @@ class SurveillanceReport(models.Model):
         null=True, blank=True, db_column='session_id',
         related_name='surveillance_reports',
     )
+
+    @property
+    def computed_risk_level(self):
+        if hasattr(self, 'aptas_risk_level') and self.aptas_risk_level:
+            return self.aptas_risk_level
+        score = self.ml_anomaly_score or 0
+        if score >= 0.85: return 'Critical'
+        if score >= 0.65: return 'High'
+        if score >= 0.45: return 'Moderate'
+        return 'Low'
     created_at = models.DateTimeField()
     updated_at = models.DateTimeField()
 
