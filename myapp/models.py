@@ -259,9 +259,32 @@ class SurveillanceReport(models.Model):
 
         score = None
 
-        # 2. Extract ML Confidence % from remarks FIRST (most reliable source)
-        #    Format: "... | ML Confidence: 56.8% | ..."
-        if self.remarks:
+        # 2. First priority: Use APTAS Final Composite Risk Score if present
+        for attr in ['final_risk', 'final_score', 'aptas_score', 'risk_score']:
+            val = getattr(self, attr, None)
+            if val is not None:
+                val = float(val)
+                if 0.0 <= val <= 1.0:
+                    score = val
+                    break
+
+        # 3. Second priority: If spatial/temporal/anomaly metrics exist, calculate dynamic composite weighted average
+        if score is None:
+            # Also check without '_score' suffix since API/JS payloads might omit it
+            anom = getattr(self, 'anomaly_score', getattr(self, 'anomaly', None))
+            temp = getattr(self, 'temporal_score', getattr(self, 'temporal', None))
+            spat = getattr(self, 'spatial_score', getattr(self, 'spatial', None))
+            
+            if anom is not None and temp is not None and spat is not None:
+                env = getattr(self, 'environmental_score', getattr(self, 'environmental', 0.5))
+                if env is None: env = 0.5
+                try:
+                    score = (float(anom) * 0.3) + (float(temp) * 0.3) + (float(spat) * 0.2) + (float(env) * 0.2)
+                except (ValueError, TypeError):
+                    pass
+
+        # 4. Third priority: Fallback to ML Diagnostic Confidence
+        if score is None and self.remarks:
             match = re.search(r'ML Confidence:\s*([\d.]+)%', self.remarks, re.IGNORECASE)
             if match:
                 try:
@@ -269,17 +292,7 @@ class SurveillanceReport(models.Model):
                 except (ValueError, TypeError):
                     pass
 
-        # 3. Fallback: check explicit probability-scale fields (0..1 range only)
-        if score is None:
-            for attr in ['final_risk', 'risk_score', 'aptas_score']:
-                val = getattr(self, attr, None)
-                if val is not None:
-                    val = float(val)
-                    if 0.0 <= val <= 1.0:
-                        score = val
-                        break
-
-        # 4. Last resort: use ml_anomaly_score only if it's positive (probability-like)
+        # 5. Last resort: use ml_anomaly_score only if it's positive (probability-like)
         if score is None and self.ml_anomaly_score is not None:
             val = float(self.ml_anomaly_score)
             if val > 0:
