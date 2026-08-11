@@ -829,7 +829,9 @@ def incident_reports(request):
     by_classif  = {'suspected': 0, 'probable': 0, 'confirmed': 0}
 
     for r in reports:
-        by_disease[r.syndrome_type]  = by_disease.get(r.syndrome_type, 0) + r.case_count
+        synd_lower = (r.syndrome_type or '').lower()
+        if synd_lower and 'insufficient data' not in synd_lower and 'pending' not in synd_lower and 'inconclusive' not in synd_lower and 'unclassified' not in synd_lower:
+            by_disease[r.syndrome_type]  = by_disease.get(r.syndrome_type, 0) + r.case_count
         by_barangay[r.barangay_name] = by_barangay.get(r.barangay_name, 0) + r.case_count
         by_classif[r.case_classification] = by_classif.get(r.case_classification, 0) + r.case_count
 

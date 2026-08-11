@@ -166,9 +166,10 @@ def build_disease_distribution_data(qs):
         qs.exclude(
             Q(surveillance_report__syndrome_type__isnull=True) |
             Q(surveillance_report__syndrome_type__exact='') |
-            Q(surveillance_report__syndrome_type__iexact='inconclusive') |
-            Q(surveillance_report__syndrome_type__iexact='unclassified') |
-            Q(surveillance_report__syndrome_type__iexact='inconclusive syndromic pattern')
+            Q(surveillance_report__syndrome_type__icontains='inconclusive') |
+            Q(surveillance_report__syndrome_type__icontains='unclassified') |
+            Q(surveillance_report__syndrome_type__icontains='insufficient data') |
+            Q(surveillance_report__syndrome_type__icontains='pending')
         )
         .values(disease=F('surveillance_report__syndrome_type'))
         .annotate(count=Count('id'))
