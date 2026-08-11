@@ -1165,14 +1165,22 @@
     }
 
 
+    function riskBadgeStyleForLevel(label) {
+      var key = String(label || '').toLowerCase();
+      if (key === 'critical') return { label: 'Critical', style: 'background-color: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe;' };
+      if (key === 'high') return { label: 'High', style: 'background-color: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5;' };
+      if (key === 'moderate') return { label: 'Moderate', style: 'background-color: #fef3c7; color: #92400e; border: 1px solid #fcd34d;' };
+      return { label: 'Low', style: 'background-color: #d1fae5; color: #047857; border: 1px solid #6ee7b7;' };
+    }
+
     function getRiskBadgeDetails(score) {
       var n = Number(score);
       if (isNaN(n) || n < 0) n = 0;
       if (n > 1.5) n = n / 100;
-      if (n >= 0.85) return { label: 'Critical', style: 'background-color: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe;' };
-      if (n >= 0.65) return { label: 'High', style: 'background-color: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5;' };
-      if (n >= 0.45) return { label: 'Moderate', style: 'background-color: #fef3c7; color: #92400e; border: 1px solid #fcd34d;' };
-      return { label: 'Low', style: 'background-color: #d1fae5; color: #047857; border: 1px solid #6ee7b7;' };
+      if (n >= 0.75) return riskBadgeStyleForLevel('Critical');
+      if (n >= 0.60) return riskBadgeStyleForLevel('High');
+      if (n >= 0.40) return riskBadgeStyleForLevel('Moderate');
+      return riskBadgeStyleForLevel('Low');
     }
 
     function buildRiskFactorGrid(c) {
@@ -1365,7 +1373,7 @@
       html += '<div class="map-case-popup__section map-case-popup__section--divider map-case-popup__risk-section">';
 
       var overallScore = c.final_score != null ? c.final_score : (c.risk_score != null ? c.risk_score : c.anomaly_score);
-      var badge = getRiskBadgeDetails(overallScore);
+      var badge = c.aptas_risk_level ? riskBadgeStyleForLevel(c.aptas_risk_level) : getRiskBadgeDetails(overallScore);
       html += '<div class="map-case-popup__risk-heading" style="display: flex; align-items: center; justify-content: space-between;">';
       html += '<span>Risk Factors</span>';
       html += '<span style="font-size: 0.65rem; font-weight: 700; padding: 0.125rem 0.625rem; border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.05em; ' + badge.style + '">' + badge.label + ' RISK</span>';

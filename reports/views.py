@@ -55,20 +55,6 @@ def _incident_summary_disease_label(syndrome_type: str) -> str:
     return label
 
 
-def _incident_report_risk_level(report, assessment=None) -> str:
-    """Lightweight risk label for incident tables (avoids per-row APTAS recompute)."""
-    if assessment and assessment.risk_level:
-        level = assessment.risk_level.strip().title()
-        if level.lower() != 'low':
-            return level
-    classif = (report.case_classification or 'suspected').lower()
-    return {
-        'confirmed': 'Critical',
-        'probable': 'High',
-        'suspected': 'Moderate',
-    }.get(classif, 'Moderate')
-
-
 # ── Submit Case Report (Health Officer / BHW / Encoder) ──────────
 
 @login_required
@@ -813,11 +799,15 @@ def incident_reports(request):
             if assessment.report_id not in assessments:
                 assessments[assessment.report_id] = assessment
 
+    from reports.report_risk_service import risk_level_for_report
+
+    aptas_cache = {}
     for report in reports:
         report.display_disease = _incident_summary_disease_label(report.syndrome_type) or (report.syndrome_type or '—')
-        report.incident_risk_level = _incident_report_risk_level(
+        report.incident_risk_level = risk_level_for_report(
             report,
             assessments.get(report.id),
+            aptas_cache,
         )
 
     if request.GET.get('export') == 'excel':

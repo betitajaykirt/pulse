@@ -21,7 +21,10 @@ from reports.ml_display import (
     parse_ml_confidence,
     predicted_disease_display,
 )
-from reports.aptas_service import compute_aptas_breakdown, normalize_anomaly_score
+from reports.report_risk_service import (
+    aptas_display_scores_for_report,
+    risk_level_for_report,
+)
 from reports.disease_category_data import (
     DISEASE_CATEGORY_CHOICES,
     MONITORED_DISEASE_CHOICES,
@@ -329,44 +332,6 @@ def api_cases(request):
             return f'{score:.2f} — {level} Risk', score, level
         return f'{level} Risk', None, level
 
-    def _aptas_breakdown_for_report(report, assessment, cache):
-        barangay = report.barangay.barangay_name if report.barangay else ''
-        syndrome = (
-            ml_top_prediction_for_report(report)
-            or report.syndrome_type
-            or report.suspected_disease
-            or 'Undetermined'
-        ).strip()
-        raw_anomaly = None
-        if assessment and assessment.anomaly_score is not None:
-            raw_anomaly = float(assessment.anomaly_score)
-        elif report.ml_anomaly_score is not None:
-            raw_anomaly = float(report.ml_anomaly_score)
-
-        cache_key = (barangay.lower(), syndrome.lower(), report.id, round(raw_anomaly or 0.0, 4))
-        if cache_key not in cache:
-            try:
-                cache[cache_key] = compute_aptas_breakdown(
-                    barangay, syndrome, raw_anomaly, report=report,
-                )
-            except (ValueError, TypeError):
-                anomaly = normalize_anomaly_score(raw_anomaly)
-                cache[cache_key] = {
-                    'anomaly_score': anomaly,
-                    'temporal_score': 0.0,
-                    'spatial_score': 0.0,
-                    'environmental_score': 0.0,
-                    'final_risk_score': 0.0,
-                }
-        breakdown = cache[cache_key]
-        return {
-            'final_score': round(float(breakdown['final_risk_score']) / 100.0, 4),
-            'anomaly_score': round(float(breakdown['anomaly_score']), 4),
-            'temporal_score': round(float(breakdown['temporal_score']), 4),
-            'spatial_score': round(float(breakdown['spatial_score']), 4),
-            'environmental_score': round(float(breakdown['environmental_score']), 4),
-        }
-
     def _recommendations_text(mitigation, recommended_action, disease_name):
         disease_name = (disease_name or 'the reported illness').strip()
         intro = f'Initiate {disease_name} vector control protocols.'
@@ -422,7 +387,8 @@ def api_cases(request):
         action_disease = _canonical_disease_for_actions(
             r, status_norm, ml_predicted, confirmed_disease,
         )
-        aptas_scores = _aptas_breakdown_for_report(r, assessment, aptas_cache)
+        aptas_scores = aptas_display_scores_for_report(r, assessment, aptas_cache)
+        aptas_risk_level = risk_level_for_report(r, assessment, aptas_cache)
         
         p_case = r.patient_case.first()
         purok = ''
@@ -462,6 +428,7 @@ def api_cases(request):
             'risk_score_line':     risk_line,
             'risk_score':          risk_score,
             'risk_level':          risk_level,
+            'aptas_risk_level':    aptas_risk_level,
             'final_score':         aptas_scores['final_score'],
             'anomaly_score':       aptas_scores['anomaly_score'],
             'temporal_score':      aptas_scores['temporal_score'],
