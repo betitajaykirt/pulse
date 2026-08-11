@@ -251,28 +251,41 @@ class SurveillanceReport(models.Model):
 
     @property
     def computed_risk_level(self):
+        import re
+
+        # 1. Direct label override from APTAS
         if hasattr(self, 'aptas_risk_level') and self.aptas_risk_level and self.aptas_risk_level.lower() != 'low':
             return self.aptas_risk_level
-        if hasattr(self, 'risk_level') and self.risk_level and self.risk_level.lower() != 'low':
-            return self.risk_level
 
         score = None
-        for attr in ['final_risk', 'final', 'risk_score', 'aptas_score', 'ml_anomaly_score']:
-            if hasattr(self, attr) and getattr(self, attr) is not None:
-                score = getattr(self, attr)
-                break
-        
-        # Extract confidence numerical value from remarks (e.g. "ML Confidence: 56.8%")
-        if score is None and self.remarks:
-            import re
+
+        # 2. Extract ML Confidence % from remarks FIRST (most reliable source)
+        #    Format: "... | ML Confidence: 56.8% | ..."
+        if self.remarks:
             match = re.search(r'ML Confidence:\s*([\d.]+)%', self.remarks, re.IGNORECASE)
             if match:
                 try:
                     score = float(match.group(1)) / 100.0
-                except ValueError:
+                except (ValueError, TypeError):
                     pass
-                    
-        score = float(score) if score is not None else 0.0
+
+        # 3. Fallback: check explicit probability-scale fields (0..1 range only)
+        if score is None:
+            for attr in ['final_risk', 'risk_score', 'aptas_score']:
+                val = getattr(self, attr, None)
+                if val is not None:
+                    val = float(val)
+                    if 0.0 <= val <= 1.0:
+                        score = val
+                        break
+
+        # 4. Last resort: use ml_anomaly_score only if it's positive (probability-like)
+        if score is None and self.ml_anomaly_score is not None:
+            val = float(self.ml_anomaly_score)
+            if val > 0:
+                score = val
+
+        score = score or 0.0
         if score >= 0.85: return 'Critical'
         if score >= 0.65: return 'High'
         if score >= 0.45: return 'Moderate'
