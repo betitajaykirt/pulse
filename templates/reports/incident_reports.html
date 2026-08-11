@@ -1,4 +1,5 @@
 {% extends "dashboard/base_dashboard.html" %}
+{% load pulse_dates %}
 {% block page_title %}Health Incident Reports{% endblock %}
 {% block content %}
 <div class="pulse-page">
@@ -26,11 +27,11 @@
       <div class="pulse-form-grid" style="grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); align-items:end;">
         <div class="form-group" style="margin:0;">
           <label for="date-from">Date From</label>
-          <input type="date" id="date-from" name="date_from" class="input-soft input-soft--plain" value="{{ date_from }}" placeholder="mm/dd/yyyy">
+          <input type="text" id="date-from" name="date_from" class="input-soft input-soft--plain date-input-md" value="{{ date_from }}" placeholder="mm/dd/yyyy">
         </div>
         <div class="form-group" style="margin:0;">
           <label for="date-to">Date To</label>
-          <input type="date" id="date-to" name="date_to" class="input-soft input-soft--plain" value="{{ date_to }}" placeholder="mm/dd/yyyy">
+          <input type="text" id="date-to" name="date_to" class="input-soft input-soft--plain date-input-md" value="{{ date_to }}" placeholder="mm/dd/yyyy">
         </div>
         <div class="form-group" style="margin:0;">
           <label for="filter-syndrome">Disease</label>
@@ -143,10 +144,10 @@
               data-disease="{{ r.syndrome_type }}"
               data-cases="{{ r.case_count }}"
               data-classification="{{ r.case_classification|title }}"
-              data-onset="{{ r.date_of_onset|default:'—' }}"
+              data-onset="{{ r.date_of_onset|md_date }}"
               data-risk="{{ r.computed_risk_level }}"
               data-reporter="{{ r.reporter|default:'—' }}"
-              data-date="{{ r.report_date|date:'M d, Y H:i' }}"
+              data-date="{{ r.report_date|md_datetime }}"
               data-remarks="{{ r.remarks|default:'No remarks provided.' }}">
             <td data-label="Barangay">{{ r.barangay_name|default:"—" }}</td>
             <td data-label="Disease">
@@ -159,7 +160,7 @@
             <td data-label="Classification">
               <span class="pill-badge {% if r.case_classification == 'confirmed' %}badge-danger{% elif r.case_classification == 'probable' %}badge-probable{% else %}badge-info{% endif %}">{{ r.case_classification|title }}</span>
             </td>
-            <td data-label="Onset">{{ r.date_of_onset|default:"—" }}</td>
+            <td data-label="Onset">{{ r.date_of_onset|md_date }}</td>
             <td data-label="Risk">
               {% with risk=r.computed_risk_level|lower %}
                 <span class="pill-badge {% if risk == 'critical' %}badge-risk-critical{% elif risk == 'high' %}badge-risk-high{% elif risk == 'moderate' %}badge-risk-moderate{% else %}badge-risk-low{% endif %}">
@@ -168,7 +169,7 @@
               {% endwith %}
             </td>
             <td data-label="Reporter">{{ r.reporter|default:"—" }}</td>
-            <td data-label="Date"><span class="um-date">{{ r.report_date|date:"M d, Y" }}</span></td>
+            <td data-label="Date"><span class="um-date">{{ r.report_date|md_datetime }}</span></td>
             <td data-label="Actions">
               <button type="button" class="nc-btn nc-btn--outline" style="padding: 0.25rem 0.75rem; font-size: 0.8rem;" onclick="openRecordModal(this.closest('tr'))">View</button>
             </td>

@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.db.models import Q
 from django.utils import timezone
 from accounts.auth_utils import role_required, hash_password, build_full_name
+from myapp.date_utils import parse_user_date
 from myapp.models import User, Barangay
 
 
@@ -55,6 +56,8 @@ def create(request):
     if len(password) < 8: errors.append('Password must be at least 8 characters.')
     if role in ('barangay_health_worker', 'encoder', 'surveillance_officer', 'health_officer', 'catchment_nurse') and not barangay:
         errors.append('Barangay is required for the selected role.')
+    if bdate and not parse_user_date(bdate):
+        errors.append('Enter date of birth as mm/dd/yyyy.')
 
     if errors:
         for e in errors:
@@ -67,13 +70,14 @@ def create(request):
 
     username = f"{first.lower()}.{last.lower()}.{secrets.token_hex(4)}"
     now = timezone.now()
+    parsed_birthdate = parse_user_date(bdate) if bdate else None
     User.objects.create(
         username=username,
         first_name=first,
         last_name=last,
         middle_name=middle or None,
         suffix=suffix or None,
-        birthdate=bdate or None,
+        birthdate=parsed_birthdate,
         email=email,
         password_hash=hash_password(password),
         role=role,

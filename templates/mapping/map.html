@@ -922,15 +922,22 @@
 
 
 
+    function mapPopupDisplayDate(value) {
+      if (window.PulseDates) {
+        return escapeMapPopupHtml(PulseDates.formatDisplay(value) || '—');
+      }
+      return escapeMapPopupHtml(value || '—');
+    }
+
     function mapPopupDateRows(c, rowClass) {
 
       rowClass = rowClass || 'map-case-popup__row';
 
       var html = '';
 
-      html += '<div class="' + rowClass + '"><strong>Onset Date:</strong> ' + escapeMapPopupHtml(c.date_of_onset) + '</div>';
+      html += '<div class="' + rowClass + '"><strong>Onset Date:</strong> ' + mapPopupDisplayDate(c.date_of_onset) + '</div>';
 
-      html += '<div class="' + rowClass + '"><strong>Reported Date:</strong> ' + escapeMapPopupHtml(c.report_date) + '</div>';
+      html += '<div class="' + rowClass + '"><strong>Reported Date:</strong> ' + mapPopupDisplayDate(c.report_date) + '</div>';
 
       return html;
 

@@ -22,6 +22,7 @@ from myapp.barangay_scope import (
     resolve_user_barangay, barangay_queryset_filter,
 )
 from myapp.audit_utils import log_audit, log_system
+from myapp.date_utils import format_display_date, format_display_datetime, parse_user_date
 from .risk_service import evaluate_report_risk
 from .batch_service import save_batch_submission
 from .ml_display import predicted_disease_display
@@ -237,7 +238,7 @@ def _process_report_submission(request, barangays, locked_barangay=None):
         patient_name=patient_name or 'Unknown Resident',
         date_of_birth=birthdate,
         detailed_address=patient_addr or '',
-        date_of_onset=onset_date or None,
+        date_of_onset=parse_user_date(onset_date),
         case_classification=classif,
         status=classif.capitalize(),
         validation_status='pending',
@@ -264,12 +265,7 @@ def _process_report_submission(request, barangays, locked_barangay=None):
 
 
 def _parse_patient_birthdate(raw):
-    if not raw:
-        return None
-    try:
-        return datetime.strptime(raw, '%Y-%m-%d').date()
-    except ValueError:
-        return None
+    return parse_user_date(raw)
 
 
 def _get_or_create_patient(barangay_id, full_name, sex, birthdate, address):
@@ -747,9 +743,13 @@ def incident_reports(request):
     q = Q(validation_status='validated')
 
     if date_from:
-        q &= Q(report_date__date__gte=date_from)
+        parsed_from = parse_user_date(date_from)
+        if parsed_from:
+            q &= Q(report_date__date__gte=parsed_from)
     if date_to:
-        q &= Q(report_date__date__lte=date_to)
+        parsed_to = parse_user_date(date_to)
+        if parsed_to:
+            q &= Q(report_date__date__lte=parsed_to)
     if syndrome:
         q &= Q(syndrome_type=syndrome)
     if barangay:
@@ -815,10 +815,10 @@ def incident_reports(request):
                 r.syndrome_type,
                 r.case_count,
                 r.case_classification.title(),
-                r.date_of_onset or '—',
+                format_display_date(r.date_of_onset),
                 r.computed_risk_level,
                 r.reporter or '—',
-                r.report_date.strftime("%Y-%m-%d") if r.report_date else '—'
+                format_display_datetime(r.report_date),
             ])
         return response
 

@@ -1,4 +1,5 @@
 {% extends "dashboard/base_dashboard.html" %}
+{% load pulse_dates %}
 {% block page_title %}My Profile{% endblock %}
 {% block content %}
 <div class="pulse-page">
@@ -53,7 +54,7 @@
         {% if user.birthdate %}
         <div class="form-group">
           <label for="profile-birthdate">Date of Birth</label>
-          <input type="text" id="profile-birthdate" class="input-soft input-soft--plain readonly-field" value="{{ user.birthdate }}" readonly>
+          <input type="text" id="profile-birthdate" class="input-soft input-soft--plain readonly-field" value="{{ user.birthdate|md_date }}" readonly>
         </div>
         {% endif %}
         <p class="profile-hint">Name and birthdate are locked. Contact your administrator to request changes.</p>

@@ -1,4 +1,5 @@
 {% extends "dashboard/base_dashboard.html" %}
+{% load pulse_dates %}
 {% block page_title %}Case Records{% endblock %}
 {% block content %}
 <div class="pulse-page">
@@ -127,13 +128,13 @@
                 <div class="um-muted" style="font-size:.75rem;margin-top:.15rem;">{{ r.ml_prediction.confidence_pct }}% confidence</div>
               {% endif %}
             </td>
-            <td data-label="Onset">{{ r.date_of_onset|default:"—" }}</td>
+            <td data-label="Onset">{{ r.date_of_onset|md_date }}</td>
             <td data-label="Reporter">{{ r.submitted_by_name|default:"—" }}</td>
             <td data-label="Status">
               <span class="pill-badge {% if r.status == 'Unclassified' or r.status == 'Pending ML Analysis' %}badge-muted{% elif r.status == 'Suspected' %}badge-suspected{% elif r.status == 'Confirmed' %}badge-confirmed{% elif r.status == 'Discarded' %}badge-discarded{% elif r.status == 'Probable' %}badge-probable{% else %}badge-muted{% endif %}">
                 {{ r.status }}
               </span>
-              {% if r.confirmed_at %}<div class="um-muted" style="margin-top:.25rem;">{{ r.confirmed_at|date:"M d, Y" }}</div>{% endif %}
+              {% if r.confirmed_at %}<div class="um-muted" style="margin-top:.25rem;">{{ r.confirmed_at|md_date }}</div>{% endif %}
             </td>
             <td data-label="Validation">
               <span class="pill-badge {% if r.validation_status == 'validated' %}badge-active{% elif r.validation_status == 'rejected' %}badge-inactive{% else %}badge-muted{% endif %}">{{ r.validation_status|title }}</span>
@@ -147,17 +148,17 @@
                     '{{ r.syndrome_type }}',
                     '{{ r.case_classification }}',
                     '{{ r.case_count }}',
-                    '{{ r.date_of_onset|default:"" }}',
+                    '{{ r.date_of_onset|md_date }}',
                     '{{ r.status }}',
                     '{{ r.validation_status }}',
                     '{{ r.submitted_by_name|default:"—" }}',
-                    '{{ r.report_date|date:"M d, Y H:i" }}',
-                    '{{ r.confirmed_at|date:"M d, Y H:i"|default:"" }}',
+                    '{{ r.report_date|md_datetime }}',
+                    '{{ r.confirmed_at|md_datetime|default:"" }}',
                     {{ r.latitude|default:"null" }},
                     {{ r.longitude|default:"null" }},
                     `{{ r.remarks|default:""|escapejs }}`,
                     '{{ r.resolution_outcome|default:""|escapejs }}',
-                    '{{ r.closed_at|date:"M d, Y H:i"|default:"" }}'
+                    '{{ r.closed_at|md_datetime|default:"" }}'
                   )">View</button>
                 {% if r.status == 'Suspected' and can_confirm %}
                 <form method="POST" action="{% url 'confirm_case' r.id %}" class="um-inline-form" onsubmit="return confirm('Confirm this case as verified by CHO?');">

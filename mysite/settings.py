@@ -140,6 +140,19 @@ TIME_ZONE = 'Asia/Manila'
 
 USE_I18N = True
 
+USE_L10N = True
+
+DATE_FORMAT = 'm/d/Y'
+SHORT_DATE_FORMAT = 'm/d/Y'
+DATETIME_FORMAT = 'm/d/Y g:i A'
+SHORT_DATETIME_FORMAT = 'm/d/Y g:i A'
+DATE_INPUT_FORMATS = [
+    '%m/%d/%Y',
+    '%m/%d/%y',
+    '%m-%d-%Y',
+    '%Y-%m-%d',
+]
+
 USE_TZ = True
 
 

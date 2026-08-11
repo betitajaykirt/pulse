@@ -1,4 +1,5 @@
 {% extends "dashboard/base_dashboard.html" %}
+{% load pulse_dates %}
 {% block page_title %}User Management{% endblock %}
 {% block content %}
 <div class="pulse-page um-page">
@@ -52,7 +53,7 @@
         </div>
         <div class="form-group">
           <label for="create-birthdate">Date of Birth</label>
-          <input type="date" id="create-birthdate" name="birthdate" class="input-soft" placeholder="mm/dd/yyyy">
+          <input type="text" id="create-birthdate" name="birthdate" class="input-soft date-input-md" placeholder="mm/dd/yyyy">
         </div>
         <div class="form-group">
           <label for="create-email">Email *</label>
@@ -174,7 +175,7 @@
             <td data-label="Status">
               <span class="um-pill um-pill--{{ u.status }}">{{ u.status|title }}</span>
             </td>
-            <td data-label="Created"><span class="um-date">{{ u.created_at|date:"M d, Y" }}</span></td>
+            <td data-label="Created"><span class="um-date">{{ u.created_at|md_datetime }}</span></td>
             <td data-label="Actions">
               <div class="um-actions">
                 <button type="button" class="nc-btn nc-btn--outline nc-btn--sm btn-edit-toggle" data-id="{{ u.id }}">

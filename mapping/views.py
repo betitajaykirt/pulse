@@ -4,6 +4,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_GET
 from django.db.models import OuterRef, Subquery, Sum, Count, Q
 from django.utils import timezone
+from myapp.date_utils import format_display_date, format_display_datetime, parse_user_date
 from datetime import timedelta
 from accounts.auth_utils import login_required
 from myapp.models import (
@@ -411,10 +412,8 @@ def api_cases(request):
             or classif_norm == 'confirmed'
             or bool(r.validated_by)
         )
-        confirmed_date = (
-            r.confirmed_at.strftime('%Y-%m-%d') if r.confirmed_at else ''
-        )
-        onset = r.date_of_onset.strftime('%Y-%m-%d') if r.date_of_onset else ''
+        confirmed_date = format_display_date(r.confirmed_at) if r.confirmed_at else ''
+        onset = format_display_date(r.date_of_onset)
         ml_predicted = ml_top_prediction_for_report(r) or _ml_predicted_disease(r)
         ml_confidence = parse_ml_confidence(r.remarks or '')
         ml_display = predicted_disease_display(r)
@@ -452,7 +451,7 @@ def api_cases(request):
             'case_count':          r.case_count,
             'case_classification': r.case_classification,
             'validation_status':   r.validation_status,
-            'report_date':         r.report_date.strftime('%Y-%m-%d') if r.report_date else '',
+            'report_date':         format_display_date(r.report_date),
             'date_of_onset':       onset,
             'barangay_name':       r.barangay.barangay_name if r.barangay else 'Unknown',
             'heat_intensity':      heat_intensity,

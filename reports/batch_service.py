@@ -17,6 +17,7 @@ from myapp.models import (
 )
 
 from myapp.symptom_utils import symptom_label_map
+from myapp.date_utils import parse_user_date
 
 from .ml_service import analyze_batch_cases
 
@@ -123,33 +124,12 @@ def resolve_barangay_id(barangay_value, locked_barangay=None):
 
 
 def _parse_optional_date(raw):
-
     if not raw:
-
         return None
-
     s = str(raw).strip()
-
     if not s:
-
         return None
-
-    from datetime import datetime
-
-    for fmt in ('%Y-%m-%d', '%m/%d/%Y', '%m-%d-%Y'):
-
-        try:
-
-            return datetime.strptime(s, fmt).date()
-
-        except ValueError:
-
-            continue
-
-    return None
-
-
-
+    return parse_user_date(s)
 
 
 def _extract_demographics(case):

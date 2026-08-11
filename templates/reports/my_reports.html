@@ -1,4 +1,5 @@
 {% extends "dashboard/base_dashboard.html" %}
+{% load pulse_dates %}
 {% block page_title %}My Reports{% endblock %}
 {% block content %}
 <div class="pulse-page">
@@ -58,13 +59,13 @@
                 {{ r.case_classification|title }}
               </span>
             </td>
-            <td data-label="Onset">{{ r.date_of_onset|default:"—" }}</td>
+            <td data-label="Onset">{{ r.date_of_onset|md_date }}</td>
             <td data-label="Status">
               <span class="pill-badge {% if r.status == 'Confirmed' %}badge-confirmed{% elif r.status == 'Probable' %}badge-probable{% elif r.status == 'Suspected' %}badge-suspected{% else %}badge-muted{% endif %}">
                 {{ r.status|default:"—" }}
               </span>
             </td>
-            <td data-label="Submitted"><span class="um-date">{{ r.report_date|date:"M d, Y H:i" }}</span></td>
+            <td data-label="Submitted"><span class="um-date">{{ r.report_date|md_datetime }}</span></td>
           </tr>
           {% endfor %}
         {% endif %}

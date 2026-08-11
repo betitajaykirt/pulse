@@ -1,4 +1,5 @@
 {% extends "dashboard/base_dashboard.html" %}
+{% load pulse_dates %}
 {% block page_title %}Case Confirmation{% endblock %}
 {% block content %}
 <div class="pulse-page">
@@ -76,8 +77,8 @@
               <span class="pill-badge badge-danger" style="margin-left:.25rem;">Anomaly</span>
               {% endif %}
             </td>
-            <td data-label="Date of Onset">{{ item.onset_date|date:"M d, Y"|default:"—" }}</td>
-            <td data-label="Date Reported">{{ r.report_date|date:"M d, Y H:i" }}</td>
+            <td data-label="Date of Onset">{{ item.onset_date|md_date }}</td>
+            <td data-label="Date Reported">{{ r.report_date|md_datetime }}</td>
             <td data-label="Status">
               <span class="pill-badge badge-probable">{{ r.status }}</span>
             </td>
@@ -89,7 +90,7 @@
                   '{{ item.patient_id_display|escapejs }}',
                   '{{ r.barangay_name|default:"—"|escapejs }}',
                   '{{ item.ml_disease|escapejs }}',
-                  '{{ r.report_date|date:"M d, Y H:i"|escapejs }}'
+                  '{{ r.report_date|md_datetime|escapejs }}'
                 )">
                 <i data-lucide="flask-conical" class="lucide-icon lucide-icon--xs"></i>
                 Process Lab Result
