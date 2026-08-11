@@ -23,6 +23,9 @@ from myapp.barangay_scope import (
 )
 from myapp.audit_utils import log_audit, log_system
 from myapp.date_utils import format_display_date, format_display_datetime, parse_user_date
+from reports.disease_category_data import filter_surveillance_reports_by_disease_label
+from reports.ml_display import is_inconclusive_disease_label
+from reports.pidsr_schema import DISEASE_LABELS, normalize_disease_label
 from .risk_service import evaluate_report_risk
 from .batch_service import save_batch_submission
 from .ml_display import predicted_disease_display
@@ -42,6 +45,28 @@ DISEASE_CATEGORIES = [
     'Water-Borne Disease', 'Respiratory Disease',
     'Vaccine-Preventable Disease', 'Zoonotic Disease', 'Other',
 ]
+
+
+def _incident_summary_disease_label(syndrome_type: str) -> str:
+    """Normalize legacy syndrome labels for incident report summaries."""
+    label = normalize_disease_label((syndrome_type or '').strip())
+    if is_inconclusive_disease_label(label):
+        return ''
+    return label
+
+
+def _incident_report_risk_level(report, assessment=None) -> str:
+    """Lightweight risk label for incident tables (avoids per-row APTAS recompute)."""
+    if assessment and assessment.risk_level:
+        level = assessment.risk_level.strip().title()
+        if level.lower() != 'low':
+            return level
+    classif = (report.case_classification or 'suspected').lower()
+    return {
+        'confirmed': 'Critical',
+        'probable': 'High',
+        'suspected': 'Moderate',
+    }.get(classif, 'Moderate')
 
 
 # ── Submit Case Report (Health Officer / BHW / Encoder) ──────────
@@ -755,54 +780,45 @@ def incident_reports(request):
     if barangay:
         q &= Q(barangay_id=barangay)
 
-    reports = list(SurveillanceReport.objects.filter(q).select_related('barangay', 'submitted_by').annotate(
-        barangay_name=F('barangay__barangay_name'),
-        risk_status=Value('low', output_field=CharField()),
-        reporter=Concat(
-            F('submitted_by__first_name'),
-            Value(' '),
-            F('submitted_by__last_name'),
-            output_field=CharField()
+    if syndrome:
+        base_qs = filter_surveillance_reports_by_disease_label(
+            SurveillanceReport.objects.filter(q),
+            syndrome,
         )
-    ).order_by('-report_date'))
+    else:
+        base_qs = SurveillanceReport.objects.filter(q)
 
-    # Retrieve and calculate APTAS metrics for all fetched reports
+    reports = list(
+        base_qs.select_related('barangay', 'submitted_by')
+        .annotate(
+            barangay_name=F('barangay__barangay_name'),
+            reporter=Concat(
+                F('submitted_by__first_name'),
+                Value(' '),
+                F('submitted_by__last_name'),
+                output_field=CharField(),
+            ),
+        )
+        .order_by('-report_date')
+    )
+
     from myapp.models import RiskAssessment
-    from reports.aptas_service import compute_aptas_breakdown
-    
+
     report_ids = [r.id for r in reports]
-    assessments = {a.report_id: a for a in RiskAssessment.objects.filter(report_id__in=report_ids)}
-    
-    aptas_cache = {}
-    for r in reports:
-        assessment = assessments.get(r.id)
-        raw_anomaly = None
-        if assessment and assessment.anomaly_score is not None:
-            raw_anomaly = float(assessment.anomaly_score)
-        elif r.ml_anomaly_score is not None:
-            raw_anomaly = float(r.ml_anomaly_score)
-            
-        b_name = r.barangay_name if r.barangay_name else ''
-        syndrome = (r.syndrome_type or r.suspected_disease or '').strip()
-        
-        cache_key = (b_name.lower(), syndrome.lower(), r.id, round(raw_anomaly or 0.0, 4))
-        if cache_key not in aptas_cache:
-            try:
-                aptas_cache[cache_key] = compute_aptas_breakdown(b_name, syndrome, raw_anomaly, report=r)
-            except Exception:
-                aptas_cache[cache_key] = {
-                    'anomaly_score': raw_anomaly or 0.0,
-                    'temporal_score': 0.0,
-                    'spatial_score': 0.0,
-                    'environmental_score': 0.0,
-                    'final_risk_score': 0.0,
-                }
-        breakdown = aptas_cache[cache_key]
-        r.final_score = float(breakdown['final_risk_score']) / 100.0 if breakdown.get('final_risk_score') is not None else None
-        r.anomaly_score = float(breakdown['anomaly_score']) if breakdown.get('anomaly_score') is not None else None
-        r.temporal_score = float(breakdown['temporal_score']) if breakdown.get('temporal_score') is not None else None
-        r.spatial_score = float(breakdown['spatial_score']) if breakdown.get('spatial_score') is not None else None
-        r.environmental_score = float(breakdown['environmental_score']) if breakdown.get('environmental_score') is not None else None
+    assessments = {}
+    if report_ids:
+        for assessment in RiskAssessment.objects.filter(
+            report_id__in=report_ids,
+        ).order_by('report_id', '-created_at'):
+            if assessment.report_id not in assessments:
+                assessments[assessment.report_id] = assessment
+
+    for report in reports:
+        report.display_disease = _incident_summary_disease_label(report.syndrome_type) or (report.syndrome_type or '—')
+        report.incident_risk_level = _incident_report_risk_level(
+            report,
+            assessments.get(report.id),
+        )
 
     if request.GET.get('export') == 'excel':
         response = HttpResponse(content_type='text/csv')
@@ -812,11 +828,11 @@ def incident_reports(request):
         for r in reports:
             writer.writerow([
                 r.barangay_name or '—',
-                r.syndrome_type,
+                r.display_disease,
                 r.case_count,
                 r.case_classification.title(),
                 format_display_date(r.date_of_onset),
-                r.computed_risk_level,
+                r.incident_risk_level,
                 r.reporter or '—',
                 format_display_datetime(r.report_date),
             ])
@@ -829,9 +845,9 @@ def incident_reports(request):
     by_classif  = {'suspected': 0, 'probable': 0, 'confirmed': 0}
 
     for r in reports:
-        synd_lower = (r.syndrome_type or '').lower()
-        if synd_lower and 'insufficient data' not in synd_lower and 'pending' not in synd_lower and 'inconclusive' not in synd_lower and 'unclassified' not in synd_lower:
-            by_disease[r.syndrome_type]  = by_disease.get(r.syndrome_type, 0) + r.case_count
+        disease_label = _incident_summary_disease_label(r.syndrome_type)
+        if disease_label:
+            by_disease[disease_label] = by_disease.get(disease_label, 0) + r.case_count
         by_barangay[r.barangay_name] = by_barangay.get(r.barangay_name, 0) + r.case_count
         by_classif[r.case_classification] = by_classif.get(r.case_classification, 0) + r.case_count
 
@@ -844,7 +860,7 @@ def incident_reports(request):
         'by_barangay': sorted(by_barangay.items(), key=lambda x: -x[1]),
         'by_classif':  by_classif,
         'barangays':   barangays,
-        'syndrome_types': SYNDROME_TYPES,
+        'syndrome_types': list(DISEASE_LABELS),
         'date_from': date_from, 'date_to': date_to,
         'syndrome': syndrome, 'barangay': barangay,
     })

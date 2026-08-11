@@ -158,30 +158,25 @@
           <tr class="pulse-table__row"
               data-id="{{ r.id }}"
               data-barangay="{{ r.barangay_name|default:'—' }}"
-              data-disease="{{ r.syndrome_type }}"
+              data-disease="{{ r.display_disease }}"
               data-cases="{{ r.case_count }}"
               data-classification="{{ r.case_classification|title }}"
               data-onset="{{ r.date_of_onset|md_date }}"
-              data-risk="{{ r.computed_risk_level }}"
+              data-risk="{{ r.incident_risk_level }}"
               data-reporter="{{ r.reporter|default:'—' }}"
               data-date="{{ r.report_date|md_datetime }}"
               data-remarks="{{ r.remarks|default:'No remarks provided.' }}">
             <td data-label="Barangay">{{ r.barangay_name|default:"—" }}</td>
-            <td data-label="Disease">
-              {{ r.syndrome_type }}
-              {% if r.remarks %}
-                <br><small class="um-muted">{{ r.remarks|truncatechars:80 }}</small>
-              {% endif %}
-            </td>
+            <td data-label="Disease">{{ r.display_disease }}</td>
             <td data-label="Cases"><strong>{{ r.case_count }}</strong></td>
             <td data-label="Classification">
               <span class="pill-badge {% if r.case_classification == 'confirmed' %}badge-danger{% elif r.case_classification == 'probable' %}badge-probable{% else %}badge-info{% endif %}">{{ r.case_classification|title }}</span>
             </td>
             <td data-label="Onset">{{ r.date_of_onset|md_date }}</td>
             <td data-label="Risk">
-              {% with risk=r.computed_risk_level|lower %}
+              {% with risk=r.incident_risk_level|lower %}
                 <span class="pill-badge {% if risk == 'critical' %}badge-risk-critical{% elif risk == 'high' %}badge-risk-high{% elif risk == 'moderate' %}badge-risk-moderate{% else %}badge-risk-low{% endif %}">
-                  {{ r.computed_risk_level }}
+                  {{ r.incident_risk_level }}
                 </span>
               {% endwith %}
             </td>
