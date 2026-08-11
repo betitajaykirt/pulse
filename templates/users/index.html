@@ -63,9 +63,7 @@
           <label for="create-role">Role *</label>
           <select name="role" id="create-role" class="input-soft" required>
             <option value="">Select Role</option>
-            <option value="encoder">Encoder</option>
             <option value="health_officer">Health Officer</option>
-            <option value="surveillance_officer">Surveillance Officer</option>
             <option value="catchment_nurse">Catchment Nurse</option>
             <option value="barangay_health_worker">Barangay Health Worker</option>
           </select>
@@ -240,7 +238,7 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   var roleSelect = document.getElementById('create-role');
-  var barangayRoles = ['barangay_health_worker', 'encoder', 'surveillance_officer', 'health_officer', 'catchment_nurse'];
+  var barangayRoles = ['barangay_health_worker', 'health_officer', 'catchment_nurse'];
   roleSelect.addEventListener('change', function () {
     var bf = document.getElementById('barangay-field');
     var needsBarangay = barangayRoles.indexOf(this.value) !== -1;

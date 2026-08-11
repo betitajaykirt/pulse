@@ -47,14 +47,14 @@ def create(request):
     barangay = request.POST.get('barangay_text', '').strip()
     contact  = request.POST.get('contact_number', '').strip()
 
-    valid_roles = ['encoder', 'health_officer', 'surveillance_officer', 'barangay_health_worker', 'catchment_nurse']
+    valid_roles = ['health_officer', 'barangay_health_worker', 'catchment_nurse']
     errors = []
     if not first:  errors.append('First name required.')
     if not last:   errors.append('Last name required.')
     if not email:  errors.append('Email required.')
     if role not in valid_roles: errors.append('Invalid role.')
     if len(password) < 8: errors.append('Password must be at least 8 characters.')
-    if role in ('barangay_health_worker', 'encoder', 'surveillance_officer', 'health_officer', 'catchment_nurse') and not barangay:
+    if role in ('barangay_health_worker', 'health_officer', 'catchment_nurse') and not barangay:
         errors.append('Barangay is required for the selected role.')
     if bdate and not parse_user_date(bdate):
         errors.append('Enter date of birth as mm/dd/yyyy.')
