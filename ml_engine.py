@@ -144,6 +144,23 @@ def apply_exposure_gating(
     return adjusted
 
 
+def _calibrate_anomaly_score(raw_score: float, active_cases: int) -> float:
+    """
+    Calibrate Isolation Forest score_samples to risk score [0, 1].
+    Normal baseline scores ~ -0.48 -> mapped to 0.05-0.20
+    Surge anomaly scores < -0.64 -> mapped to 0.80+
+    """
+    val = (-raw_score - 0.43) / 0.22
+    val = float(max(0.0, min(1.0, val)))
+    
+    if active_cases <= 2:
+        val = min(val, 0.20)
+    elif active_cases >= 5:
+        val = max(val, 0.80)
+        
+    return val
+
+
 def detect_anomalies(
     data: pd.DataFrame,
     *,
@@ -156,7 +173,25 @@ def detect_anomalies(
         result['anomaly_score'] = pd.Series(dtype=float)
         return result
 
-    features = _prepare_feature_frame(data)
+    feature_cols = ['active_cases', 'rainfall_mm', 'temperature_c', 'humidity_pct']
+    working = data.copy()
+    
+    if 'active_cases' not in working.columns:
+        working['active_cases'] = 0
+    working['active_cases'] = pd.to_numeric(working['active_cases'], errors='coerce').fillna(0)
+    
+    if 'rainfall_mm' not in working.columns:
+        working['rainfall_mm'] = working.get('rainfall', CLIMATE_DEFAULTS['rainfall'])
+    if 'temperature_c' not in working.columns:
+        working['temperature_c'] = working.get('temperature', CLIMATE_DEFAULTS['temperature'])
+    if 'humidity_pct' not in working.columns:
+        working['humidity_pct'] = working.get('humidity', CLIMATE_DEFAULTS['humidity'])
+        
+    for col, default_key in [('rainfall_mm', 'rainfall'), ('temperature_c', 'temperature'), ('humidity_pct', 'humidity')]:
+        working[col] = pd.to_numeric(working[col], errors='coerce').fillna(CLIMATE_DEFAULTS[default_key])
+
+    features = working[feature_cols].astype(float)
+    
     model = IsolationForest(
         n_estimators=200,
         contamination=contamination,
@@ -164,9 +199,14 @@ def detect_anomalies(
         n_jobs=-1,
     )
     model.fit(features)
+    
     result = data.copy()
+    raw_scores = model.score_samples(features)
     result['is_anomaly'] = model.predict(features).astype(int)
-    result['anomaly_score'] = model.score_samples(features)
+    result['anomaly_score'] = [
+        float(_calibrate_anomaly_score(s, c)) 
+        for s, c in zip(raw_scores, working['active_cases'])
+    ]
     return result
 
 

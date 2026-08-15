@@ -41,6 +41,53 @@ def _load_training_frame() -> pd.DataFrame:
     return _build_mock_training_set()
 
 
+def _get_outbreak_training_data() -> pd.DataFrame:
+    baseline_path = Path(settings.BASE_DIR) / 'pulse_zero_baseline_data.csv'
+    if baseline_path.is_file():
+        baseline_df = pd.read_csv(baseline_path)
+        grouped_baseline = baseline_df.groupby(['date', 'barangay']).agg({
+            'active_cases': 'sum',
+            'rainfall_mm': 'mean',
+            'temperature_c': 'mean',
+            'humidity_pct': 'mean'
+        }).reset_index()
+    else:
+        grouped_baseline = pd.DataFrame()
+        
+    from myapp.models import SurveillanceReport
+    
+    reports = SurveillanceReport.objects.exclude(status__in=['Discarded', 'Closed']).values('report_date', 'barangay__barangay_name')
+    db_rows = []
+    for r in reports:
+        dt = r['report_date']
+        if dt:
+            # handle timezone aware
+            if timezone.is_aware(dt):
+                dt = timezone.localtime(dt)
+            db_rows.append({
+                'date': dt.date().isoformat(),
+                'barangay': r['barangay__barangay_name'] or '',
+                'active_cases': 1,
+            })
+            
+    db_df = pd.DataFrame(db_rows)
+    if not db_df.empty:
+        db_df = db_df.groupby(['date', 'barangay']).agg({'active_cases': 'sum'}).reset_index()
+        
+    if not db_df.empty and not grouped_baseline.empty:
+        combined = pd.concat([grouped_baseline, db_df], ignore_index=True)
+        return combined.groupby(['date', 'barangay']).agg({
+            'active_cases': 'sum',
+            'rainfall_mm': 'mean',
+            'temperature_c': 'mean',
+            'humidity_pct': 'mean'
+        }).reset_index()
+    elif not db_df.empty:
+        # We don't have climate for these dynamically if baseline is empty, so we fill with defaults later
+        return db_df
+    return grouped_baseline
+
+
 def get_climate_features_for_timestamp(reference_dt=None) -> dict:
     ref = reference_dt or timezone.now()
     if timezone.is_naive(ref):
@@ -92,6 +139,7 @@ def analyze_patient_case(
     submission_datetime=None,
 ) -> Dict[str, Any]:
     train_df = _load_training_frame()
+    outbreak_train_df = _get_outbreak_training_data()
     now = submission_datetime or timezone.now()
     symptoms = normalize_symptom_codes(symptoms)
     symptom_count = len(symptoms)
@@ -109,8 +157,31 @@ def analyze_patient_case(
     feature_row['submission_date'] = now.date().isoformat()
     incoming = ensure_climate_columns(pd.DataFrame([feature_row]))
 
-    baseline = train_df.drop(columns=[TARGET_COLUMN], errors='ignore')
-    screened = detect_anomalies(pd.concat([baseline, incoming], ignore_index=True))
+    from myapp.models import SurveillanceReport
+    from datetime import datetime, time, timedelta
+    
+    # Safe date filtering for SQLite
+    if timezone.is_naive(now):
+        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    else:
+        start_of_day = timezone.localtime(now).replace(hour=0, minute=0, second=0, microsecond=0)
+        
+    end_of_day = start_of_day + timedelta(days=1)
+    
+    db_today_cases = SurveillanceReport.objects.filter(
+        barangay__barangay_name=barangay_name, 
+        report_date__gte=start_of_day,
+        report_date__lt=end_of_day
+    ).exclude(status__in=['Discarded', 'Closed']).count()
+
+    incoming_outbreak_row = pd.DataFrame([{
+        'active_cases': db_today_cases + 1,
+        'rainfall_mm': climate.get('rainfall', CLIMATE_DEFAULTS['rainfall']),
+        'temperature_c': climate.get('temperature', CLIMATE_DEFAULTS['temperature']),
+        'humidity_pct': climate.get('humidity', CLIMATE_DEFAULTS['humidity']),
+    }])
+
+    screened = detect_anomalies(pd.concat([outbreak_train_df, incoming_outbreak_row], ignore_index=True))
     result_row = screened.iloc[-1]
     is_anomaly = int(result_row['is_anomaly']) == -1
     anomaly_score = float(result_row['anomaly_score'])
