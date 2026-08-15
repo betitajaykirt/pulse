@@ -453,11 +453,11 @@
 
       return cases.reduce(function (best, c) {
 
-        var cl = c.case_classification || 'suspected';
+        var cl = mapPopupClassificationKey(c);
 
         return (CLASSIF_RANK[cl] || 0) > (CLASSIF_RANK[best] || 0) ? cl : best;
 
-      }, cases[0].case_classification || 'suspected');
+      }, mapPopupClassificationKey(cases[0]));
 
     }
 
@@ -1135,8 +1135,9 @@
     function mapPopupClassificationLabel(c) {
       var st = (c.status || '').toString().trim();
       var cl = (c.case_classification || '').toString().trim();
+      var stLower = st.toLowerCase();
 
-      if (st.toLowerCase() === 'probable' || st.toLowerCase() === 'confirmed') {
+      if (stLower === 'probable' || stLower === 'confirmed' || stLower === 'suspected') {
         return st.toUpperCase();
       }
 
@@ -1144,7 +1145,7 @@
         return st ? st.toUpperCase() : 'INCONCLUSIVE';
       }
 
-      var raw = (cl || st || 'Suspected').replace(/_/g, ' ').trim();
+      var raw = (st || cl || 'Suspected').replace(/_/g, ' ').trim();
       return raw.toUpperCase();
     }
 
