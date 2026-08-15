@@ -1423,7 +1423,7 @@
 
       var classifCounts = { suspected: 0, probable: 0, confirmed: 0 };
       cases.forEach(function(c) {
-         var cls = (c.case_classification || 'suspected').toLowerCase();
+         var cls = mapPopupClassificationKey(c);
          if (classifCounts[cls] !== undefined) classifCounts[cls]++;
       });
       var statusText = [];
@@ -1518,7 +1518,8 @@
 
         hp.push([c.latitude, c.longitude, c.heat_intensity]);
 
-        counts[c.case_classification] = (counts[c.case_classification] || 0) + c.case_count;
+        var classifKey = mapPopupClassificationKey(c);
+        counts[classifKey] = (counts[classifKey] || 0) + c.case_count;
 
         counts.total += c.case_count;
 
@@ -1539,7 +1540,7 @@
 
         html += 'Cases: <b>' + (c.case_count || 0) + '</b><br>';
 
-        html += 'Classification: <b>' + (c.case_classification || 'suspected').toUpperCase() + '</b><br>';
+        html += 'Classification: <b>' + mapPopupClassificationLabel(c) + '</b><br>';
 
         html += 'Barangay: ' + (c.barangay_name || '—');
 

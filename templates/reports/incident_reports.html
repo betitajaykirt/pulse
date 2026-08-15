@@ -93,7 +93,7 @@
         <i data-lucide="alert-triangle" class="lucide-icon lucide-icon--sm"></i>
       </div>
       <div>
-        <div class="pulse-stat-card__value">{{ by_classif.confirmed }}</div>
+        <div class="pulse-stat-card__value">{{ by_classif.Confirmed }}</div>
         <div class="pulse-stat-card__label">Confirmed</div>
       </div>
     </div>
@@ -160,7 +160,7 @@
               data-barangay="{{ r.barangay_name|default:'—' }}"
               data-disease="{{ r.display_disease }}"
               data-cases="{{ r.case_count }}"
-              data-classification="{{ r.case_classification|title }}"
+              data-classification="{{ r.status }}"
               data-onset="{{ r.date_of_onset|md_date }}"
               data-risk="{{ r.incident_risk_level }}"
               data-reporter="{{ r.reporter|default:'—' }}"
@@ -170,7 +170,7 @@
             <td data-label="Disease">{{ r.display_disease }}</td>
             <td data-label="Cases"><strong>{{ r.case_count }}</strong></td>
             <td data-label="Classification">
-              <span class="pill-badge {% if r.case_classification == 'confirmed' %}badge-danger{% elif r.case_classification == 'probable' %}badge-probable{% else %}badge-info{% endif %}">{{ r.case_classification|title }}</span>
+              <span class="pill-badge {% if r.status == 'Confirmed' %}badge-danger{% elif r.status == 'Probable' %}badge-probable{% elif r.status == 'Suspected' %}badge-suspected{% else %}badge-info{% endif %}">{{ r.status }}</span>
             </td>
             <td data-label="Onset">{{ r.date_of_onset|md_date }}</td>
             <td data-label="Risk">

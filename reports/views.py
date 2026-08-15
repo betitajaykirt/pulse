@@ -820,7 +820,7 @@ def incident_reports(request):
                 r.barangay_name or '—',
                 r.display_disease,
                 r.case_count,
-                r.case_classification.title(),
+                r.status,
                 format_display_date(r.date_of_onset),
                 r.incident_risk_level,
                 r.reporter or '—',
@@ -832,14 +832,15 @@ def incident_reports(request):
     total_cases = sum(r.case_count for r in reports)
     by_disease  = {}
     by_barangay = {}
-    by_classif  = {'suspected': 0, 'probable': 0, 'confirmed': 0}
+    by_classif  = {'Suspected': 0, 'Probable': 0, 'Confirmed': 0}
 
     for r in reports:
         disease_label = _incident_summary_disease_label(r.syndrome_type)
         if disease_label:
             by_disease[disease_label] = by_disease.get(disease_label, 0) + r.case_count
         by_barangay[r.barangay_name] = by_barangay.get(r.barangay_name, 0) + r.case_count
-        by_classif[r.case_classification] = by_classif.get(r.case_classification, 0) + r.case_count
+        status_key = r.status if r.status in by_classif else 'Suspected'
+        by_classif[status_key] = by_classif.get(status_key, 0) + r.case_count
 
     barangays = Barangay.objects.all().order_by('barangay_name')
 
