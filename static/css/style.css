@@ -1243,11 +1243,11 @@ select {
   text-transform: uppercase; letter-spacing: .05em; margin-right: .15rem;
 }
 .filter-bar select {
-  border: none; background: transparent; font-size: .82rem; font-weight: 500;
+  border: none; background-color: transparent; font-size: .82rem; font-weight: 500;
   color: var(--text); padding: .35rem 1.5rem .35rem .45rem;
   cursor: pointer; border-radius: var(--radius);
 }
-.filter-bar select:hover, .filter-bar select:focus { background: var(--bg); outline: none; }
+.filter-bar select:hover, .filter-bar select:focus { background-color: var(--bg); outline: none; }
 .filter-bar__divider { width: 1px; height: 1.1rem; background: var(--border); margin: 0 .15rem; }
 
 /* ── Collapsible filter drawer ──────────────────────────────────── */
@@ -2739,7 +2739,7 @@ tbody tr:last-child td { border-bottom: none; }
 .filter-drawer__grid select,
 .filter-drawer__grid input[type="text"] {
   padding: .65rem .9rem;
-  background: #F1F5F9; border: 1.5px solid transparent;
+  background-color: #F1F5F9; border: 1.5px solid transparent;
   border-radius: var(--radius-md);
 }
 
