@@ -26,13 +26,13 @@
         <thead>
           <tr>
             <th>#</th><th>Patient</th><th>Barangay</th><th>Predicted Disease</th><th>Cases</th>
-            <th>Classification</th><th>Date of Onset</th><th>Status</th><th>Submitted</th>
+            <th>Date of Onset</th><th>Status</th><th>Submitted</th>
           </tr>
         </thead>
         <tbody>
         {% if not reports %}
           <tr>
-            <td colspan="9">
+            <td colspan="8">
               <div class="pulse-empty">
                 <i data-lucide="file-text" class="lucide-icon"></i>
                 <p>No reports submitted yet. <a href="{% url 'submit_report' %}">Submit your first report.</a></p>
@@ -54,11 +54,6 @@
               {% endif %}
             </td>
             <td data-label="Cases"><strong>{{ r.case_count }}</strong></td>
-            <td data-label="Classification">
-              <span class="pill-badge {% if r.case_classification == 'confirmed' %}badge-danger{% elif r.case_classification == 'probable' %}badge-probable{% else %}badge-info{% endif %}">
-                {{ r.case_classification|title }}
-              </span>
-            </td>
             <td data-label="Onset">{{ r.date_of_onset|md_date }}</td>
             <td data-label="Status">
               <span class="pill-badge {% if r.status == 'Confirmed' %}badge-confirmed{% elif r.status == 'Probable' %}badge-probable{% elif r.status == 'Suspected' %}badge-suspected{% else %}badge-muted{% endif %}">
