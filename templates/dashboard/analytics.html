@@ -251,7 +251,7 @@ function emptyChartData() {
   };
 }
 
-function buildLineChart(ctx, payload, emptyMsgId) {
+function buildEpiChart(ctx, payload, emptyMsgId) {
   const isEmpty = !hasChartData(payload);
   const el = document.getElementById(emptyMsgId);
   if (el) el.style.display = isEmpty ? 'block' : 'none';
@@ -261,14 +261,7 @@ function buildLineChart(ctx, payload, emptyMsgId) {
   if (!isEmpty) {
     datasets = datasets.map(ds => ({
       ...ds,
-      type: 'line',
-      tension: 0.3,
-      fill: false,
-      borderColor: ds.backgroundColor,
-      borderWidth: 2.5,
-      pointRadius: 3,
-      pointHoverRadius: 6,
-      spanGaps: true,
+      type: 'bar',
     }));
   }
 
@@ -279,7 +272,7 @@ function buildLineChart(ctx, payload, emptyMsgId) {
   }
 
   return new Chart(ctx, {
-    type: 'line',
+    type: 'bar',
     data: isEmpty ? emptyChartData() : { labels: payload.labels, datasets: datasets },
     options: {
       responsive: true,
@@ -289,8 +282,13 @@ function buildLineChart(ctx, payload, emptyMsgId) {
         tooltip: { enabled: !isEmpty, mode: 'index', intersect: false },
       },
       scales: {
-        x: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B', maxTicksLimit: maxTicks, maxRotation: 45, minRotation: 0 } },
+        x: { 
+          stacked: true, 
+          grid: { display: false }, 
+          ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B', maxTicksLimit: maxTicks, maxRotation: 45, minRotation: 0 } 
+        },
         y: {
+          stacked: true,
           beginAtZero: true,
           ticks: { precision: 0, font: { family: 'Inter', size: 11 }, color: '#64748B' },
           grid: { color: CHART_GRID, drawBorder: false },
@@ -421,7 +419,7 @@ async function loadAnalytics() {
     
     if (!epiCanvas || !demoCanvas || !diseaseCanvas || typeof Chart === 'undefined') return;
 
-    epiChart = buildLineChart(
+    epiChart = buildEpiChart(
       epiCanvas.getContext('2d'),
       data.epi_curve || {},
       'epi-empty-msg'

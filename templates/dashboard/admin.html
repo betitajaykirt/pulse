@@ -224,21 +224,12 @@ document.addEventListener('DOMContentLoaded', async function() {
       return;
     }
 
-    // 1. Epi-Curve Chart (Line)
+    // 1. Epi-Curve Chart (Stacked Bar)
     const epiCanvas = document.getElementById('overview-epi-chart');
     if (epiCanvas && data.epi_curve) {
-      // Convert bar configuration to line if desired, or keep as bar from payload.
-      // Modifying payload datasets for line chart appearance
       const epiDatasets = data.epi_curve.datasets.map(ds => ({
         ...ds,
-        type: 'line',
-        tension: 0.3,
-        fill: false,
-        borderColor: ds.backgroundColor,
-        borderWidth: 2.5,
-        pointRadius: 3,
-        pointHoverRadius: 6,
-        spanGaps: true,
+        type: 'bar',
       }));
       
       var epiMaxTicks = 12;
@@ -247,15 +238,19 @@ document.addEventListener('DOMContentLoaded', async function() {
       }
       
       new Chart(epiCanvas.getContext('2d'), {
-        type: 'line',
+        type: 'bar',
         data: {
           labels: data.epi_curve.labels,
           datasets: epiDatasets
         },
         options: Object.assign({}, chartOptions, {
+          plugins: {
+            ...chartOptions.plugins,
+            tooltip: { mode: 'index', intersect: false }
+          },
           scales: {
-            x: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B', maxTicksLimit: epiMaxTicks, maxRotation: 45, minRotation: 0 } },
-            y: { grid: { color: 'rgba(241, 245, 249, 0.9)' }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B', precision: 0 }, border: { display: false }, beginAtZero: true }
+            x: { stacked: true, grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B', maxTicksLimit: epiMaxTicks, maxRotation: 45, minRotation: 0 } },
+            y: { stacked: true, grid: { color: 'rgba(241, 245, 249, 0.9)' }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B', precision: 0 }, border: { display: false }, beginAtZero: true }
           }
         })
       });

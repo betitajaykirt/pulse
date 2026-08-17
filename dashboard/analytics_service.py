@@ -77,15 +77,24 @@ def _period_label(dt, interval):
     return dt.strftime('%b %Y')
 
 
-def _pad_period_keys(period_keys, interval):
+def _pad_period_keys(period_keys, interval, start_date=None, end_date=None):
     """Fill gaps in period_keys so every day/week/month in the range is represented."""
     from datetime import date
 
-    if not period_keys:
+    if not period_keys and not (start_date and end_date):
         return period_keys
 
-    dates = sorted(date.fromisoformat(k) for k in period_keys)
-    start, end = dates[0], dates[-1]
+    if period_keys:
+        dates = sorted(date.fromisoformat(k) for k in period_keys)
+        start = start_date or dates[0]
+        end = end_date or dates[-1]
+    else:
+        start = start_date
+        end = end_date
+
+    # Ensure start is not after end
+    if start > end:
+        start = end
 
     if interval == 'day':
         step = timedelta(days=1)
@@ -168,8 +177,21 @@ def build_epi_curve_data(qs, time_range='current_year'):
             if key not in raw_period_keys:
                 raw_period_keys.append(key)
 
+    from django.utils import timezone
+    today = timezone.now().date()
+    expected_start = earliest if earliest else today
+    
+    if time_range == 'last_30_days':
+        expected_start = today - timedelta(days=30)
+    elif time_range == 'last_3_months':
+        expected_start = today - timedelta(days=90)
+    elif time_range == 'last_6_months':
+        expected_start = today - timedelta(days=183)
+    elif time_range == 'current_year':
+        expected_start = today.replace(month=1, day=1)
+
     # --- 3. Pad the timeline so every interval slot exists ---
-    period_keys = _pad_period_keys(raw_period_keys, interval)
+    period_keys = _pad_period_keys(raw_period_keys, interval, start_date=expected_start, end_date=today)
     if not period_keys:
         period_keys = raw_period_keys
 
