@@ -23,8 +23,8 @@ def _raw_anomaly_for_report(report, *, is_anomaly=False) -> float:
     if report.ml_anomaly_score is not None:
         return float(report.ml_anomaly_score)
     if is_anomaly or report.is_anomaly:
-        return -0.45
-    return 0.25
+        return 0.75   # Pre-calibrated: maps to High tier
+    return 0.15       # Pre-calibrated: maps to Low/Baseline tier
 
 
 def _persist_aptas_risk_log(report, raw_anomaly_score, force_activate=False):

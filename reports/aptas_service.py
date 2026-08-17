@@ -847,8 +847,8 @@ def _raw_anomaly_for_report(report) -> float:
     if report.ml_anomaly_score is not None:
         return float(report.ml_anomaly_score)
     if report.is_anomaly:
-        return -0.45
-    return 0.25
+        return 0.75   # Pre-calibrated: maps to High tier
+    return 0.15       # Pre-calibrated: maps to Low/Baseline tier
 
 
 def reset_aptas_risk_for_barangay_syndrome(barangay_name: str, syndrome_name: str) -> BarangayRiskLog | None:

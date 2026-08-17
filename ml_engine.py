@@ -146,19 +146,51 @@ def apply_exposure_gating(
 
 def _calibrate_anomaly_score(raw_score: float, active_cases: int) -> float:
     """
-    Calibrate Isolation Forest score_samples to risk score [0, 1].
-    Normal baseline scores ~ -0.48 -> mapped to 0.05-0.20
-    Surge anomaly scores < -0.64 -> mapped to 0.80+
+    Calibrate Isolation Forest anomaly score to risk [0, 1] using
+    sigmoid-based density scaling.
+
+    The raw IF score_samples value is combined with the active case
+    count inside the spatial radius window to produce a graduated
+    risk curve:
+        1 case  → ~0.10 – 0.22  (Low / Baseline)
+        2 cases → ~0.35 – 0.52  (Moderate)
+        3 cases → ~0.60 – 0.77  (High)
+        4+ cases→ ~0.85 – 0.99  (Critical Surge)
     """
-    val = (-raw_score - 0.43) / 0.22
-    val = float(max(0.0, min(1.0, val)))
-    
-    if active_cases <= 2:
-        val = min(val, 0.20)
-    elif active_cases >= 5:
-        val = max(val, 0.80)
-        
-    return val
+    import math
+
+    # --- Step 1: Normalize the raw IF score to a base anomaly in [0, 1] ---
+    # IF score_samples typically range from ~-0.65 (anomalous) to ~-0.40 (normal)
+    # for this baseline.  Linear map: -0.65 → 1.0, -0.40 → 0.0
+    base = (-raw_score - 0.40) / 0.25
+    base = max(0.0, min(1.0, base))
+
+    # --- Step 2: Case-density sigmoid curve ---
+    # Sigmoid centered at k=2.5 with steepness=2.0 maps case counts
+    # to the target risk tiers smoothly.
+    n = max(int(active_cases), 0)
+    k = 2.5   # midpoint: 2-3 cases straddle the 0.50 mark
+    s = 2.0   # steepness: controls transition slope
+    density_signal = 1.0 / (1.0 + math.exp(-s * (n - k)))
+
+    # --- Step 3: Blend base anomaly with density signal ---
+    # Density dominates (70%) because case count is the strongest
+    # indicator of cluster escalation; the raw IF score provides
+    # fine-grained adjustment (30%).
+    blended = (0.30 * base) + (0.70 * density_signal)
+
+    # --- Step 4: Tier-aware floor/ceiling nudge ---
+    # Ensure the output stays within the expected tier bands.
+    if n <= 0:
+        return min(blended, 0.08)      # No cases → near-zero
+    elif n == 1:
+        return max(0.10, min(blended, 0.22))   # 1 case:  0.10–0.22
+    elif n == 2:
+        return max(0.35, min(blended, 0.52))   # 2 cases: 0.35–0.52
+    elif n == 3:
+        return max(0.60, min(blended, 0.77))   # 3 cases: 0.60–0.77
+    else:
+        return max(0.85, min(blended, 0.99))   # 4+ cases: 0.85–0.99
 
 
 def detect_anomalies(
@@ -207,6 +239,16 @@ def detect_anomalies(
         float(_calibrate_anomaly_score(s, c)) 
         for s, c in zip(raw_scores, working['active_cases'])
     ]
+
+    # --- Cluster equalization: all records in the same barangay cluster
+    #     share the maximum escalated score so risk is uniform. ---
+    if 'barangay' in data.columns:
+        for brgy in result['barangay'].unique():
+            mask = result['barangay'] == brgy
+            if mask.sum() > 1:
+                cluster_max = result.loc[mask, 'anomaly_score'].max()
+                result.loc[mask, 'anomaly_score'] = cluster_max
+
     return result
 
 
