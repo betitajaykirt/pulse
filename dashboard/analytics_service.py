@@ -123,8 +123,6 @@ def build_epi_curve_data(qs, time_range='current_year'):
 
     All gaps are zero-filled so Chart.js renders continuous lines.
     """
-    from django.db.models.functions import TruncDate
-
     # --- 1. Determine the actual data span to choose the right interval ---
     date_range = qs.aggregate(
         earliest=models.Min('date_of_onset'),
@@ -141,7 +139,7 @@ def build_epi_curve_data(qs, time_range='current_year'):
     # Adaptive interval based on data density
     if span_days <= 31:
         interval = 'day'
-        trunc = TruncDate('date_of_onset')
+        trunc = F('date_of_onset')
     elif span_days <= 90 or time_range == 'last_3_months':
         interval = 'week'
         trunc = TruncWeek('date_of_onset')
