@@ -279,7 +279,7 @@ def api_analytics_data(request):
 
     time_range = request.GET.get('time_range', 'current_year').strip()
 
-    if time_range not in ('current_year', 'last_3_months', 'last_6_months'):
+    if time_range not in ('current_year', 'last_3_months', 'last_6_months', 'last_30_days'):
         time_range = 'current_year'
 
     valid_categories = {value for value, _ in SYNDROME_CATEGORY_OPTIONS if value}

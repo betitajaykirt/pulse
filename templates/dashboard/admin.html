@@ -234,8 +234,17 @@ document.addEventListener('DOMContentLoaded', async function() {
         type: 'line',
         tension: 0.3,
         fill: false,
-        borderColor: ds.backgroundColor
+        borderColor: ds.backgroundColor,
+        borderWidth: 2.5,
+        pointRadius: 3,
+        pointHoverRadius: 6,
+        spanGaps: true,
       }));
+      
+      var epiMaxTicks = 12;
+      if (data.epi_curve.labels && data.epi_curve.labels.length > 14) {
+        epiMaxTicks = 10;
+      }
       
       new Chart(epiCanvas.getContext('2d'), {
         type: 'line',
@@ -243,7 +252,12 @@ document.addEventListener('DOMContentLoaded', async function() {
           labels: data.epi_curve.labels,
           datasets: epiDatasets
         },
-        options: chartOptions
+        options: Object.assign({}, chartOptions, {
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B', maxTicksLimit: epiMaxTicks, maxRotation: 45, minRotation: 0 } },
+            y: { grid: { color: 'rgba(241, 245, 249, 0.9)' }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B', precision: 0 }, border: { display: false }, beginAtZero: true }
+          }
+        })
       });
     }
 

@@ -1,6 +1,7 @@
 """Aggregate PatientCase data for surveillance analytics charts."""
 from datetime import timedelta
 
+from django.db import models
 from django.db.models import Count, F, Q
 from django.db.models.functions import TruncMonth, TruncWeek
 from django.utils import timezone
@@ -53,7 +54,10 @@ def _base_queryset(symptom_category='', barangay_id='', time_range='current_year
     if barangay_id:
         qs = qs.filter(barangay_id=barangay_id)
 
-    if time_range == 'last_3_months':
+    if time_range == 'last_30_days':
+        cutoff = now - timedelta(days=30)
+        qs = qs.filter(date_of_onset__gte=cutoff)
+    elif time_range == 'last_3_months':
         cutoff = now - timedelta(days=90)
         qs = qs.filter(date_of_onset__gte=cutoff)
     elif time_range == 'last_6_months':
@@ -66,15 +70,86 @@ def _base_queryset(symptom_category='', barangay_id='', time_range='current_year
 
 
 def _period_label(dt, interval):
+    if interval == 'day':
+        return dt.strftime('%b %d')
     if interval == 'week':
         return dt.strftime('%b %d, %Y')
     return dt.strftime('%b %Y')
 
 
-def build_epi_curve_data(qs, time_range='current_year'):
-    interval = 'week' if time_range == 'last_3_months' else 'month'
-    trunc = TruncWeek('date_of_onset') if interval == 'week' else TruncMonth('date_of_onset')
+def _pad_period_keys(period_keys, interval):
+    """Fill gaps in period_keys so every day/week/month in the range is represented."""
+    from datetime import date
 
+    if not period_keys:
+        return period_keys
+
+    dates = sorted(date.fromisoformat(k) for k in period_keys)
+    start, end = dates[0], dates[-1]
+
+    if interval == 'day':
+        step = timedelta(days=1)
+    elif interval == 'week':
+        step = timedelta(weeks=1)
+    else:
+        # Monthly: step by ~30 days, snapping to 1st of month
+        filled = []
+        cur = start.replace(day=1)
+        end_month = end.replace(day=1)
+        while cur <= end_month:
+            filled.append(cur.isoformat())
+            if cur.month == 12:
+                cur = cur.replace(year=cur.year + 1, month=1)
+            else:
+                cur = cur.replace(month=cur.month + 1)
+        return filled
+
+    filled = []
+    cur = start
+    while cur <= end:
+        filled.append(cur.isoformat())
+        cur += step
+    return filled
+
+
+def build_epi_curve_data(qs, time_range='current_year'):
+    """
+    Build Epi-Curve chart payload with adaptive time intervals.
+
+    Interval selection:
+      - Data span ≤ 31 days  → daily (YYYY-MM-DD)
+      - Data span ≤ 90 days  → weekly
+      - Data span > 90 days  → monthly
+
+    All gaps are zero-filled so Chart.js renders continuous lines.
+    """
+    from django.db.models.functions import TruncDate
+
+    # --- 1. Determine the actual data span to choose the right interval ---
+    date_range = qs.aggregate(
+        earliest=models.Min('date_of_onset'),
+        latest=models.Max('date_of_onset'),
+    )
+    earliest = date_range['earliest']
+    latest = date_range['latest']
+
+    if earliest and latest:
+        span_days = (latest - earliest).days
+    else:
+        span_days = 0
+
+    # Adaptive interval based on data density
+    if span_days <= 31:
+        interval = 'day'
+        trunc = TruncDate('date_of_onset')
+    elif span_days <= 90 or time_range == 'last_3_months':
+        interval = 'week'
+        trunc = TruncWeek('date_of_onset')
+    else:
+        interval = 'month'
+        trunc = TruncMonth('date_of_onset')
+
+    # --- 2. Query grouped counts ---
     rows = (
         qs.annotate(period=trunc)
         .values('period', status=F('surveillance_report__status'))
@@ -82,19 +157,39 @@ def build_epi_curve_data(qs, time_range='current_year'):
         .order_by('period')
     )
 
-    periods = []
-    period_keys = []
+    # Collect unique period keys from the query
+    raw_period_keys = []
     for row in rows:
-        key = row['period'].isoformat() if row['period'] else None
-        if key and key not in period_keys:
-            period_keys.append(key)
-            periods.append(_period_label(row['period'], interval))
+        if row['period']:
+            dt = row['period']
+            # TruncDate returns a date, TruncWeek/TruncMonth returns datetime
+            if hasattr(dt, 'date') and callable(dt.date):
+                key = dt.date().isoformat()
+            else:
+                key = dt.isoformat()
+            if key not in raw_period_keys:
+                raw_period_keys.append(key)
 
+    # --- 3. Pad the timeline so every interval slot exists ---
+    period_keys = _pad_period_keys(raw_period_keys, interval)
+    if not period_keys:
+        period_keys = raw_period_keys
+
+    from datetime import date as date_type
+    periods = [_period_label(date_type.fromisoformat(k), interval) for k in period_keys]
+
+    # --- 4. Build zero-filled data arrays per status ---
     status_data = {s: [0] * len(period_keys) for s in STATUS_ORDER}
     key_index = {k: i for i, k in enumerate(period_keys)}
 
     for row in rows:
-        key = row['period'].isoformat() if row['period'] else None
+        if not row['period']:
+            continue
+        dt = row['period']
+        if hasattr(dt, 'date') and callable(dt.date):
+            key = dt.date().isoformat()
+        else:
+            key = dt.isoformat()
         status = row['status'] or 'Unclassified'
         if key in key_index and status in status_data:
             status_data[status][key_index[key]] += row['count']
