@@ -58,92 +58,150 @@ def call_ocr_api(file_obj) -> dict:
         return {'success': False, 'raw_text': '', 'error': f'OCR API request failed: {exc}'}
 
 
-# ── Regex helpers ────────────────────────────────────────────────
-
-def _extract_after(text: str, anchors: list[str], multiline: bool = False) -> str:
-    """Return the value that follows any of the given anchors (case-insensitive)."""
-    for anchor in anchors:
-        pattern = re.escape(anchor) + r'\s*(.+)'
-        flags = re.IGNORECASE | (re.DOTALL if multiline else 0)
-        m = re.search(pattern, text, flags)
-        if m:
-            val = m.group(1).strip()
-            # For single-line extractions, trim at the next newline
-            if not multiline:
-                val = val.split('\n')[0].strip()
-            # Clean trailing punctuation artefacts
-            val = val.rstrip('|:;,')
-            return val.strip()
-    return ''
+# ── Strict Regex Anchor Extraction ───────────────────────────────
+#
+# Each field is extracted with a dedicated regex that uses lookahead
+# boundaries anchored to known neighboring labels.  This prevents
+# column-bleeding where OCR line offsets cause values to leak into
+# adjacent fields.
 
 
-def _extract_block(text: str, anchors: list[str]) -> str:
-    """
-    Extract a multi-line text block following an anchor heading.
-
-    Captures everything from the anchor to the next section heading
-    or end of text.
-    """
-    for anchor in anchors:
-        pattern = re.escape(anchor) + r'\s*[:\-]?\s*\n?([\s\S]+?)(?=\n\s*[A-Z][a-z]+\s*[:\-]|\Z)'
-        m = re.search(pattern, text, re.IGNORECASE)
-        if m:
-            block = m.group(1).strip()
-            # Also try inline (same line) if block is empty
-            if not block:
-                inline = _extract_after(text, [anchor])
-                if inline:
-                    return inline
-            return block
-    return ''
+def _clean(val: str) -> str:
+    """Strip whitespace, trailing punctuation artefacts, and normalize."""
+    if not val:
+        return ''
+    val = val.strip()
+    val = val.rstrip('|:;,')
+    # collapse internal whitespace runs
+    val = re.sub(r'\s+', ' ', val)
+    return val.strip()
 
 
 # ── Field extraction engine ──────────────────────────────────────
 
 def parse_lab_fields(raw_text: str) -> dict:
     """
-    Parse all structured fields from OCR-extracted laboratory text.
+    Parse all structured fields from OCR-extracted laboratory text
+    using strict regex anchor matching with lookahead boundaries.
 
     Returns a dict with extracted fields (empty string when not found).
     """
     t = raw_text or ''
 
-    # ── Patient Demographics ──
-    patient_name = _extract_after(t, ['Patient Name:', 'Patient:', 'Name:'])
-    age = _extract_after(t, ['Age:'])
-    sex = _extract_after(t, ['Sex:', 'Gender:'])
-    address = _extract_after(t, ['Address:', 'Barangay:', 'City:'])
+    # ── Patient Demographics ─────────────────────────────────────
 
-    # ── Lab Identifiers ──
-    control_number = _extract_after(t, ['Control Number:', 'Control No:', 'Control No.:'])
-    if not control_number:
-        m = re.search(r'LC-\d{4}-\d{4,6}', t)
+    # Patient Name — stop at Birthday, Age, Nationality, Civil Status, or EOL
+    patient_name = ''
+    m = re.search(
+        r'(?:Patient\s*Name|Patient|Name)\s*[:]\s*'
+        r'([A-Za-z\s,.]+?)'
+        r'(?=\s*(?:Birthday|Age|Nationality|Civil\s*Status|Date\s*of\s*Birth|Sex|Gender|\n|$))',
+        t, re.IGNORECASE
+    )
+    if m:
+        patient_name = _clean(m.group(1))
+
+    # Age + Gender — often on the same line or nearby
+    age = ''
+    sex = ''
+    m = re.search(r'Age\s*[:]\s*(\d+)', t, re.IGNORECASE)
+    if m:
+        age = m.group(1).strip()
+    m = re.search(r'(?:Gender|Sex)\s*[:]\s*([A-Za-z]+)', t, re.IGNORECASE)
+    if m:
+        sex = _clean(m.group(1))
+
+    # Address — stop at Barangay, City, Province, Email, Phone, Contact, or EOL
+    address = ''
+    m = re.search(
+        r'Address\s*[:]\s*'
+        r'([A-Za-z0-9\s,.]+?)'
+        r'(?=\s*(?:Barangay|City|Province|Email|Phone|Contact|Municipality|\n|$))',
+        t, re.IGNORECASE
+    )
+    if m:
+        address = _clean(m.group(1))
+    # If the address regex was too narrow (stopped at Barangay), try a broader capture
+    if not address or len(address) < 5:
+        m = re.search(
+            r'Address\s*[:]\s*(.+?)(?=\s*(?:Email|Phone|Contact|Nationality|Civil\s*Status|\n|$))',
+            t, re.IGNORECASE
+        )
         if m:
-            control_number = m.group(0)
+            address = _clean(m.group(1))
 
-    lab_number = _extract_after(t, [
-        'Lab Number:', 'Lab No:', 'Lab No.:',
-        'Specimen ID:', 'Specimen No:', 'Specimen No.:',
-        'Accession No:', 'Accession No.:',
-    ])
+    # Also try to append Barangay info if found separately
+    m_brgy = re.search(r'Barangay\s*[:]\s*([A-Za-z0-9\s,.]+?)(?=\s*(?:City|Province|Municipality|\n|$))', t, re.IGNORECASE)
+    if m_brgy:
+        brgy_val = _clean(m_brgy.group(1))
+        if brgy_val and brgy_val.lower() not in address.lower():
+            address = f"{address}, BARANGAY {brgy_val}" if address else f"BARANGAY {brgy_val}"
 
-    result_date = _extract_after(t, [
-        'Certificate Issued:', 'Result Date:', 'Date Released:', 'Date Issued:',
-    ])
+    # ── Laboratory Identifiers ───────────────────────────────────
+
+    # Control Number — match LC-YYYY-XXXXXX pattern or anchored extraction
+    control_number = ''
+    m = re.search(r'(?:Control\s*(?:Number|No\.?)\s*[:]\s*)([A-Za-z0-9\-]+)', t, re.IGNORECASE)
+    if m:
+        control_number = _clean(m.group(1))
+    if not control_number:
+        # Fallback: standalone LC-YYYY-XXXXXX pattern anywhere in text
+        m = re.search(r'(LC-\d{4}-[A-Za-z0-9]{4,6})', t)
+        if m:
+            control_number = m.group(1)
+
+    # Lab / Specimen Number — match PORT or similar patterns
+    lab_number = ''
+    m = re.search(
+        r'(?:Lab\s*(?:Number|No\.?)|Specimen\s*(?:ID|Number|No\.?)|Accession\s*(?:No\.?))\s*[:]\s*([A-Za-z0-9\-]+)',
+        t, re.IGNORECASE
+    )
+    if m:
+        lab_number = _clean(m.group(1))
+    if not lab_number:
+        # Fallback: standalone PORT pattern
+        m = re.search(r'(PORT\d{6,8}-\d{3,6})', t)
+        if m:
+            lab_number = m.group(1)
+
+    # Certificate / Issue Date — capture date+time values
+    result_date = ''
+    m = re.search(
+        r'(?:Certificate\s*Issued|Result\s*Date|Date\s*Released|Date\s*Issued)\s*[:]\s*'
+        r'([\d/\-\s:APMapm]+)',
+        t, re.IGNORECASE
+    )
+    if m:
+        result_date = _clean(m.group(1))
     if not result_date:
-        # Fallback: generic "Date:" but only if it looks like a date value
-        date_candidate = _extract_after(t, ['Date:'])
-        if date_candidate and re.search(r'\d', date_candidate):
-            result_date = date_candidate
+        # Fallback: generic "Date:" only if value looks like a date
+        m = re.search(r'Date\s*[:]\s*([\d/\-]+(?:\s+[\d:]+(?:\s*[APMapm]+)?)?)', t, re.IGNORECASE)
+        if m:
+            result_date = _clean(m.group(1))
 
-    # ── Clinical Findings ──
-    lab_results = _extract_after(t, ['Test Results:', 'Test Result:', 'Result:', 'Findings:'])
-    if not lab_results:
-        lab_results = _extract_block(t, ['Test Results:', 'Test Result:', 'Result:', 'Findings:'])
+    # ── Clinical Findings & Interpretation ───────────────────────
 
-    interpretation = _extract_after(t, ['Interpretation:', 'Diagnostic Impression:', 'Impression:'])
-    if not interpretation:
-        interpretation = _extract_block(t, ['Interpretation:', 'Diagnostic Impression:', 'Impression:'])
+    # Lab Results / Findings — capture everything until Interpretation:
+    lab_results = ''
+    m = re.search(
+        r'(?:Test\s*Results?|Result|Findings?)\s*[:]\s*'
+        r'([\s\S]*?)'
+        r'(?=\s*(?:Interpretation|Diagnostic\s*Impression|Impression|Remarks|$))',
+        t, re.IGNORECASE
+    )
+    if m:
+        lab_results = _clean(m.group(1))
+
+    # Interpretation — capture everything until Remarks: or end
+    interpretation = ''
+    m = re.search(
+        r'(?:Interpretation|Diagnostic\s*Impression|Impression)\s*[:]\s*'
+        r'([\s\S]*?)'
+        r'(?=\s*(?:Remarks|Recommendation|Note|Prepared\s*by|Pathologist|Medical\s*Technologist|$))',
+        t, re.IGNORECASE
+    )
+    if m:
+        interpretation = _clean(m.group(1))
 
     return {
         'patient_name': patient_name,
@@ -161,11 +219,12 @@ def parse_lab_fields(raw_text: str) -> dict:
 # ── Test Type keyword matching ───────────────────────────────────
 
 _TEST_TYPE_KEYWORDS: list[tuple[list[str], str]] = [
-    (['NS1', 'NS-1', 'NS1 Antigen'],                    'NS1 Antigen'),
-    (['IgM', 'ELISA', 'IgM ELISA'],                     'IgM ELISA'),
-    (['PCR', 'Polymerase', 'RT-PCR', 'RTPCR'],          'PCR'),
-    (['Rapid Diagnostic', 'RDT', 'Rapid Test'],          'Rapid Diagnostic Test'),
-    (['Culture', 'Blood Culture', 'Stool Culture'],      'Culture'),
+    (['NS1 Ag & IgG/IgM Combo', 'NS1 Ag', 'IgG/IgM Combo',
+      'Dengue NS1', 'NS1 Antigen', 'NS1', 'NS-1'],           'Dengue NS1 Ag & IgG/IgM Combo'),
+    (['IgM', 'ELISA', 'IgM ELISA'],                           'IgM ELISA'),
+    (['PCR', 'Polymerase', 'RT-PCR', 'RTPCR'],                'PCR'),
+    (['Rapid Diagnostic', 'RDT', 'Rapid Test'],                'Rapid Diagnostic Test'),
+    (['Culture', 'Blood Culture', 'Stool Culture'],            'Culture'),
 ]
 
 
