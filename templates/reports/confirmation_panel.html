@@ -373,13 +373,22 @@ function processOCR() {
     headers: { 'X-CSRFToken': csrfToken },
     body: formData
   })
-  .then(function(r) { return r.json(); })
+  .then(function(r) {
+    if (r.redirected || r.status === 302 || r.status === 301) {
+      throw new Error('Session expired. Please refresh the page and log in again.');
+    }
+    var contentType = r.headers.get('content-type') || '';
+    if (contentType.indexOf('application/json') === -1) {
+      throw new Error('Server returned an unexpected response (HTTP ' + r.status + '). Please try again.');
+    }
+    return r.json();
+  })
   .then(function(data) {
     document.getElementById('ocr-loading').style.display = 'none';
 
     if (!data.success) {
       document.getElementById('ocr-upload-zone').style.display = '';
-      alert('OCR Failed: ' + data.error);
+      alert('OCR Failed: ' + (data.error || 'Unknown error'));
       return;
     }
 
@@ -430,8 +439,8 @@ function processOCR() {
   .catch(function(err) {
     document.getElementById('ocr-loading').style.display = 'none';
     document.getElementById('ocr-upload-zone').style.display = '';
-    alert('An error occurred during OCR processing.');
-    console.error(err);
+    alert('OCR Error: ' + (err.message || 'An unexpected error occurred. Please try again.'));
+    console.error('OCR processing error:', err);
   });
 }
 </script>

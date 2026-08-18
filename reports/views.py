@@ -585,42 +585,48 @@ def admin_confirmation_panel(request):
 @login_required
 @role_required('admin', 'super_admin', 'health_officer')
 def ocr_parse_lab_document(request):
-    import json
-    from .ocr_service import (
-        call_ocr_api, parse_lab_fields, match_test_type, 
-        match_disease, cross_validate_patient
-    )
-    
-    file_obj = request.FILES.get('lab_document')
-    if not file_obj:
-        return JsonResponse({'success': False, 'error': 'No document uploaded.'}, status=400)
-    
-    case_patient_name = request.POST.get('case_patient_name', '')
-    
-    # 1. Call OCR API
-    ocr_res = call_ocr_api(file_obj)
-    if not ocr_res.get('success'):
-        return JsonResponse({'success': False, 'error': ocr_res.get('error', 'OCR failed')})
-    
-    raw_text = ocr_res.get('raw_text', '')
-    
-    # 2. Extract fields
-    fields = parse_lab_fields(raw_text)
-    
-    # 3. Match dropdowns
-    test_type = match_test_type(raw_text)
-    confirmed_disease = match_disease(raw_text)
-    
-    # 4. Cross-validate patient
-    validation = cross_validate_patient(fields.get('patient_name', ''), case_patient_name)
-    
-    return JsonResponse({
-        'success': True,
-        'fields': fields,
-        'test_type': test_type,
-        'confirmed_disease': confirmed_disease,
-        'validation': validation,
-    })
+    import traceback
+    try:
+        from .ocr_service import (
+            call_ocr_api, parse_lab_fields, match_test_type, 
+            match_disease, cross_validate_patient
+        )
+        
+        file_obj = request.FILES.get('lab_document')
+        if not file_obj:
+            return JsonResponse({'success': False, 'error': 'No document uploaded.'}, status=400)
+        
+        case_patient_name = request.POST.get('case_patient_name', '')
+        
+        # 1. Call OCR API
+        ocr_res = call_ocr_api(file_obj)
+        if not ocr_res.get('success'):
+            return JsonResponse({'success': False, 'error': ocr_res.get('error', 'OCR failed')})
+        
+        raw_text = ocr_res.get('raw_text', '')
+        
+        # 2. Extract fields
+        fields = parse_lab_fields(raw_text)
+        
+        # 3. Match dropdowns
+        test_type = match_test_type(raw_text)
+        confirmed_disease = match_disease(raw_text)
+        
+        # 4. Cross-validate patient
+        validation = cross_validate_patient(fields.get('patient_name', ''), case_patient_name)
+        
+        return JsonResponse({
+            'success': True,
+            'fields': fields,
+            'test_type': test_type,
+            'confirmed_disease': confirmed_disease,
+            'validation': validation,
+        })
+    except Exception as exc:
+        return JsonResponse({
+            'success': False,
+            'error': f'Server error: {exc}',
+        }, status=500)
 
 
 @require_POST
