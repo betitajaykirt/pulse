@@ -107,88 +107,156 @@
 
 </div>
 
+{# ═══════════════════════════════════════════════════════════ #}
+{# ── Process Laboratory Result Modal (OCR-enhanced) ──────── #}
+{# ═══════════════════════════════════════════════════════════ #}
+
 <div class="pulse-modal-overlay" id="lab-modal" onclick="closeLabModal(event)">
-  <div class="pulse-modal pulse-modal--form">
+  <div class="pulse-modal pulse-modal--form pulse-modal--lab-wide">
     <div class="pulse-modal__head">
       <h3>Process Laboratory Result</h3>
       <button type="button" class="pulse-modal__close" onclick="closeLabModal()">&times;</button>
     </div>
     <div class="pulse-modal__body">
+
+      {# ── Case Summary (always visible) ─────────────────── #}
       <div class="confirmation-summary" id="lab-modal-summary"></div>
 
-      <!-- OCR Upload Zone -->
-      <div class="ocr-upload-zone" id="ocr-upload-zone" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+      {# ── OCR Upload Zone ───────────────────────────────── #}
+      <div class="ocr-upload-zone" id="ocr-upload-zone"
+           ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
         <input type="file" id="lab_document" accept="image/*,application/pdf" style="display:none;" onchange="handleFileSelect(event)">
-        <i data-lucide="upload-cloud" class="lucide-icon" style="width: 32px; height: 32px; margin-bottom: 0.5rem; color: var(--primary);"></i>
-        <p><strong>Drag & Drop</strong> lab document here or <button type="button" class="nc-btn nc-btn--outline nc-btn--sm" onclick="document.getElementById('lab_document').click()">Browse</button></p>
-        <span class="um-muted" style="font-size: 0.8rem;">Supports JPG, PNG, PDF (max 1MB)</span>
+        <i data-lucide="upload-cloud" class="lucide-icon ocr-upload-zone__icon"></i>
+        <p class="ocr-upload-zone__text">
+          <strong>Drag &amp; Drop</strong> lab document here or
+          <button type="button" class="nc-btn nc-btn--outline nc-btn--sm" onclick="document.getElementById('lab_document').click()">Browse File</button>
+        </p>
+        <span class="um-muted" style="font-size:.78rem;">Supports JPG, PNG, PDF (max 1 MB)</span>
       </div>
 
-      <!-- OCR Loading Spinner -->
-      <div class="ocr-loading" id="ocr-loading" style="display:none; text-align: center; padding: 1.5rem; color: var(--primary);">
-        <i data-lucide="loader-2" class="lucide-icon spinner-icon" style="animation: spin 1s linear infinite;"></i>
-        <p style="margin-top: 0.5rem; font-weight: 500;">Scanning document with AI...</p>
+      {# ── OCR Scanning Spinner ──────────────────────────── #}
+      <div class="ocr-loading" id="ocr-loading" style="display:none;">
+        <svg class="ocr-spinner" viewBox="0 0 50 50">
+          <circle cx="25" cy="25" r="20" fill="none" stroke="currentColor"
+                  stroke-width="4" stroke-dasharray="90 150" stroke-linecap="round"/>
+        </svg>
+        <p>Scanning document…</p>
       </div>
 
-      <!-- Mismatch Alert -->
-      <div class="ocr-alert-banner" id="ocr-alert-banner" style="display:none; background-color: #FEF3C7; color: #92400E; padding: 0.75rem 1rem; border-radius: var(--radius-md); margin-top: 1rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
-        <i data-lucide="alert-triangle" class="lucide-icon" style="flex-shrink: 0;"></i>
-        <span id="ocr-alert-msg"><strong>Warning:</strong> Scanned document name does not match current patient record.</span>
+      {# ── ① Verification Banner ─────────────────────────── #}
+      <div class="ocr-verify-banner ocr-verify-banner--match" id="ocr-verify-match" style="display:none;">
+        <i data-lucide="check-circle-2" class="lucide-icon lucide-icon--sm"></i>
+        <span><strong>Patient Verified:</strong> <span id="ocr-verify-name"></span></span>
+      </div>
+      <div class="ocr-verify-banner ocr-verify-banner--mismatch" id="ocr-verify-mismatch" style="display:none;">
+        <i data-lucide="alert-triangle" class="lucide-icon lucide-icon--sm"></i>
+        <span id="ocr-mismatch-msg"><strong>Warning:</strong> Scanned document name does not match current patient record.</span>
       </div>
 
-      <!-- OCR Preview Panel -->
-      <div class="ocr-scan-summary" id="ocr-scan-summary" style="display:none; margin-top: 1.25rem; background: #F8FAFC; border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 1rem;">
-        <div class="section-divider" style="margin-top: 0;">OCR Scan Summary</div>
-        
-        <div class="ocr-field-row" style="display: flex; gap: 1rem; margin-bottom: 0.5rem; align-items: center;">
-          <label style="min-width: 120px; font-size: 0.85rem; font-weight: 600; color: var(--muted);">Patient Name</label>
-          <input type="text" id="ocr_patient_name" class="input-soft" style="flex-grow: 1; padding: 0.4rem 0.6rem; font-size: 0.85rem;">
+      {# ── ② Scanned Patient Demographics (read-only) ───── #}
+      <div class="ocr-section" id="ocr-demographics" style="display:none;">
+        <div class="ocr-section__title">
+          <i data-lucide="user-circle-2" class="lucide-icon lucide-icon--xs"></i>
+          Scanned Patient Demographics
         </div>
-        
-        <div class="ocr-field-row" style="display: flex; gap: 1rem; margin-bottom: 0.5rem; align-items: center;">
-          <label style="min-width: 120px; font-size: 0.85rem; font-weight: 600; color: var(--muted);">Result Date</label>
-          <input type="text" id="ocr_result_date" class="input-soft" style="flex-grow: 1; padding: 0.4rem 0.6rem; font-size: 0.85rem;">
-        </div>
-
-        <div class="ocr-field-row" style="display: flex; gap: 1rem; align-items: flex-start;">
-          <label style="min-width: 120px; font-size: 0.85rem; font-weight: 600; color: var(--muted); margin-top: 0.4rem;">Clinical Findings</label>
-          <textarea id="ocr_findings" class="input-soft" rows="2" style="flex-grow: 1; padding: 0.4rem 0.6rem; font-size: 0.85rem; resize: vertical;"></textarea>
+        <div class="ocr-demo-grid">
+          <div class="ocr-demo-field">
+            <span class="ocr-demo-label">Patient Name</span>
+            <span class="ocr-demo-value" id="ocr_demo_name">—</span>
+          </div>
+          <div class="ocr-demo-field">
+            <span class="ocr-demo-label">Age / Gender</span>
+            <span class="ocr-demo-value" id="ocr_demo_age_sex">—</span>
+          </div>
+          <div class="ocr-demo-field ocr-demo-field--full">
+            <span class="ocr-demo-label">Address</span>
+            <span class="ocr-demo-value" id="ocr_demo_address">—</span>
+          </div>
         </div>
       </div>
 
+      {# ── Confirmation Form ─────────────────────────────── #}
       <form method="POST" id="lab-confirm-form" action="">
         {% csrf_token %}
         <input type="hidden" name="redirect_to" value="admin_confirmation_panel">
         <input type="hidden" id="case_patient_name" name="case_patient_name" value="">
 
-        <div class="form-group" style="margin-top: 1.25rem;">
-          <label for="lab_control_number">Laboratory Control Number <span class="um-muted">(required)</span></label>
-          <input type="text" id="lab_control_number" name="lab_control_number" class="input-soft"
-                 placeholder="e.g. LC-2026-004821" required maxlength="64">
+        {# ── ③ Laboratory Identifiers & Dates ────────────── #}
+        <div class="ocr-section">
+          <div class="ocr-section__title">
+            <i data-lucide="flask-conical" class="lucide-icon lucide-icon--xs"></i>
+            Laboratory Identifiers &amp; Dates
+          </div>
+          <div class="ocr-form-grid">
+            <div class="form-group">
+              <label for="lab_control_number">Laboratory Control Number <span class="um-muted">(required)</span></label>
+              <input type="text" id="lab_control_number" name="lab_control_number" class="input-soft"
+                     placeholder="e.g. LC-2026-004821" required maxlength="64">
+            </div>
+            <div class="form-group">
+              <label for="lab_specimen_number">Lab / Specimen Number</label>
+              <input type="text" id="lab_specimen_number" name="lab_specimen_number" class="input-soft"
+                     placeholder="e.g. PORT202608-3882" maxlength="64">
+            </div>
+            <div class="form-group">
+              <label for="lab_issue_date">Certificate / Issue Date</label>
+              <input type="text" id="lab_issue_date" name="lab_issue_date" class="input-soft"
+                     placeholder="e.g. 08/17/2026 14:30" maxlength="64">
+            </div>
+          </div>
         </div>
 
-        <div class="form-group">
-          <label for="test_type">Test Type <span class="um-muted">(required)</span></label>
-          <select id="test_type" name="test_type" class="input-soft" required>
-            <option value="">Select test type…</option>
-            <option value="NS1 Antigen">NS1 Antigen</option>
-            <option value="IgM ELISA">IgM ELISA</option>
-            <option value="PCR">PCR</option>
-            <option value="Rapid Diagnostic Test">Rapid Diagnostic Test</option>
-            <option value="Culture">Culture</option>
-            <option value="Other">Other</option>
-          </select>
+        {# ── ④ Classification & Disease ──────────────────── #}
+        <div class="ocr-section">
+          <div class="ocr-section__title">
+            <i data-lucide="microscope" class="lucide-icon lucide-icon--xs"></i>
+            Classification &amp; Disease
+          </div>
+          <div class="ocr-form-grid ocr-form-grid--two">
+            <div class="form-group">
+              <label for="test_type">Test Type <span class="um-muted">(required)</span></label>
+              <select id="test_type" name="test_type" class="input-soft" required>
+                <option value="">Select test type…</option>
+                <option value="NS1 Antigen">NS1 Antigen</option>
+                <option value="IgM ELISA">IgM ELISA</option>
+                <option value="PCR">PCR</option>
+                <option value="Rapid Diagnostic Test">Rapid Diagnostic Test</option>
+                <option value="Culture">Culture</option>
+                <option value="Stool Microscopy">Stool Microscopy</option>
+                <option value="Blood Culture">Blood Culture</option>
+                <option value="Dengue NS1 Ag & IgG/IgM Combo">Dengue NS1 Ag &amp; IgG/IgM Combo</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="confirmed_disease">Confirmed Disease <span class="um-muted">(required)</span></label>
+              <select id="confirmed_disease" name="confirmed_disease" class="input-soft" required>
+                <option value="">Select confirmed disease…</option>
+                {% for syndrome in syndrome_types %}
+                  <option value="{{ syndrome }}">{{ syndrome }}</option>
+                {% endfor %}
+                <option value="Other / Non-specific">Other / Non-specific</option>
+              </select>
+            </div>
+          </div>
         </div>
 
-        <div class="form-group">
-          <label for="confirmed_disease">Confirmed Disease <span class="um-muted">(required)</span></label>
-          <select id="confirmed_disease" name="confirmed_disease" class="input-soft" required>
-            <option value="">Select confirmed disease…</option>
-            {% for syndrome in syndrome_types %}
-              <option value="{{ syndrome }}">{{ syndrome }}</option>
-            {% endfor %}
-            <option value="Other / Non-specific">Other / Non-specific</option>
-          </select>
+        {# ── ⑤ Clinical Findings & Interpretation ────────── #}
+        <div class="ocr-section">
+          <div class="ocr-section__title">
+            <i data-lucide="file-text" class="lucide-icon lucide-icon--xs"></i>
+            Clinical Findings &amp; Interpretation
+          </div>
+          <div class="form-group">
+            <label for="lab_findings">Test Findings / Result Summary</label>
+            <textarea id="lab_findings" name="lab_findings" class="input-soft" rows="3"
+                      placeholder="e.g. DENGUE VIRUS NS1 ANTIGEN: DETECTED…" style="resize:vertical;"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="lab_interpretation">Diagnostic Interpretation</label>
+            <textarea id="lab_interpretation" name="lab_interpretation" class="input-soft" rows="2"
+                      placeholder="e.g. POSITIVE FOR ACUTE DENGUE FEVER INFECTION" style="resize:vertical;"></textarea>
+          </div>
         </div>
 
         <div class="pulse-modal__actions">
@@ -200,6 +268,7 @@
           </button>
         </div>
       </form>
+
     </div>
   </div>
 </div>
@@ -210,16 +279,24 @@
 const CONFIRM_URL_TEMPLATE = "{% url 'confirm_case' 0 %}";
 document.addEventListener('DOMContentLoaded', function () { if (window.lucide) lucide.createIcons(); });
 
+/* ── Open Modal ───────────────────────────────────────────── */
 function openLabModal(reportId, patientName, patientId, barangay, disease, reportedAt) {
-  document.getElementById('lab-confirm-form').action = CONFIRM_URL_TEMPLATE.replace('/0/', '/' + reportId + '/');
-  document.getElementById('lab_control_number').value = '';
-  document.getElementById('test_type').value = '';
+  const form = document.getElementById('lab-confirm-form');
+  form.action = CONFIRM_URL_TEMPLATE.replace('/0/', '/' + reportId + '/');
+
   document.getElementById('case_patient_name').value = patientName;
-  
-  const diseaseSelect = document.getElementById('confirmed_disease');
-  let optionExists = Array.from(diseaseSelect.options).some(opt => opt.value === disease);
+
+  // Reset all editable fields
+  ['lab_control_number','lab_specimen_number','lab_issue_date','lab_findings','lab_interpretation'].forEach(function(id) {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('test_type').value = '';
+
+  var diseaseSelect = document.getElementById('confirmed_disease');
+  var optionExists = Array.from(diseaseSelect.options).some(function(opt) { return opt.value === disease; });
   diseaseSelect.value = optionExists ? disease : '';
 
+  // Render Case Summary
   document.getElementById('lab-modal-summary').innerHTML =
     '<div class="section-divider">Case Summary</div>' +
     row('Report ID', '#' + reportId) +
@@ -229,16 +306,15 @@ function openLabModal(reportId, patientName, patientId, barangay, disease, repor
     row('ML Predicted Disease', disease) +
     row('Date Reported', reportedAt);
 
-  // Reset OCR state
+  // Reset OCR UI
   document.getElementById('lab_document').value = '';
-  document.getElementById('ocr-upload-zone').style.display = 'block';
-  document.getElementById('ocr-scan-summary').style.display = 'none';
-  document.getElementById('ocr-alert-banner').style.display = 'none';
+  document.getElementById('ocr-upload-zone').style.display = '';
   document.getElementById('ocr-loading').style.display = 'none';
+  document.getElementById('ocr-verify-match').style.display = 'none';
+  document.getElementById('ocr-verify-mismatch').style.display = 'none';
+  document.getElementById('ocr-demographics').style.display = 'none';
 
   document.getElementById('lab-modal').classList.add('open');
-  // Avoid focusing lab_control_number automatically if they want to upload
-  // document.getElementById('lab_control_number').focus(); 
   if (window.lucide) lucide.createIcons();
 }
 
@@ -251,91 +327,109 @@ function closeLabModal(e) {
   document.getElementById('lab-modal').classList.remove('open');
 }
 
+/* ── Drag & Drop Handlers ─────────────────────────────────── */
 function handleDragOver(e) {
-  e.preventDefault();
-  e.stopPropagation();
-  e.currentTarget.style.borderColor = 'var(--primary)';
-  e.currentTarget.style.backgroundColor = 'rgba(15, 76, 129, 0.05)';
+  e.preventDefault(); e.stopPropagation();
+  e.currentTarget.classList.add('ocr-upload-zone--active');
 }
-
 function handleDragLeave(e) {
-  e.preventDefault();
-  e.stopPropagation();
-  e.currentTarget.style.borderColor = 'var(--border-light)';
-  e.currentTarget.style.backgroundColor = 'transparent';
+  e.preventDefault(); e.stopPropagation();
+  e.currentTarget.classList.remove('ocr-upload-zone--active');
 }
-
 function handleDrop(e) {
-  e.preventDefault();
-  e.stopPropagation();
-  e.currentTarget.style.borderColor = 'var(--border-light)';
-  e.currentTarget.style.backgroundColor = 'transparent';
-  
+  e.preventDefault(); e.stopPropagation();
+  e.currentTarget.classList.remove('ocr-upload-zone--active');
   if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
     document.getElementById('lab_document').files = e.dataTransfer.files;
     processOCR();
   }
 }
-
 function handleFileSelect(e) {
-  if (e.target.files && e.target.files.length > 0) {
-    processOCR();
-  }
+  if (e.target.files && e.target.files.length > 0) processOCR();
 }
 
+/* ── OCR Processing ───────────────────────────────────────── */
 function processOCR() {
-  const fileInput = document.getElementById('lab_document');
-  const file = fileInput.files[0];
+  var fileInput = document.getElementById('lab_document');
+  var file = fileInput.files[0];
   if (!file) return;
 
-  const casePatientName = document.getElementById('case_patient_name').value;
-  const formData = new FormData();
+  var casePatientName = document.getElementById('case_patient_name').value;
+  var formData = new FormData();
   formData.append('lab_document', file);
   formData.append('case_patient_name', casePatientName);
-  
-  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-  
+
+  var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+  // Show loading, hide others
   document.getElementById('ocr-upload-zone').style.display = 'none';
-  document.getElementById('ocr-loading').style.display = 'block';
-  document.getElementById('ocr-scan-summary').style.display = 'none';
-  document.getElementById('ocr-alert-banner').style.display = 'none';
-  
+  document.getElementById('ocr-loading').style.display = 'flex';
+  document.getElementById('ocr-verify-match').style.display = 'none';
+  document.getElementById('ocr-verify-mismatch').style.display = 'none';
+  document.getElementById('ocr-demographics').style.display = 'none';
+
   fetch('{% url "ocr_parse_lab" %}', {
     method: 'POST',
     headers: { 'X-CSRFToken': csrfToken },
     body: formData
   })
-  .then(response => response.json())
-  .then(data => {
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
     document.getElementById('ocr-loading').style.display = 'none';
-    if (data.success) {
-      document.getElementById('ocr-scan-summary').style.display = 'block';
-      
-      document.getElementById('ocr_patient_name').value = data.fields.patient_name || '';
-      document.getElementById('ocr_result_date').value = data.fields.result_date || '';
-      const combinedFindings = [data.fields.lab_results, data.fields.interpretation].filter(Boolean).join('\n\n');
-      document.getElementById('ocr_findings').value = combinedFindings;
-      
-      if (data.fields.control_number) document.getElementById('lab_control_number').value = data.fields.control_number;
-      if (data.test_type) document.getElementById('test_type').value = data.test_type;
-      if (data.confirmed_disease) {
-        const diseaseSelect = document.getElementById('confirmed_disease');
-        const optionExists = Array.from(diseaseSelect.options).some(opt => opt.value === data.confirmed_disease);
-        if (optionExists) diseaseSelect.value = data.confirmed_disease;
-      }
-      
-      if (data.validation && data.validation.mismatch) {
-        document.getElementById('ocr-alert-banner').style.display = 'flex';
-        document.getElementById('ocr-alert-msg').innerHTML = '<strong>Warning:</strong> ' + data.validation.message;
-      }
-    } else {
-      document.getElementById('ocr-upload-zone').style.display = 'block';
+
+    if (!data.success) {
+      document.getElementById('ocr-upload-zone').style.display = '';
       alert('OCR Failed: ' + data.error);
+      return;
     }
+
+    var f = data.fields;
+
+    /* ① Verification Banner */
+    if (data.validation) {
+      if (data.validation.match) {
+        document.getElementById('ocr-verify-name').textContent = f.patient_name || '—';
+        document.getElementById('ocr-verify-match').style.display = 'flex';
+      } else if (data.validation.mismatch) {
+        document.getElementById('ocr-mismatch-msg').innerHTML =
+          '<strong>⚠ Warning:</strong> ' + data.validation.message;
+        document.getElementById('ocr-verify-mismatch').style.display = 'flex';
+      }
+    }
+
+    /* ② Patient Demographics */
+    document.getElementById('ocr_demo_name').textContent = f.patient_name || '—';
+    var ageSex = [f.age, f.sex].filter(Boolean).join(' / ');
+    document.getElementById('ocr_demo_age_sex').textContent = ageSex || '—';
+    document.getElementById('ocr_demo_address').textContent = f.address || '—';
+    document.getElementById('ocr-demographics').style.display = '';
+
+    /* ③ Lab Identifiers */
+    if (f.control_number) document.getElementById('lab_control_number').value = f.control_number;
+    if (f.lab_number)     document.getElementById('lab_specimen_number').value = f.lab_number;
+    if (f.result_date)    document.getElementById('lab_issue_date').value = f.result_date;
+
+    /* ④ Classification Dropdowns */
+    if (data.test_type) {
+      var ttSel = document.getElementById('test_type');
+      var ttExists = Array.from(ttSel.options).some(function(o) { return o.value === data.test_type; });
+      if (ttExists) ttSel.value = data.test_type;
+    }
+    if (data.confirmed_disease) {
+      var ds = document.getElementById('confirmed_disease');
+      var dsExists = Array.from(ds.options).some(function(o) { return o.value === data.confirmed_disease; });
+      if (dsExists) ds.value = data.confirmed_disease;
+    }
+
+    /* ⑤ Clinical Findings & Interpretation */
+    if (f.lab_results)    document.getElementById('lab_findings').value = f.lab_results;
+    if (f.interpretation) document.getElementById('lab_interpretation').value = f.interpretation;
+
+    if (window.lucide) lucide.createIcons();
   })
-  .catch(err => {
+  .catch(function(err) {
     document.getElementById('ocr-loading').style.display = 'none';
-    document.getElementById('ocr-upload-zone').style.display = 'block';
+    document.getElementById('ocr-upload-zone').style.display = '';
     alert('An error occurred during OCR processing.');
     console.error(err);
   });

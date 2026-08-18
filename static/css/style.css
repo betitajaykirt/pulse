@@ -2732,19 +2732,102 @@ tbody tr:last-child td { border-bottom: none; }
   letter-spacing: .07em; color: var(--secondary); margin: 1rem 0 .45rem;
 }
 
+/* ── OCR Lab Modal — expanded layout ────────────────────── */
+.pulse-modal--lab-wide {
+  max-width: 780px;
+}
+
 .ocr-upload-zone {
   border: 2px dashed var(--border-light);
   border-radius: var(--radius-md);
-  padding: 1.5rem;
+  padding: 1.75rem 1.5rem;
   text-align: center;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s, background 0.2s;
   cursor: pointer;
 }
+.ocr-upload-zone--active,
 .ocr-upload-zone:hover {
   border-color: var(--primary);
-  background: rgba(15, 76, 129, 0.05);
+  background: rgba(15, 76, 129, 0.04);
 }
-.ocr-upload-zone p { margin: 0; font-size: 0.95rem; }
+.ocr-upload-zone__icon {
+  width: 36px; height: 36px; margin-bottom: .5rem; color: var(--primary);
+}
+.ocr-upload-zone__text {
+  margin: 0; font-size: .92rem;
+}
+
+/* Loading spinner */
+.ocr-loading {
+  display: flex; align-items: center; justify-content: center;
+  gap: .75rem; padding: 1.5rem; color: var(--primary); font-weight: 500;
+}
+.ocr-loading p { margin: 0; }
+.ocr-spinner {
+  width: 28px; height: 28px; animation: ocr-spin 1s linear infinite;
+}
+@keyframes ocr-spin { to { transform: rotate(360deg); } }
+
+/* Verification banners */
+.ocr-verify-banner {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .7rem 1rem; border-radius: var(--radius-md);
+  font-size: .88rem; margin-top: 1rem;
+}
+.ocr-verify-banner--match {
+  background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0;
+}
+.ocr-verify-banner--mismatch {
+  background: #FFFBEB; color: #92400E; border: 1px solid #FDE68A;
+}
+
+/* Section grouping */
+.ocr-section {
+  margin-top: 1.25rem;
+  padding: 1rem 1.15rem;
+  background: #F8FAFC;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+}
+.ocr-section__title {
+  display: flex; align-items: center; gap: .4rem;
+  font-size: .72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--secondary); margin-bottom: .85rem;
+}
+
+/* Demographics read-only grid */
+.ocr-demo-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: .6rem;
+}
+.ocr-demo-field {
+  background: #fff; border-radius: var(--radius-sm);
+  padding: .55rem .75rem; border: 1px solid var(--border-light);
+}
+.ocr-demo-field--full { grid-column: 1 / -1; }
+.ocr-demo-label {
+  display: block; font-size: .72rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .04em;
+  color: var(--muted); margin-bottom: .2rem;
+}
+.ocr-demo-value {
+  font-size: .88rem; font-weight: 500; color: var(--text);
+}
+
+/* Editable form grid inside sections */
+.ocr-form-grid {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .75rem;
+}
+.ocr-form-grid--two {
+  grid-template-columns: 1fr 1fr;
+}
+.ocr-form-grid .form-group { margin-bottom: 0; }
+
+@media (max-width: 640px) {
+  .ocr-form-grid,
+  .ocr-form-grid--two,
+  .ocr-demo-grid { grid-template-columns: 1fr; }
+  .ocr-demo-field--full { grid-column: auto; }
+}
 
 .symptom-tag {
   background: rgba(15, 76, 129, 0.08); color: var(--primary);

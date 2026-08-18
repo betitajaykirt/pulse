@@ -242,6 +242,10 @@ class SurveillanceReport(models.Model):
         null=True, blank=True, db_column='validated_by',
         related_name='validated_reports',
     )
+    lab_specimen_number = models.CharField(max_length=64, null=True, blank=True)
+    lab_issue_date = models.CharField(max_length=64, null=True, blank=True)
+    lab_findings = models.TextField(null=True, blank=True)
+    lab_interpretation = models.TextField(null=True, blank=True)
     remarks = models.TextField(null=True, blank=True)
     session = models.ForeignKey(
         'SurveillanceSession', on_delete=models.DO_NOTHING,

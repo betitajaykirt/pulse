@@ -473,6 +473,10 @@ def _perform_case_confirmation(
     lab_control_number='',
     test_type='',
     confirmed_disease='',
+    lab_specimen_number='',
+    lab_issue_date='',
+    lab_findings='',
+    lab_interpretation='',
     actor_type='admin',
     request=None,
 ):
@@ -487,6 +491,16 @@ def _perform_case_confirmation(
 
     if confirmed_disease:
         update_fields['syndrome_type'] = confirmed_disease
+
+    # Persist new lab detail fields
+    if lab_specimen_number:
+        update_fields['lab_specimen_number'] = lab_specimen_number
+    if lab_issue_date:
+        update_fields['lab_issue_date'] = lab_issue_date
+    if lab_findings:
+        update_fields['lab_findings'] = lab_findings
+    if lab_interpretation:
+        update_fields['lab_interpretation'] = lab_interpretation
 
     lab_notes = []
     if lab_control_number:
@@ -625,6 +639,10 @@ def confirm_case(request, report_id):
     lab_control_number = request.POST.get('lab_control_number', '').strip()
     test_type = request.POST.get('test_type', '').strip()
     confirmed_disease = request.POST.get('confirmed_disease', '').strip()
+    lab_specimen_number = request.POST.get('lab_specimen_number', '').strip()
+    lab_issue_date = request.POST.get('lab_issue_date', '').strip()
+    lab_findings = request.POST.get('lab_findings', '').strip()
+    lab_interpretation = request.POST.get('lab_interpretation', '').strip()
 
     threshold_result = _perform_case_confirmation(
         report,
@@ -632,6 +650,10 @@ def confirm_case(request, report_id):
         lab_control_number=lab_control_number,
         test_type=test_type,
         confirmed_disease=confirmed_disease,
+        lab_specimen_number=lab_specimen_number,
+        lab_issue_date=lab_issue_date,
+        lab_findings=lab_findings,
+        lab_interpretation=lab_interpretation,
         actor_type=request.session.get('user_type', 'admin'),
         request=request,
     )
