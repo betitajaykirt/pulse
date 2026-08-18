@@ -116,11 +116,52 @@
     <div class="pulse-modal__body">
       <div class="confirmation-summary" id="lab-modal-summary"></div>
 
+      <!-- OCR Upload Zone -->
+      <div class="ocr-upload-zone" id="ocr-upload-zone" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+        <input type="file" id="lab_document" accept="image/*,application/pdf" style="display:none;" onchange="handleFileSelect(event)">
+        <i data-lucide="upload-cloud" class="lucide-icon" style="width: 32px; height: 32px; margin-bottom: 0.5rem; color: var(--primary);"></i>
+        <p><strong>Drag & Drop</strong> lab document here or <button type="button" class="nc-btn nc-btn--outline nc-btn--sm" onclick="document.getElementById('lab_document').click()">Browse</button></p>
+        <span class="um-muted" style="font-size: 0.8rem;">Supports JPG, PNG, PDF (max 1MB)</span>
+      </div>
+
+      <!-- OCR Loading Spinner -->
+      <div class="ocr-loading" id="ocr-loading" style="display:none; text-align: center; padding: 1.5rem; color: var(--primary);">
+        <i data-lucide="loader-2" class="lucide-icon spinner-icon" style="animation: spin 1s linear infinite;"></i>
+        <p style="margin-top: 0.5rem; font-weight: 500;">Scanning document with AI...</p>
+      </div>
+
+      <!-- Mismatch Alert -->
+      <div class="ocr-alert-banner" id="ocr-alert-banner" style="display:none; background-color: #FEF3C7; color: #92400E; padding: 0.75rem 1rem; border-radius: var(--radius-md); margin-top: 1rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
+        <i data-lucide="alert-triangle" class="lucide-icon" style="flex-shrink: 0;"></i>
+        <span id="ocr-alert-msg"><strong>Warning:</strong> Scanned document name does not match current patient record.</span>
+      </div>
+
+      <!-- OCR Preview Panel -->
+      <div class="ocr-scan-summary" id="ocr-scan-summary" style="display:none; margin-top: 1.25rem; background: #F8FAFC; border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 1rem;">
+        <div class="section-divider" style="margin-top: 0;">OCR Scan Summary</div>
+        
+        <div class="ocr-field-row" style="display: flex; gap: 1rem; margin-bottom: 0.5rem; align-items: center;">
+          <label style="min-width: 120px; font-size: 0.85rem; font-weight: 600; color: var(--muted);">Patient Name</label>
+          <input type="text" id="ocr_patient_name" class="input-soft" style="flex-grow: 1; padding: 0.4rem 0.6rem; font-size: 0.85rem;">
+        </div>
+        
+        <div class="ocr-field-row" style="display: flex; gap: 1rem; margin-bottom: 0.5rem; align-items: center;">
+          <label style="min-width: 120px; font-size: 0.85rem; font-weight: 600; color: var(--muted);">Result Date</label>
+          <input type="text" id="ocr_result_date" class="input-soft" style="flex-grow: 1; padding: 0.4rem 0.6rem; font-size: 0.85rem;">
+        </div>
+
+        <div class="ocr-field-row" style="display: flex; gap: 1rem; align-items: flex-start;">
+          <label style="min-width: 120px; font-size: 0.85rem; font-weight: 600; color: var(--muted); margin-top: 0.4rem;">Clinical Findings</label>
+          <textarea id="ocr_findings" class="input-soft" rows="2" style="flex-grow: 1; padding: 0.4rem 0.6rem; font-size: 0.85rem; resize: vertical;"></textarea>
+        </div>
+      </div>
+
       <form method="POST" id="lab-confirm-form" action="">
         {% csrf_token %}
         <input type="hidden" name="redirect_to" value="admin_confirmation_panel">
+        <input type="hidden" id="case_patient_name" name="case_patient_name" value="">
 
-        <div class="form-group">
+        <div class="form-group" style="margin-top: 1.25rem;">
           <label for="lab_control_number">Laboratory Control Number <span class="um-muted">(required)</span></label>
           <input type="text" id="lab_control_number" name="lab_control_number" class="input-soft"
                  placeholder="e.g. LC-2026-004821" required maxlength="64">
@@ -173,6 +214,7 @@ function openLabModal(reportId, patientName, patientId, barangay, disease, repor
   document.getElementById('lab-confirm-form').action = CONFIRM_URL_TEMPLATE.replace('/0/', '/' + reportId + '/');
   document.getElementById('lab_control_number').value = '';
   document.getElementById('test_type').value = '';
+  document.getElementById('case_patient_name').value = patientName;
   
   const diseaseSelect = document.getElementById('confirmed_disease');
   let optionExists = Array.from(diseaseSelect.options).some(opt => opt.value === disease);
@@ -187,8 +229,16 @@ function openLabModal(reportId, patientName, patientId, barangay, disease, repor
     row('ML Predicted Disease', disease) +
     row('Date Reported', reportedAt);
 
+  // Reset OCR state
+  document.getElementById('lab_document').value = '';
+  document.getElementById('ocr-upload-zone').style.display = 'block';
+  document.getElementById('ocr-scan-summary').style.display = 'none';
+  document.getElementById('ocr-alert-banner').style.display = 'none';
+  document.getElementById('ocr-loading').style.display = 'none';
+
   document.getElementById('lab-modal').classList.add('open');
-  document.getElementById('lab_control_number').focus();
+  // Avoid focusing lab_control_number automatically if they want to upload
+  // document.getElementById('lab_control_number').focus(); 
   if (window.lucide) lucide.createIcons();
 }
 
@@ -199,6 +249,96 @@ function row(label, value) {
 function closeLabModal(e) {
   if (e && e.target !== document.getElementById('lab-modal')) return;
   document.getElementById('lab-modal').classList.remove('open');
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  e.currentTarget.style.borderColor = 'var(--primary)';
+  e.currentTarget.style.backgroundColor = 'rgba(15, 76, 129, 0.05)';
+}
+
+function handleDragLeave(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  e.currentTarget.style.borderColor = 'var(--border-light)';
+  e.currentTarget.style.backgroundColor = 'transparent';
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  e.currentTarget.style.borderColor = 'var(--border-light)';
+  e.currentTarget.style.backgroundColor = 'transparent';
+  
+  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    document.getElementById('lab_document').files = e.dataTransfer.files;
+    processOCR();
+  }
+}
+
+function handleFileSelect(e) {
+  if (e.target.files && e.target.files.length > 0) {
+    processOCR();
+  }
+}
+
+function processOCR() {
+  const fileInput = document.getElementById('lab_document');
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  const casePatientName = document.getElementById('case_patient_name').value;
+  const formData = new FormData();
+  formData.append('lab_document', file);
+  formData.append('case_patient_name', casePatientName);
+  
+  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+  
+  document.getElementById('ocr-upload-zone').style.display = 'none';
+  document.getElementById('ocr-loading').style.display = 'block';
+  document.getElementById('ocr-scan-summary').style.display = 'none';
+  document.getElementById('ocr-alert-banner').style.display = 'none';
+  
+  fetch('{% url "ocr_parse_lab" %}', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': csrfToken },
+    body: formData
+  })
+  .then(response => response.json())
+  .then(data => {
+    document.getElementById('ocr-loading').style.display = 'none';
+    if (data.success) {
+      document.getElementById('ocr-scan-summary').style.display = 'block';
+      
+      document.getElementById('ocr_patient_name').value = data.fields.patient_name || '';
+      document.getElementById('ocr_result_date').value = data.fields.result_date || '';
+      const combinedFindings = [data.fields.lab_results, data.fields.interpretation].filter(Boolean).join('\n\n');
+      document.getElementById('ocr_findings').value = combinedFindings;
+      
+      if (data.fields.control_number) document.getElementById('lab_control_number').value = data.fields.control_number;
+      if (data.test_type) document.getElementById('test_type').value = data.test_type;
+      if (data.confirmed_disease) {
+        const diseaseSelect = document.getElementById('confirmed_disease');
+        const optionExists = Array.from(diseaseSelect.options).some(opt => opt.value === data.confirmed_disease);
+        if (optionExists) diseaseSelect.value = data.confirmed_disease;
+      }
+      
+      if (data.validation && data.validation.mismatch) {
+        document.getElementById('ocr-alert-banner').style.display = 'flex';
+        document.getElementById('ocr-alert-msg').innerHTML = '<strong>Warning:</strong> ' + data.validation.message;
+      }
+    } else {
+      document.getElementById('ocr-upload-zone').style.display = 'block';
+      alert('OCR Failed: ' + data.error);
+    }
+  })
+  .catch(err => {
+    document.getElementById('ocr-loading').style.display = 'none';
+    document.getElementById('ocr-upload-zone').style.display = 'block';
+    alert('An error occurred during OCR processing.');
+    console.error(err);
+  });
 }
 </script>
 {% endblock %}
