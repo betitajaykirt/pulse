@@ -405,7 +405,6 @@ def case_records(request):
         'symptom_category': symptom_category,
         'disease_category': disease_category,
         'city_wide': city_wide,
-        'can_confirm': role in ('admin', 'super_admin', 'health_officer'),
         'can_validate': False,
     })
 
@@ -807,8 +806,8 @@ def close_case(request, report_id):
         messages.error(request, 'Report not found.')
         return redirect('case_records')
 
-    if report.status not in ('Confirmed', 'Probable'):
-        messages.error(request, f'Only Confirmed or Probable cases can be closed (current status: {report.status}).')
+    if report.status not in ('Confirmed', 'Probable', 'Suspected'):
+        messages.error(request, f'Only active cases can be closed (current status: {report.status}).')
         return redirect('case_records')
 
     outcome = request.POST.get('resolution_outcome', '').strip()

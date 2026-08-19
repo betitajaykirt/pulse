@@ -163,12 +163,6 @@
                     '{{ r.resolution_outcome|default:""|escapejs }}',
                     '{{ r.closed_at|md_datetime|default:"" }}'
                   )">View</button>
-                {% if r.status == 'Suspected' and can_confirm %}
-                <form method="POST" action="{% url 'confirm_case' r.id %}" class="um-inline-form" onsubmit="return confirm('Confirm this case as verified by CHO?');">
-                  {% csrf_token %}
-                  <button type="submit" class="nc-btn nc-btn--primary nc-btn--sm">Confirm</button>
-                </form>
-                {% endif %}
                 {% if r.validation_status == 'pending' and can_validate %}
                 <form method="POST" action="{% url 'validate_report' r.id %}" class="um-inline-form">
                   {% csrf_token %}
@@ -312,7 +306,7 @@ function viewRecord(id, barangay, disease, classif, cases, onset, caseStatus, va
   document.getElementById('modal-body').innerHTML = html;
   
   const closeContainer = document.getElementById('close-case-container');
-  if (caseStatus === 'Confirmed' || caseStatus === 'Probable') {
+  if (caseStatus === 'Confirmed' || caseStatus === 'Probable' || caseStatus === 'Suspected') {
     closeContainer.style.display = 'block';
     document.getElementById('close-case-form').action = CLOSE_URL_TEMPLATE.replace('/0/', '/' + id + '/');
   } else {
