@@ -348,36 +348,177 @@ def _extract_patient_name(text: str) -> str:
     return _clean(m.group(1)) if m else ''
 
 
+def split_person_name(full_name: str) -> dict:
+    """Split a display name into first, last, middle, suffix."""
+    raw = _clean(full_name)
+    empty = {'first_name': '', 'last_name': '', 'middle_name': '', 'suffix': ''}
+    if not raw:
+        return empty
+
+    suffixes = {'jr', 'jr.', 'sr', 'sr.', 'ii', 'iii', 'iv'}
+    suffix = ''
+    if ',' in raw:
+        last, rest = raw.split(',', 1)
+        tokens = rest.strip().split()
+        if tokens and tokens[-1].lower() in suffixes:
+            suffix = tokens.pop()
+        first = tokens[0] if tokens else ''
+        middle = ' '.join(tokens[1:]) if len(tokens) > 1 else ''
+        return {
+            'first_name': first.title() if first.isupper() or first.islower() else first,
+            'last_name': last.strip().title() if last.strip().isupper() else last.strip(),
+            'middle_name': middle.upper() if len(middle.replace('.', '')) <= 2 else middle.title(),
+            'suffix': suffix,
+        }
+
+    tokens = raw.split()
+    if tokens and tokens[-1].lower() in suffixes:
+        suffix = tokens.pop()
+    if not tokens:
+        return {**empty, 'suffix': suffix}
+    if len(tokens) == 1:
+        return {'first_name': tokens[0], 'last_name': '', 'middle_name': '', 'suffix': suffix}
+    first = tokens[0]
+    last = tokens[-1]
+    middle = ' '.join(tokens[1:-1])
+    return {
+        'first_name': first,
+        'last_name': last,
+        'middle_name': middle,
+        'suffix': suffix,
+    }
+
+
+def format_split_name(parts: dict) -> str:
+    bits = [
+        (parts.get('first_name') or '').strip(),
+        (parts.get('middle_name') or '').strip(),
+        (parts.get('last_name') or '').strip(),
+        (parts.get('suffix') or '').strip(),
+    ]
+    return ' '.join(b for b in bits if b)
+
+
+def _title_place(value: str) -> str:
+    value = _clean(value)
+    if not value:
+        return ''
+    small = {'of', 'del', 'de', 'da', 'la', 'los', 'the'}
+    words = []
+    for i, word in enumerate(value.replace('_', ' ').split()):
+        low = word.lower()
+        if i > 0 and low in small:
+            words.append(low)
+        else:
+            words.append(word.capitalize() if word.isupper() or word.islower() else word)
+    return ' '.join(words)
+
+
+def _fix_address_typos(value: str) -> str:
+    text = value or ''
+    replacements = (
+        (r'\bPURUK\b', 'PUROK'),
+        (r'\bPUR0K\b', 'PUROK'),
+        (r'\bP0RUK\b', 'PUROK'),
+        (r'\bBARANGAY\s+BARANGAY\b', 'BARANGAY'),
+    )
+    for pattern, repl in replacements:
+        text = re.sub(pattern, repl, text, flags=re.IGNORECASE)
+    return text
+
+
+def _labeled_place(text: str, label: str) -> str:
+    return _title_place(_first_group(
+        rf'{label}\s*[:\-]?\s*([A-Za-z0-9\s,.]+?)(?=\s*(?:Barangay|City|Province|Municipality|Region|Email|Phone|Contact|Nationality|Civil\s*Status|Address|\n|$))',
+        text,
+    ))
+
+
 def _extract_address(text: str) -> str:
-    address = ''
+    parts = _extract_address_parts(text)
+    return parts.get('address') or ''
+
+
+def _extract_address_parts(text: str) -> dict:
+    text = _fix_address_typos(text)
+    raw_address = ''
     m = re.search(
-        r'Address\s*[:\-]\s*'
+        r'Address\s*[:\-]?\s*'
         r'([A-Za-z0-9\s,.\-]+?)'
         r'(?=\s*(?:Barangay|City|Province|Email|Phone|Contact|Municipality|Region|\n|$))',
         text,
         re.IGNORECASE,
     )
     if m:
-        address = _clean(m.group(1))
-    if not address or len(address) < 5:
+        raw_address = _clean(m.group(1))
+    if not raw_address or len(raw_address) < 5:
         m = re.search(
-            r'Address\s*[:\-]\s*(.+?)(?=\s*(?:Email|Phone|Contact|Nationality|Civil\s*Status|\n|$))',
+            r'Address\s*[:\-]?\s*(.+?)(?=\s*(?:Email|Phone|Contact|Nationality|Civil\s*Status|\n|$))',
             text,
             re.IGNORECASE,
         )
         if m:
-            address = _clean(m.group(1))
+            raw_address = _clean(m.group(1))
 
-    m_brgy = re.search(
-        r'Barangay\s*[:\-]\s*([A-Za-z0-9\s,.]+?)(?=\s*(?:City|Province|Municipality|Region|\n|$))',
-        text,
-        re.IGNORECASE,
-    )
-    if m_brgy:
-        brgy_val = _clean(m_brgy.group(1))
-        if brgy_val and brgy_val.lower() not in address.lower():
-            address = f'{address}, BARANGAY {brgy_val}' if address else f'BARANGAY {brgy_val}'
-    return address
+    raw_address = _fix_address_typos(raw_address)
+    barangay = _labeled_place(text, 'Barangay')
+    city = _labeled_place(text, 'City')
+    province = _labeled_place(text, 'Province')
+    region = _labeled_place(text, 'Region')
+
+    purok = ''
+    purok_m = re.search(r'\bPurok\s+([A-Za-z0-9\s.\-]+?)(?=,| Barangay|\n|$)', raw_address, re.IGNORECASE)
+    if purok_m:
+        purok = _title_place('Purok ' + purok_m.group(1))
+    elif re.search(r'\bPurok\b', raw_address, re.IGNORECASE):
+        purok = _title_place(raw_address.split(',')[0])
+
+    if barangay and barangay.lower() in (raw_address or '').lower() and 'barangay' not in raw_address.lower():
+        pass
+    display_bits = []
+    if purok:
+        display_bits.append(purok)
+    elif raw_address:
+        first = raw_address.split(',')[0].strip()
+        if first and (not barangay or first.lower() != barangay.lower()):
+            display_bits.append(_title_place(first))
+    if barangay:
+        display_bits.append(f'Barangay {barangay}')
+    if city:
+        display_bits.append(city)
+    if province:
+        display_bits.append(province)
+
+    address = ', '.join(dict.fromkeys(display_bits))
+    return {
+        'purok': purok,
+        'barangay': barangay,
+        'city': city,
+        'province': province,
+        'region': region,
+        'address': address,
+    }
+
+
+def apply_record_name_correction(ocr_name: str, case_name: str) -> dict:
+    """Prefer the case-record name when OCR is a close misspelling."""
+    parts = split_person_name(ocr_name)
+    raw = ocr_name or ''
+    validation = cross_validate_patient(ocr_name, case_name)
+    corrected = False
+    display = format_split_name(parts) or raw
+    if validation.get('match') and case_name:
+        record_parts = split_person_name(case_name)
+        if record_parts.get('first_name') or record_parts.get('last_name'):
+            parts = record_parts
+            display = format_split_name(record_parts) or case_name
+            corrected = display.lower() != (raw or '').lower()
+    return {
+        'patient_name': display,
+        'raw_patient_name': raw,
+        'name_corrected': corrected,
+        **parts,
+    }
 
 
 def build_lab_overview(fields: dict) -> dict:
@@ -407,9 +548,16 @@ def parse_lab_fields(raw_text: str) -> dict:
     t = _normalize_ocr_text(raw_text or '')
 
     patient_name = _extract_patient_name(t)
+    name_parts = split_person_name(patient_name)
     age = _first_group(r'Age\s*[:\-]?\s*(\d{1,3})', t)
     sex = _first_group(r'(?:Gender|Sex)\s*[:\-]?\s*([A-Za-z]+)', t)
-    address = _extract_address(t)
+    birthday = _first_group(r'(?:Birthday|Date\s*of\s*Birth|DOB)\s*[:\-]?\s*([\d/\-]+)', t)
+    civil_status = _first_group(r'Civil\s*Status\s*[:\-]?\s*([A-Za-z]+)', t)
+    nationality = _first_group(r'Nationality\s*[:\-]?\s*([A-Za-z\s]+?)(?=\s*(?:Civil\s*Status|Gender|Sex|Address|\n|$))', t)
+    phone = _first_group(r'(?:Phone|Mobile|Contact)\s*[:\-]?\s*([+\d][\d\s\-]{8,18})', t)
+    email = _first_group(r'Email\s*[:\-]?\s*([\w.+-]+@[\w.-]+)', t)
+    address_parts = _extract_address_parts(t)
+    address = address_parts.get('address') or ''
     control_number, lab_number = _extract_lab_identifiers(t)
     result_date = _extract_issue_date(t)
     markers = _extract_markers(t)
@@ -417,10 +565,25 @@ def parse_lab_fields(raw_text: str) -> dict:
     interpretation = _extract_interpretation(t, markers)
 
     fields = {
-        'patient_name': patient_name,
+        'patient_name': format_split_name(name_parts) or patient_name,
+        'raw_patient_name': patient_name,
+        'first_name': name_parts.get('first_name') or '',
+        'last_name': name_parts.get('last_name') or '',
+        'middle_name': name_parts.get('middle_name') or '',
+        'suffix': name_parts.get('suffix') or '',
         'age': age,
         'sex': sex.upper() if sex else '',
+        'birthday': birthday,
+        'civil_status': _title_place(civil_status),
+        'nationality': _title_place(nationality),
+        'phone': phone,
+        'email': email,
         'address': address,
+        'purok': address_parts.get('purok') or '',
+        'barangay': address_parts.get('barangay') or '',
+        'city': address_parts.get('city') or '',
+        'province': address_parts.get('province') or '',
+        'region': address_parts.get('region') or '',
         'control_number': control_number,
         'lab_number': lab_number,
         'result_date': result_date,

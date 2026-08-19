@@ -1,6 +1,12 @@
 from django.test import SimpleTestCase
 
-from reports.ocr_service import parse_lab_fields, cross_validate_patient, match_test_type
+from reports.ocr_service import (
+    parse_lab_fields,
+    cross_validate_patient,
+    match_test_type,
+    split_person_name,
+    apply_record_name_correction,
+)
 
 
 SAMPLE_REPORT = """
@@ -66,6 +72,12 @@ class ParseLabFieldsTests(SimpleTestCase):
         self.assertIn('POSITIVE FOR ACUTE DENGUE', fields['interpretation'])
         self.assertEqual(fields['overview']['verdict'], 'POSITIVE')
         self.assertEqual(fields['overview']['marker_summary'], 'NS1(+) / IgM(+) / IgG(-)')
+        self.assertEqual(fields['first_name'].upper(), 'JELYN')
+        self.assertEqual(fields['last_name'].upper(), 'AUJERO')
+        self.assertIn('PUROK', fields['address'].upper())
+        self.assertNotIn('PURUK', fields['address'].upper())
+        self.assertEqual(fields['barangay'].upper(), 'POBLACION')
+        self.assertIn('BAGO', fields['city'].upper())
 
     def test_messy_ocr_still_recovers_fields(self):
         fields = parse_lab_fields(MESSY_OCR)
@@ -90,3 +102,16 @@ class ParseLabFieldsTests(SimpleTestCase):
             match_test_type(SAMPLE_REPORT),
             'Dengue NS1 Ag & IgG/IgM Combo',
         )
+
+    def test_split_last_comma_first(self):
+        parts = split_person_name('AUJERO, JELYN S.')
+        self.assertEqual(parts['first_name'].upper(), 'JELYN')
+        self.assertEqual(parts['last_name'].upper(), 'AUJERO')
+        self.assertEqual(parts['middle_name'].replace('.', '').upper(), 'S')
+
+    def test_record_name_corrects_ocr_typo(self):
+        fixed = apply_record_name_correction('AUJERO, JELVN S', 'Jelyn S. Aujero')
+        self.assertTrue(fixed['name_corrected'])
+        self.assertEqual(fixed['first_name'], 'Jelyn')
+        self.assertEqual(fixed['last_name'], 'Aujero')
+        self.assertIn('JELVN', fixed['raw_patient_name'].upper())

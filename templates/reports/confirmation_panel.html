@@ -83,15 +83,8 @@
               <span class="pill-badge badge-probable">{{ r.status }}</span>
             </td>
             <td data-label="Action">
-              <button type="button" class="nc-btn nc-btn--primary nc-btn--sm"
-                onclick="openLabModal(
-                  {{ r.id }},
-                  '{{ item.patient_name|escapejs }}',
-                  '{{ item.patient_id_display|escapejs }}',
-                  '{{ r.barangay_name|default:"—"|escapejs }}',
-                  '{{ item.ml_disease|escapejs }}',
-                  '{{ r.report_date|md_datetime|escapejs }}'
-                )">
+              <button type="button" class="nc-btn nc-btn--primary nc-btn--sm btn-process-lab"
+                data-payload="{{ item.patient_payload|escape }}">
                 <i data-lucide="flask-conical" class="lucide-icon lucide-icon--xs"></i>
                 Process Lab Result
               </button>
@@ -119,8 +112,8 @@
     </div>
     <div class="pulse-modal__body">
 
-      {# ── Case Summary (always visible) ─────────────────── #}
-      <div class="confirmation-summary" id="lab-modal-summary"></div>
+      {# ── Patient Details (always visible before upload) ── #}
+      <div class="ocr-section ocr-patient-card" id="lab-modal-summary"></div>
 
       {# ── OCR Upload Zone ───────────────────────────────── #}
       <div class="ocr-upload-zone" id="ocr-upload-zone"
@@ -143,60 +136,99 @@
         <p>Scanning document…</p>
       </div>
 
-      {# ── ① Verification Banner ─────────────────────────── #}
-      <div class="ocr-verify-banner ocr-verify-banner--match" id="ocr-verify-match" style="display:none;">
-        <i data-lucide="check-circle-2" class="lucide-icon lucide-icon--sm"></i>
-        <span><strong>Patient Verified:</strong> <span id="ocr-verify-name"></span></span>
-      </div>
-      <div class="ocr-verify-banner ocr-verify-banner--mismatch" id="ocr-verify-mismatch" style="display:none;">
-        <i data-lucide="alert-triangle" class="lucide-icon lucide-icon--sm"></i>
-        <span id="ocr-mismatch-msg"><strong>Warning:</strong> Scanned document name does not match current patient record.</span>
-      </div>
+      {# ── Uploaded document + OCR comparison ───────────── #}
+      <div class="ocr-compare" id="ocr-compare" style="display:none;">
+        <div class="ocr-section ocr-compare__scan">
+          <div class="ocr-section__title">
+            <i data-lucide="file-scan" class="lucide-icon lucide-icon--xs"></i>
+            Uploaded Lab Document
+          </div>
+          <div class="ocr-scan-frame">
+            <img id="ocr-doc-preview-img" alt="Uploaded laboratory document" style="display:none;">
+            <iframe id="ocr-doc-preview-frame" title="Uploaded laboratory PDF" style="display:none;"></iframe>
+            <p class="um-muted" id="ocr-doc-preview-fallback" style="display:none;">Preview not available for this file type. Open the original file to compare.</p>
+          </div>
+          <p class="ocr-scan-hint">Compare the original scan with the OCR fields on the right.</p>
+        </div>
+        <div class="ocr-compare__extracted">
+          <div class="ocr-verify-banner ocr-verify-banner--match" id="ocr-verify-match" style="display:none;">
+            <i data-lucide="check-circle-2" class="lucide-icon lucide-icon--sm"></i>
+            <span><strong>Patient Verified:</strong> <span id="ocr-verify-name"></span></span>
+          </div>
+          <div class="ocr-verify-banner ocr-verify-banner--mismatch" id="ocr-verify-mismatch" style="display:none;">
+            <i data-lucide="alert-triangle" class="lucide-icon lucide-icon--sm"></i>
+            <span id="ocr-mismatch-msg"><strong>Warning:</strong> Scanned document name does not match current patient record.</span>
+          </div>
 
-      {# ── ② Scanned Patient Demographics (read-only) ───── #}
-      <div class="ocr-section" id="ocr-demographics" style="display:none;">
-        <div class="ocr-section__title">
-          <i data-lucide="user-circle-2" class="lucide-icon lucide-icon--xs"></i>
-          Scanned Patient Demographics
-        </div>
-        <div class="ocr-demo-grid">
-          <div class="ocr-demo-field">
-            <span class="ocr-demo-label">Patient Name</span>
-            <span class="ocr-demo-value" id="ocr_demo_name">—</span>
+          <div class="ocr-section" id="ocr-demographics" style="display:none;">
+            <div class="ocr-section__title">
+              <i data-lucide="user-circle-2" class="lucide-icon lucide-icon--xs"></i>
+              Scanned Patient Demographics
+            </div>
+            <p class="ocr-raw-name" id="ocr-raw-name" style="display:none;"></p>
+            <div class="ocr-demo-grid ocr-demo-grid--names">
+              <div class="ocr-demo-field">
+                <span class="ocr-demo-label">First Name</span>
+                <span class="ocr-demo-value" id="ocr_demo_first">—</span>
+              </div>
+              <div class="ocr-demo-field">
+                <span class="ocr-demo-label">Last Name</span>
+                <span class="ocr-demo-value" id="ocr_demo_last">—</span>
+              </div>
+              <div class="ocr-demo-field">
+                <span class="ocr-demo-label">Middle Initial</span>
+                <span class="ocr-demo-value" id="ocr_demo_middle">—</span>
+              </div>
+              <div class="ocr-demo-field">
+                <span class="ocr-demo-label">Suffix</span>
+                <span class="ocr-demo-value" id="ocr_demo_suffix">—</span>
+              </div>
+              <div class="ocr-demo-field">
+                <span class="ocr-demo-label">Age / Gender</span>
+                <span class="ocr-demo-value" id="ocr_demo_age_sex">—</span>
+              </div>
+              <div class="ocr-demo-field">
+                <span class="ocr-demo-label">Birthday</span>
+                <span class="ocr-demo-value" id="ocr_demo_birthday">—</span>
+              </div>
+              <div class="ocr-demo-field ocr-demo-field--full">
+                <span class="ocr-demo-label">Address</span>
+                <span class="ocr-demo-value" id="ocr_demo_address">—</span>
+              </div>
+              <div class="ocr-demo-field">
+                <span class="ocr-demo-label">Barangay</span>
+                <span class="ocr-demo-value" id="ocr_demo_barangay">—</span>
+              </div>
+              <div class="ocr-demo-field">
+                <span class="ocr-demo-label">City / Province</span>
+                <span class="ocr-demo-value" id="ocr_demo_city">—</span>
+              </div>
+            </div>
           </div>
-          <div class="ocr-demo-field">
-            <span class="ocr-demo-label">Age / Gender</span>
-            <span class="ocr-demo-value" id="ocr_demo_age_sex">—</span>
-          </div>
-          <div class="ocr-demo-field ocr-demo-field--full">
-            <span class="ocr-demo-label">Address</span>
-            <span class="ocr-demo-value" id="ocr_demo_address">—</span>
-          </div>
-        </div>
-      </div>
 
-      {# ── Lab Results Overview ──────────────────────────── #}
-      <div class="ocr-section ocr-overview" id="ocr-overview" style="display:none;">
-        <div class="ocr-section__title">
-          <i data-lucide="clipboard-check" class="lucide-icon lucide-icon--xs"></i>
-          Lab Results Overview
+          <div class="ocr-section ocr-overview" id="ocr-overview" style="display:none;">
+            <div class="ocr-section__title">
+              <i data-lucide="clipboard-check" class="lucide-icon lucide-icon--xs"></i>
+              Lab Results Overview
+            </div>
+            <div class="ocr-overview__verdict" id="ocr-overview-verdict"></div>
+            <div class="ocr-overview__meta">
+              <div class="ocr-demo-field">
+                <span class="ocr-demo-label">Patient</span>
+                <span class="ocr-demo-value" id="ocr-overview-patient">—</span>
+              </div>
+              <div class="ocr-demo-field">
+                <span class="ocr-demo-label">Test / Issue Date</span>
+                <span class="ocr-demo-value" id="ocr-overview-date">—</span>
+              </div>
+              <div class="ocr-demo-field ocr-demo-field--full">
+                <span class="ocr-demo-label">Marker Summary</span>
+                <span class="ocr-demo-value" id="ocr-overview-markers">—</span>
+              </div>
+            </div>
+            <div class="ocr-marker-pills" id="ocr-overview-pills"></div>
+          </div>
         </div>
-        <div class="ocr-overview__verdict" id="ocr-overview-verdict"></div>
-        <div class="ocr-overview__meta">
-          <div class="ocr-demo-field">
-            <span class="ocr-demo-label">Patient</span>
-            <span class="ocr-demo-value" id="ocr-overview-patient">—</span>
-          </div>
-          <div class="ocr-demo-field">
-            <span class="ocr-demo-label">Test / Issue Date</span>
-            <span class="ocr-demo-value" id="ocr-overview-date">—</span>
-          </div>
-          <div class="ocr-demo-field ocr-demo-field--full">
-            <span class="ocr-demo-label">Marker Summary</span>
-            <span class="ocr-demo-value" id="ocr-overview-markers">—</span>
-          </div>
-        </div>
-        <div class="ocr-marker-pills" id="ocr-overview-pills"></div>
       </div>
 
       {# ── Confirmation Form ─────────────────────────────── #}
@@ -301,58 +333,129 @@
 {% block extra_js %}
 <script>
 const CONFIRM_URL_TEMPLATE = "{% url 'confirm_case' 0 %}";
-document.addEventListener('DOMContentLoaded', function () { if (window.lucide) lucide.createIcons(); });
+let ocrPreviewUrl = null;
 
-/* ── Open Modal ───────────────────────────────────────────── */
-function openLabModal(reportId, patientName, patientId, barangay, disease, reportedAt) {
-  const form = document.getElementById('lab-confirm-form');
+document.addEventListener('DOMContentLoaded', function () {
+  if (window.lucide) lucide.createIcons();
+  document.querySelectorAll('.btn-process-lab').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var payload = {};
+      try { payload = JSON.parse(btn.getAttribute('data-payload') || '{}'); }
+      catch (err) { payload = {}; }
+      openLabModal(payload);
+    });
+  });
+});
+
+function esc(value) {
+  return String(value == null || value === '' ? '—' : value)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function detailCell(label, value) {
+  return '<div class="ocr-demo-field">' +
+    '<span class="ocr-demo-label">' + esc(label) + '</span>' +
+    '<span class="ocr-demo-value">' + esc(value) + '</span></div>';
+}
+
+function revokePreview() {
+  if (ocrPreviewUrl) {
+    URL.revokeObjectURL(ocrPreviewUrl);
+    ocrPreviewUrl = null;
+  }
+  var img = document.getElementById('ocr-doc-preview-img');
+  var frame = document.getElementById('ocr-doc-preview-frame');
+  var fallback = document.getElementById('ocr-doc-preview-fallback');
+  if (img) { img.src = ''; img.style.display = 'none'; }
+  if (frame) { frame.src = 'about:blank'; frame.style.display = 'none'; }
+  if (fallback) fallback.style.display = 'none';
+}
+
+function showDocumentPreview(file) {
+  revokePreview();
+  var compare = document.getElementById('ocr-compare');
+  var img = document.getElementById('ocr-doc-preview-img');
+  var frame = document.getElementById('ocr-doc-preview-frame');
+  var fallback = document.getElementById('ocr-doc-preview-fallback');
+  compare.style.display = 'grid';
+  ocrPreviewUrl = URL.createObjectURL(file);
+  if ((file.type || '').indexOf('pdf') !== -1 || /\.pdf$/i.test(file.name || '')) {
+    frame.src = ocrPreviewUrl;
+    frame.style.display = '';
+  } else if ((file.type || '').indexOf('image/') === 0) {
+    img.src = ocrPreviewUrl;
+    img.style.display = '';
+  } else {
+    fallback.style.display = '';
+  }
+}
+
+function openLabModal(p) {
+  p = p || {};
+  var reportId = p.report_id;
+  var form = document.getElementById('lab-confirm-form');
   form.action = CONFIRM_URL_TEMPLATE.replace('/0/', '/' + reportId + '/');
+  document.getElementById('case_patient_name').value = p.full_name || '';
 
-  document.getElementById('case_patient_name').value = patientName;
-
-  // Reset all editable fields
   ['lab_control_number','lab_specimen_number','lab_issue_date','lab_findings','lab_interpretation'].forEach(function(id) {
     document.getElementById(id).value = '';
   });
   document.getElementById('test_type').value = '';
 
   var diseaseSelect = document.getElementById('confirmed_disease');
+  var disease = p.disease || '';
   var optionExists = Array.from(diseaseSelect.options).some(function(opt) { return opt.value === disease; });
   diseaseSelect.value = optionExists ? disease : '';
 
-  // Render Case Summary
-  document.getElementById('lab-modal-summary').innerHTML =
-    '<div class="section-divider">Case Summary</div>' +
-    row('Report ID', '#' + reportId) +
-    row('Patient', patientName) +
-    row('Patient / Case ID', patientId) +
-    row('Barangay', barangay) +
-    row('ML Predicted Disease', disease) +
-    row('Date Reported', reportedAt);
+  var studentHtml = '';
+  if (p.is_student) {
+    studentHtml = detailCell('Student', 'Yes') +
+      detailCell('Grade / Section', p.grade || '—') +
+      '<div class="ocr-demo-field ocr-demo-field--full">' +
+      '<span class="ocr-demo-label">School</span><span class="ocr-demo-value">' + esc(p.school_name || '—') + '</span></div>';
+  }
 
-  // Reset OCR UI
+  document.getElementById('lab-modal-summary').innerHTML =
+    '<div class="ocr-section__title"><i data-lucide="id-card" class="lucide-icon lucide-icon--xs"></i> Patient Details</div>' +
+    '<div class="ocr-demo-grid ocr-demo-grid--names">' +
+      detailCell('First Name', p.first_name) +
+      detailCell('Last Name', p.last_name) +
+      detailCell('Middle Initial', p.middle_name) +
+      detailCell('Suffix', p.suffix) +
+      detailCell('Age / Gender', [p.age, p.sex].filter(Boolean).join(' / ') || '—') +
+      detailCell('Date of Birth', p.date_of_birth) +
+      detailCell('Civil Status', p.civil_status) +
+      detailCell('Patient / Case ID', p.patient_id) +
+      '<div class="ocr-demo-field ocr-demo-field--full"><span class="ocr-demo-label">Address / Purok</span><span class="ocr-demo-value">' + esc(p.address || p.purok) + '</span></div>' +
+      detailCell('Barangay', p.barangay) +
+      detailCell('City', p.city) +
+      detailCell('Date of Onset', p.onset_date) +
+      detailCell('Date Reported', p.reported_at) +
+      detailCell('ML Predicted Disease', p.disease) +
+      detailCell('Status', p.status) +
+      studentHtml +
+    '</div>';
+
   document.getElementById('lab_document').value = '';
   document.getElementById('ocr-upload-zone').style.display = '';
   document.getElementById('ocr-loading').style.display = 'none';
+  document.getElementById('ocr-compare').style.display = 'none';
   document.getElementById('ocr-verify-match').style.display = 'none';
   document.getElementById('ocr-verify-mismatch').style.display = 'none';
   document.getElementById('ocr-demographics').style.display = 'none';
   document.getElementById('ocr-overview').style.display = 'none';
+  revokePreview();
 
   document.getElementById('lab-modal').classList.add('open');
   if (window.lucide) lucide.createIcons();
 }
 
-function row(label, value) {
-  return '<div class="detail-row"><span class="detail-label">' + label + '</span><span class="detail-value">' + value + '</span></div>';
-}
-
 function closeLabModal(e) {
   if (e && e.target !== document.getElementById('lab-modal')) return;
+  revokePreview();
   document.getElementById('lab-modal').classList.remove('open');
 }
 
-/* ── Drag & Drop Handlers ─────────────────────────────────── */
 function handleDragOver(e) {
   e.preventDefault(); e.stopPropagation();
   e.currentTarget.classList.add('ocr-upload-zone--active');
@@ -373,7 +476,6 @@ function handleFileSelect(e) {
   if (e.target.files && e.target.files.length > 0) processOCR();
 }
 
-/* ── OCR Processing ───────────────────────────────────────── */
 function processOCR() {
   var fileInput = document.getElementById('lab_document');
   var file = fileInput.files[0];
@@ -386,13 +488,13 @@ function processOCR() {
 
   var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
-  // Show loading, hide others
   document.getElementById('ocr-upload-zone').style.display = 'none';
   document.getElementById('ocr-loading').style.display = 'flex';
   document.getElementById('ocr-verify-match').style.display = 'none';
   document.getElementById('ocr-verify-mismatch').style.display = 'none';
   document.getElementById('ocr-demographics').style.display = 'none';
   document.getElementById('ocr-overview').style.display = 'none';
+  showDocumentPreview(file);
 
   fetch('{% url "ocr_parse_lab" %}', {
     method: 'POST',
@@ -414,13 +516,15 @@ function processOCR() {
 
     if (!data.success) {
       document.getElementById('ocr-upload-zone').style.display = '';
+      document.getElementById('ocr-compare').style.display = 'none';
+      revokePreview();
       alert('OCR Failed: ' + (data.error || 'Unknown error'));
       return;
     }
 
     var f = data.fields;
+    document.getElementById('ocr-compare').style.display = 'grid';
 
-    /* ① Verification Banner */
     if (data.validation) {
       if (data.validation.match) {
         document.getElementById('ocr-verify-name').textContent = f.patient_name || '—';
@@ -432,21 +536,31 @@ function processOCR() {
       }
     }
 
-    /* ② Patient Demographics */
-    document.getElementById('ocr_demo_name').textContent = f.patient_name || '—';
-    var ageSex = [f.age, f.sex].filter(Boolean).join(' / ');
-    document.getElementById('ocr_demo_age_sex').textContent = ageSex || '—';
+    document.getElementById('ocr_demo_first').textContent = f.first_name || '—';
+    document.getElementById('ocr_demo_last').textContent = f.last_name || '—';
+    document.getElementById('ocr_demo_middle').textContent = f.middle_name || '—';
+    document.getElementById('ocr_demo_suffix').textContent = f.suffix || '—';
+    document.getElementById('ocr_demo_age_sex').textContent = [f.age, f.sex].filter(Boolean).join(' / ') || '—';
+    document.getElementById('ocr_demo_birthday').textContent = f.birthday || '—';
     document.getElementById('ocr_demo_address').textContent = f.address || '—';
+    document.getElementById('ocr_demo_barangay').textContent = f.barangay || '—';
+    document.getElementById('ocr_demo_city').textContent = [f.city, f.province].filter(Boolean).join(', ') || '—';
     document.getElementById('ocr-demographics').style.display = '';
+
+    var rawEl = document.getElementById('ocr-raw-name');
+    if (f.name_corrected && f.raw_patient_name) {
+      rawEl.style.display = '';
+      rawEl.textContent = 'Corrected from scan: ' + f.raw_patient_name;
+    } else {
+      rawEl.style.display = 'none';
+    }
 
     renderLabOverview(data.overview || f.overview, f);
 
-    /* ③ Lab Identifiers */
     if (f.control_number) document.getElementById('lab_control_number').value = f.control_number;
     if (f.lab_number)     document.getElementById('lab_specimen_number').value = f.lab_number;
     if (f.result_date)    document.getElementById('lab_issue_date').value = f.result_date;
 
-    /* ④ Classification Dropdowns */
     if (data.test_type) {
       var ttSel = document.getElementById('test_type');
       var ttExists = Array.from(ttSel.options).some(function(o) { return o.value === data.test_type; });
@@ -458,7 +572,6 @@ function processOCR() {
       if (dsExists) ds.value = data.confirmed_disease;
     }
 
-    /* ⑤ Clinical Findings & Interpretation */
     if (f.lab_results)    document.getElementById('lab_findings').value = f.lab_results;
     if (f.interpretation) document.getElementById('lab_interpretation').value = f.interpretation;
 
@@ -467,6 +580,8 @@ function processOCR() {
   .catch(function(err) {
     document.getElementById('ocr-loading').style.display = 'none';
     document.getElementById('ocr-upload-zone').style.display = '';
+    document.getElementById('ocr-compare').style.display = 'none';
+    revokePreview();
     alert('OCR Error: ' + (err.message || 'An unexpected error occurred. Please try again.'));
     console.error('OCR processing error:', err);
   });

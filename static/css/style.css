@@ -2734,7 +2734,73 @@ tbody tr:last-child td { border-bottom: none; }
 
 /* ── OCR Lab Modal — expanded layout ────────────────────── */
 .pulse-modal--lab-wide {
-  max-width: 780px;
+  max-width: 1120px;
+}
+
+.ocr-patient-card {
+  margin-top: 0;
+  background: #F0F7FC;
+  border-color: #C5D9EA;
+}
+
+.ocr-compare {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.1fr);
+  gap: 1rem;
+  align-items: start;
+  margin-top: 1.25rem;
+}
+.ocr-compare__scan {
+  margin-top: 0;
+  position: sticky;
+  top: 0;
+}
+.ocr-compare__extracted {
+  min-width: 0;
+}
+.ocr-compare__extracted .ocr-section,
+.ocr-compare__extracted .ocr-verify-banner {
+  margin-top: .75rem;
+}
+.ocr-compare__extracted .ocr-verify-banner:first-child,
+.ocr-compare__extracted .ocr-section:first-child {
+  margin-top: 0;
+}
+.ocr-scan-frame {
+  background: #0F172A;
+  border-radius: var(--radius-sm);
+  min-height: 320px;
+  max-height: 520px;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ocr-scan-frame img,
+.ocr-scan-frame iframe {
+  width: 100%;
+  min-height: 320px;
+  max-height: 520px;
+  object-fit: contain;
+  background: #fff;
+  border: 0;
+}
+.ocr-scan-hint {
+  margin: .65rem 0 0;
+  font-size: .78rem;
+  color: var(--muted);
+}
+.ocr-raw-name {
+  margin: 0 0 .75rem;
+  font-size: .78rem;
+  color: #92400E;
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: var(--radius-sm);
+  padding: .4rem .65rem;
+}
+.ocr-demo-grid--names {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .ocr-upload-zone {
@@ -2864,10 +2930,19 @@ tbody tr:last-child td { border-bottom: none; }
 }
 .ocr-form-grid .form-group { margin-bottom: 0; }
 
+@media (max-width: 960px) {
+  .ocr-compare {
+    grid-template-columns: 1fr;
+  }
+  .ocr-compare__scan { position: static; }
+  .ocr-demo-grid--names { grid-template-columns: 1fr 1fr; }
+}
+
 @media (max-width: 640px) {
   .ocr-form-grid,
   .ocr-form-grid--two,
   .ocr-demo-grid,
+  .ocr-demo-grid--names,
   .ocr-overview__meta { grid-template-columns: 1fr; }
   .ocr-demo-field--full { grid-column: auto; }
 }

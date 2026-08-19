@@ -466,6 +466,95 @@ def _patient_display_for_report(report) -> dict:
     }
 
 
+def _remarks_field(remarks: str, label: str) -> str:
+    if not remarks:
+        return ''
+    prefix = f'{label}:'
+    for part in remarks.split(' | '):
+        if part.startswith(prefix):
+            return part.replace(prefix, '', 1).strip()
+    return ''
+
+
+def _patient_profile_for_report(report) -> dict:
+    """Full patient card used in the lab confirmation modal before OCR upload."""
+    from reports.ocr_service import split_person_name
+
+    display = _patient_display_for_report(report)
+    patient_cases = list(report.patient_case.all()) if hasattr(report, 'patient_case') else []
+    pc = patient_cases[0] if patient_cases else None
+    linked = report.patient if report.patient_id else None
+    remarks = report.remarks or ''
+    name_parts = split_person_name(display.get('name') or '')
+
+    age = ''
+    sex = ''
+    dob = ''
+    civil = ''
+    purok = ''
+    address = ''
+    is_student = False
+    school_name = ''
+    grade = ''
+
+    if pc:
+        age = '' if pc.age is None else str(pc.age)
+        sex = pc.sex or ''
+        dob = format_display_date(pc.date_of_birth) if pc.date_of_birth else ''
+        civil = pc.civil_status or ''
+        purok = (pc.purok_street or '').strip()
+        address = (pc.detailed_address or pc.purok_street or '').strip()
+        is_student = bool(pc.is_student)
+        school_name = pc.school_name or ''
+        grade = pc.grade_year_section or ''
+
+    if linked:
+        sex = sex or (linked.sex or '')
+        if linked.birthdate and not dob:
+            dob = format_display_date(linked.birthdate)
+        address = address or (linked.address or '')
+
+    dob = dob or format_display_date(getattr(report, 'date_of_birth', None), empty='')
+    civil = civil or (report.civil_status or '')
+    address = address or (report.detailed_address or '')
+    age = age or _remarks_field(remarks, 'Age')
+    sex = sex or _remarks_field(remarks, 'Sex')
+    if not address:
+        address = _remarks_field(remarks, 'Address')
+
+    barangay = ''
+    city = ''
+    if report.barangay:
+        barangay = report.barangay.barangay_name or ''
+        city = getattr(report.barangay, 'city', '') or ''
+
+    return {
+        'report_id': report.id,
+        'full_name': display.get('name') or '',
+        'first_name': name_parts.get('first_name') or '',
+        'last_name': name_parts.get('last_name') or '',
+        'middle_name': name_parts.get('middle_name') or '',
+        'suffix': name_parts.get('suffix') or '',
+        'patient_id': display.get('id_display') or str(report.id),
+        'age': age,
+        'sex': sex,
+        'date_of_birth': dob or '—',
+        'civil_status': civil or '—',
+        'purok': purok or '—',
+        'address': address or purok or '—',
+        'barangay': barangay or '—',
+        'city': city or '—',
+        'onset_date': format_display_date(display.get('onset_date') or report.date_of_onset),
+        'reported_at': format_display_datetime(report.report_date),
+        'disease': report.syndrome_type or report.suspected_disease or '—',
+        'status': report.status or '—',
+        'classification': (report.case_classification or '').title() or '—',
+        'is_student': is_student,
+        'school_name': school_name,
+        'grade': grade,
+    }
+
+
 def _perform_case_confirmation(
     report,
     *,
@@ -565,12 +654,14 @@ def admin_confirmation_panel(request):
     pending_cases = []
     for report in reports:
         patient = _patient_display_for_report(report)
+        profile = _patient_profile_for_report(report)
         pending_cases.append({
             'report': report,
             'patient_name': patient['name'],
             'patient_id_display': patient['id_display'],
             'onset_date': patient.get('onset_date'),
             'ml_disease': report.syndrome_type or report.suspected_disease or '—',
+            'patient_payload': json.dumps(profile),
         })
 
     return render(request, 'reports/confirmation_panel.html', {
@@ -588,8 +679,8 @@ def ocr_parse_lab_document(request):
     import traceback
     try:
         from .ocr_service import (
-            call_ocr_api, parse_lab_fields, match_test_type, 
-            match_disease, cross_validate_patient
+            call_ocr_api, parse_lab_fields, match_test_type,
+            match_disease, cross_validate_patient, apply_record_name_correction,
         )
         
         file_obj = request.FILES.get('lab_document')
@@ -607,6 +698,13 @@ def ocr_parse_lab_document(request):
         
         # 2. Extract fields
         fields = parse_lab_fields(raw_text)
+        name_fix = apply_record_name_correction(
+            fields.get('raw_patient_name') or fields.get('patient_name') or '',
+            case_patient_name,
+        )
+        fields.update(name_fix)
+        if fields.get('overview'):
+            fields['overview']['patient'] = fields.get('patient_name') or fields['overview'].get('patient')
         
         # 3. Match dropdowns
         test_type = match_test_type(raw_text)
