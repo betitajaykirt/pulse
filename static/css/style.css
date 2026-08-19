@@ -2813,6 +2813,48 @@ tbody tr:last-child td { border-bottom: none; }
   font-size: .88rem; font-weight: 500; color: var(--text);
 }
 
+.ocr-overview {
+  background: #F0FDFA;
+  border-color: #99F6E4;
+}
+.ocr-overview__verdict {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: .01em;
+  margin-bottom: .75rem;
+  color: var(--text);
+}
+.ocr-overview__verdict--positive { color: #B91C1C; }
+.ocr-overview__verdict--negative { color: #047857; }
+.ocr-overview__meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .6rem;
+}
+.ocr-marker-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+  margin-top: .75rem;
+}
+.ocr-marker-pill {
+  font-size: .75rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: .28rem .7rem;
+  letter-spacing: .02em;
+}
+.ocr-marker-pill--pos {
+  background: #FEE2E2;
+  color: #991B1B;
+  border: 1px solid #FECACA;
+}
+.ocr-marker-pill--neg {
+  background: #ECFDF5;
+  color: #065F46;
+  border: 1px solid #A7F3D0;
+}
+
 /* Editable form grid inside sections */
 .ocr-form-grid {
   display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .75rem;
@@ -2825,7 +2867,8 @@ tbody tr:last-child td { border-bottom: none; }
 @media (max-width: 640px) {
   .ocr-form-grid,
   .ocr-form-grid--two,
-  .ocr-demo-grid { grid-template-columns: 1fr; }
+  .ocr-demo-grid,
+  .ocr-overview__meta { grid-template-columns: 1fr; }
   .ocr-demo-field--full { grid-column: auto; }
 }
 

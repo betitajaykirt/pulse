@@ -618,6 +618,7 @@ def ocr_parse_lab_document(request):
         return JsonResponse({
             'success': True,
             'fields': fields,
+            'overview': fields.get('overview') or {},
             'test_type': test_type,
             'confirmed_disease': confirmed_disease,
             'validation': validation,

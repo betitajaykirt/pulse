@@ -175,6 +175,30 @@
         </div>
       </div>
 
+      {# ── Lab Results Overview ──────────────────────────── #}
+      <div class="ocr-section ocr-overview" id="ocr-overview" style="display:none;">
+        <div class="ocr-section__title">
+          <i data-lucide="clipboard-check" class="lucide-icon lucide-icon--xs"></i>
+          Lab Results Overview
+        </div>
+        <div class="ocr-overview__verdict" id="ocr-overview-verdict"></div>
+        <div class="ocr-overview__meta">
+          <div class="ocr-demo-field">
+            <span class="ocr-demo-label">Patient</span>
+            <span class="ocr-demo-value" id="ocr-overview-patient">—</span>
+          </div>
+          <div class="ocr-demo-field">
+            <span class="ocr-demo-label">Test / Issue Date</span>
+            <span class="ocr-demo-value" id="ocr-overview-date">—</span>
+          </div>
+          <div class="ocr-demo-field ocr-demo-field--full">
+            <span class="ocr-demo-label">Marker Summary</span>
+            <span class="ocr-demo-value" id="ocr-overview-markers">—</span>
+          </div>
+        </div>
+        <div class="ocr-marker-pills" id="ocr-overview-pills"></div>
+      </div>
+
       {# ── Confirmation Form ─────────────────────────────── #}
       <form method="POST" id="lab-confirm-form" action="">
         {% csrf_token %}
@@ -313,6 +337,7 @@ function openLabModal(reportId, patientName, patientId, barangay, disease, repor
   document.getElementById('ocr-verify-match').style.display = 'none';
   document.getElementById('ocr-verify-mismatch').style.display = 'none';
   document.getElementById('ocr-demographics').style.display = 'none';
+  document.getElementById('ocr-overview').style.display = 'none';
 
   document.getElementById('lab-modal').classList.add('open');
   if (window.lucide) lucide.createIcons();
@@ -367,6 +392,7 @@ function processOCR() {
   document.getElementById('ocr-verify-match').style.display = 'none';
   document.getElementById('ocr-verify-mismatch').style.display = 'none';
   document.getElementById('ocr-demographics').style.display = 'none';
+  document.getElementById('ocr-overview').style.display = 'none';
 
   fetch('{% url "ocr_parse_lab" %}', {
     method: 'POST',
@@ -413,6 +439,8 @@ function processOCR() {
     document.getElementById('ocr_demo_address').textContent = f.address || '—';
     document.getElementById('ocr-demographics').style.display = '';
 
+    renderLabOverview(data.overview || f.overview, f);
+
     /* ③ Lab Identifiers */
     if (f.control_number) document.getElementById('lab_control_number').value = f.control_number;
     if (f.lab_number)     document.getElementById('lab_specimen_number').value = f.lab_number;
@@ -442,6 +470,39 @@ function processOCR() {
     alert('OCR Error: ' + (err.message || 'An unexpected error occurred. Please try again.'));
     console.error('OCR processing error:', err);
   });
+}
+
+function renderLabOverview(overview, fields) {
+  overview = overview || {};
+  var section = document.getElementById('ocr-overview');
+  if (!section) return;
+
+  var verdict = overview.verdict || '';
+  var primary = overview.primary_result || '';
+  var markers = overview.markers || (fields && fields.markers) || [];
+  var hasContent = verdict || primary || markers.length || overview.marker_summary;
+  if (!hasContent) {
+    section.style.display = 'none';
+    return;
+  }
+
+  var verdictEl = document.getElementById('ocr-overview-verdict');
+  verdictEl.className = 'ocr-overview__verdict';
+  if (verdict === 'POSITIVE') verdictEl.classList.add('ocr-overview__verdict--positive');
+  else if (verdict === 'NEGATIVE') verdictEl.classList.add('ocr-overview__verdict--negative');
+  verdictEl.textContent = primary || verdict || 'Lab result scanned';
+
+  document.getElementById('ocr-overview-patient').textContent = overview.patient || (fields && fields.patient_name) || '—';
+  document.getElementById('ocr-overview-date').textContent = overview.test_date || (fields && fields.result_date) || '—';
+  document.getElementById('ocr-overview-markers').textContent = overview.marker_summary || '—';
+
+  var pills = document.getElementById('ocr-overview-pills');
+  pills.innerHTML = markers.map(function(m) {
+    var cls = m.positive ? 'ocr-marker-pill ocr-marker-pill--pos' : 'ocr-marker-pill ocr-marker-pill--neg';
+    return '<span class="' + cls + '">' + (m.name || '') + ' ' + (m.positive ? '(+)' : '(-)') + ' · ' + (m.status || '') + '</span>';
+  }).join('');
+
+  section.style.display = '';
 }
 </script>
 {% endblock %}
