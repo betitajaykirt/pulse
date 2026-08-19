@@ -157,7 +157,7 @@
           </div>
           <div class="ocr-verify-banner ocr-verify-banner--mismatch" id="ocr-verify-mismatch" style="display:none;">
             <i data-lucide="alert-triangle" class="lucide-icon lucide-icon--sm"></i>
-            <span id="ocr-mismatch-msg"><strong>Warning:</strong> Scanned document name does not match current patient record.</span>
+            <span id="ocr-mismatch-msg"><strong>Confirmation blocked:</strong> Scanned document name does not match the current patient record. Upload this patient’s lab result to continue.</span>
           </div>
 
           <div class="ocr-section" id="ocr-demographics" style="display:none;">
@@ -232,10 +232,12 @@
       </div>
 
       {# ── Confirmation Form ─────────────────────────────── #}
-      <form method="POST" id="lab-confirm-form" action="">
+      <form method="POST" id="lab-confirm-form" action="" onsubmit="return guardLabConfirm(event)">
         {% csrf_token %}
         <input type="hidden" name="redirect_to" value="admin_confirmation_panel">
         <input type="hidden" id="case_patient_name" name="case_patient_name" value="">
+        <input type="hidden" id="ocr_patient_name" name="ocr_patient_name" value="">
+        <input type="hidden" id="ocr_identity_match" name="ocr_identity_match" value="">
 
         {# ── ③ Laboratory Identifiers & Dates ────────────── #}
         <div class="ocr-section">
@@ -317,8 +319,7 @@
 
         <div class="pulse-modal__actions">
           <button type="button" class="nc-btn nc-btn--outline" onclick="closeLabModal()">Cancel</button>
-          <button type="submit" class="nc-btn nc-btn--primary"
-                  onclick="return confirm('Confirm this case as laboratory-verified? This will trigger epidemic threshold evaluation.');">
+          <button type="submit" class="nc-btn nc-btn--primary" id="lab-confirm-submit">
             <i data-lucide="badge-check" class="lucide-icon lucide-icon--xs"></i>
             Confirm Case
           </button>
@@ -334,6 +335,7 @@
 <script>
 const CONFIRM_URL_TEMPLATE = "{% url 'confirm_case' 0 %}";
 let ocrPreviewUrl = null;
+let labIdentityMismatch = false;
 
 document.addEventListener('DOMContentLoaded', function () {
   if (window.lucide) lucide.createIcons();
@@ -390,6 +392,32 @@ function showDocumentPreview(file) {
   }
 }
 
+function setConfirmLocked(locked, scanned) {
+  labIdentityMismatch = !!locked;
+  var btn = document.getElementById('lab-confirm-submit');
+  if (btn) {
+    btn.disabled = !!locked;
+    btn.setAttribute('aria-disabled', locked ? 'true' : 'false');
+    btn.title = locked
+      ? 'Confirmation is blocked until the lab document matches this patient.'
+      : '';
+  }
+  var matchField = document.getElementById('ocr_identity_match');
+  if (matchField) {
+    if (!scanned) matchField.value = '';
+    else matchField.value = locked ? '0' : '1';
+  }
+}
+
+function guardLabConfirm(e) {
+  if (labIdentityMismatch) {
+    e.preventDefault();
+    alert('Cannot confirm this case. The scanned lab document does not match the patient on record. Upload the correct laboratory result.');
+    return false;
+  }
+  return confirm('Confirm this case as laboratory-verified? This will trigger epidemic threshold evaluation.');
+}
+
 function openLabModal(p) {
   p = p || {};
   var reportId = p.report_id;
@@ -444,6 +472,9 @@ function openLabModal(p) {
   document.getElementById('ocr-verify-mismatch').style.display = 'none';
   document.getElementById('ocr-demographics').style.display = 'none';
   document.getElementById('ocr-overview').style.display = 'none';
+  document.getElementById('ocr_patient_name').value = '';
+  document.getElementById('ocr_identity_match').value = '';
+  setConfirmLocked(false, false);
   revokePreview();
 
   document.getElementById('lab-modal').classList.add('open');
@@ -526,13 +557,20 @@ function processOCR() {
     document.getElementById('ocr-compare').style.display = 'grid';
 
     if (data.validation) {
+      var scannedName = f.raw_patient_name || f.patient_name || '';
+      document.getElementById('ocr_patient_name').value = scannedName;
       if (data.validation.match) {
         document.getElementById('ocr-verify-name').textContent = f.patient_name || '—';
         document.getElementById('ocr-verify-match').style.display = 'flex';
+        setConfirmLocked(false, true);
       } else if (data.validation.mismatch) {
         document.getElementById('ocr-mismatch-msg').innerHTML =
-          '<strong>⚠ Warning:</strong> ' + data.validation.message;
+          '<strong>Confirmation blocked:</strong> ' + data.validation.message +
+          ' Upload this patient’s laboratory result to continue.';
         document.getElementById('ocr-verify-mismatch').style.display = 'flex';
+        setConfirmLocked(true, true);
+      } else {
+        setConfirmLocked(false, true);
       }
     }
 

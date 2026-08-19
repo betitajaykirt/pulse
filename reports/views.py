@@ -710,7 +710,10 @@ def ocr_parse_lab_document(request):
         confirmed_disease = match_disease(raw_text)
         
         # 4. Cross-validate patient
-        validation = cross_validate_patient(fields.get('patient_name', ''), case_patient_name)
+        validation = cross_validate_patient(
+            fields.get('raw_patient_name') or fields.get('patient_name') or '',
+            case_patient_name,
+        )
         
         return JsonResponse({
             'success': True,
@@ -738,6 +741,22 @@ def confirm_case(request, report_id):
 
     if report.status not in ('Suspected', 'Probable'):
         messages.error(request, f'Only suspected or probable cases can be confirmed (current status: {report.status}).')
+        return redirect(_confirm_redirect_target(request))
+
+    from reports.ocr_service import cross_validate_patient
+
+    ocr_patient_name = request.POST.get('ocr_patient_name', '').strip()
+    ocr_identity_match = request.POST.get('ocr_identity_match', '').strip()
+    record_name = request.POST.get('case_patient_name', '').strip() or (
+        _patient_display_for_report(report).get('name') or ''
+    )
+    identity = cross_validate_patient(ocr_patient_name, record_name) if ocr_patient_name else {}
+    if ocr_identity_match == '0' or identity.get('mismatch'):
+        messages.error(
+            request,
+            'Cannot confirm this case: the laboratory document does not match the patient on record. '
+            'Upload the correct lab result for this patient.',
+        )
         return redirect(_confirm_redirect_target(request))
 
     lab_control_number = request.POST.get('lab_control_number', '').strip()
