@@ -42,8 +42,29 @@ def _apply_symptom_category_filter(qs, symptom_category=''):
     return qs.filter(surveillance_report__syndrome_type__icontains=symptom_category)
 
 
-def _base_queryset(symptom_category='', barangay_id='', time_range='current_year'):
-    now = timezone.now().date()
+VALID_TIME_RANGES = (
+    'current_month',
+    'last_30_days',
+    'last_3_months',
+    'last_6_months',
+    'current_year',
+)
+
+
+def _time_window(time_range, today=None):
+    today = today or timezone.now().date()
+    if time_range == 'current_month':
+        return today.replace(day=1), today
+    if time_range == 'last_30_days':
+        return today - timedelta(days=30), today
+    if time_range == 'last_3_months':
+        return today - timedelta(days=90), today
+    if time_range == 'last_6_months':
+        return today - timedelta(days=183), today
+    return today.replace(month=1, day=1), today
+
+
+def _base_queryset(symptom_category='', barangay_id='', time_range='current_month'):
     qs = PatientCase.objects.filter(
         date_of_onset__isnull=False,
         surveillance_report__isnull=False,
@@ -54,18 +75,8 @@ def _base_queryset(symptom_category='', barangay_id='', time_range='current_year
     if barangay_id:
         qs = qs.filter(barangay_id=barangay_id)
 
-    if time_range == 'last_30_days':
-        cutoff = now - timedelta(days=30)
-        qs = qs.filter(date_of_onset__gte=cutoff)
-    elif time_range == 'last_3_months':
-        cutoff = now - timedelta(days=90)
-        qs = qs.filter(date_of_onset__gte=cutoff)
-    elif time_range == 'last_6_months':
-        cutoff = now - timedelta(days=183)
-        qs = qs.filter(date_of_onset__gte=cutoff)
-    else:
-        qs = qs.filter(date_of_onset__year=now.year)
-
+    start, end = _time_window(time_range)
+    qs = qs.filter(date_of_onset__gte=start, date_of_onset__lte=end)
     return qs
 
 
@@ -121,32 +132,22 @@ def _pad_period_keys(period_keys, interval, start_date=None, end_date=None):
     return filled
 
 
-def build_epi_curve_data(qs, time_range='current_year'):
+def build_epi_curve_data(qs, time_range='current_month'):
     """
     Build Epi-Curve chart payload with adaptive time intervals.
 
     Interval selection:
-      - Data span ≤ 31 days  → daily (YYYY-MM-DD)
-      - Data span ≤ 90 days  → weekly
-      - Data span > 90 days  → monthly
+      - current_month / last_30_days / span ≤ 31 days → daily
+      - last_3_months / span ≤ 90 days → weekly
+      - longer ranges → monthly
 
-    All gaps are zero-filled so Chart.js renders continuous lines.
+    Timeline is padded to the selected window so dates stay readable.
     """
-    # --- 1. Determine the actual data span to choose the right interval ---
-    date_range = qs.aggregate(
-        earliest=models.Min('date_of_onset'),
-        latest=models.Max('date_of_onset'),
-    )
-    earliest = date_range['earliest']
-    latest = date_range['latest']
+    today = timezone.now().date()
+    expected_start, expected_end = _time_window(time_range, today)
+    span_days = (expected_end - expected_start).days
 
-    if earliest and latest:
-        span_days = (latest - earliest).days
-    else:
-        span_days = 0
-
-    # Adaptive interval based on data density
-    if span_days <= 31:
+    if time_range in ('current_month', 'last_30_days') or span_days <= 31:
         interval = 'day'
         trunc = F('date_of_onset')
     elif span_days <= 90 or time_range == 'last_3_months':
@@ -156,7 +157,6 @@ def build_epi_curve_data(qs, time_range='current_year'):
         interval = 'month'
         trunc = TruncMonth('date_of_onset')
 
-    # --- 2. Query grouped counts ---
     rows = (
         qs.annotate(period=trunc)
         .values('period', status=F('surveillance_report__status'))
@@ -164,12 +164,10 @@ def build_epi_curve_data(qs, time_range='current_year'):
         .order_by('period')
     )
 
-    # Collect unique period keys from the query
     raw_period_keys = []
     for row in rows:
         if row['period']:
             dt = row['period']
-            # TruncDate returns a date, TruncWeek/TruncMonth returns datetime
             if hasattr(dt, 'date') and callable(dt.date):
                 key = dt.date().isoformat()
             else:
@@ -177,21 +175,9 @@ def build_epi_curve_data(qs, time_range='current_year'):
             if key not in raw_period_keys:
                 raw_period_keys.append(key)
 
-    from django.utils import timezone
-    today = timezone.now().date()
-    expected_start = earliest if earliest else today
-    
-    if time_range == 'last_30_days':
-        expected_start = today - timedelta(days=30)
-    elif time_range == 'last_3_months':
-        expected_start = today - timedelta(days=90)
-    elif time_range == 'last_6_months':
-        expected_start = today - timedelta(days=183)
-    elif time_range == 'current_year':
-        expected_start = today.replace(month=1, day=1)
-
-    # --- 3. Pad the timeline so every interval slot exists ---
-    period_keys = _pad_period_keys(raw_period_keys, interval, start_date=expected_start, end_date=today)
+    period_keys = _pad_period_keys(
+        raw_period_keys, interval, start_date=expected_start, end_date=expected_end,
+    )
     if not period_keys:
         period_keys = raw_period_keys
 
@@ -224,10 +210,16 @@ def build_epi_curve_data(qs, time_range='current_year'):
         for status in STATUS_ORDER
     ]
 
+    if time_range == 'current_month':
+        period_title = expected_end.strftime('%B %Y')
+    else:
+        period_title = f'{expected_start.strftime("%b %d")} – {expected_end.strftime("%b %d, %Y")}'
+
     return {
         'labels': periods,
         'datasets': datasets,
         'interval': interval,
+        'period_title': period_title,
     }
 
 
@@ -381,7 +373,7 @@ def build_summary_stats(qs, symptom_category_filter=''):
     }
 
 
-def get_analytics_payload(*, symptom_category='', barangay_id='', time_range='current_year'):
+def get_analytics_payload(*, symptom_category='', barangay_id='', time_range='current_month'):
     qs = _base_queryset(
         symptom_category=symptom_category,
         barangay_id=barangay_id,

@@ -101,10 +101,11 @@
           <div class="form-group">
             <label for="filter-time">Time Range</label>
             <select id="filter-time" class="input-soft input-soft--plain" aria-label="Time range">
-              <option value="current_year">Current Year</option>
-              <option value="last_6_months">Last 6 Months</option>
-              <option value="last_3_months">Last 3 Months (Weekly)</option>
+              <option value="current_month" selected>This Month (Daily)</option>
               <option value="last_30_days">Last 30 Days (Daily)</option>
+              <option value="last_3_months">Last 3 Months (Weekly)</option>
+              <option value="last_6_months">Last 6 Months</option>
+              <option value="current_year">Current Year</option>
             </select>
           </div>
         </div>
@@ -123,11 +124,11 @@
         <div class="chart-box__head">
           <div class="chart-box__head-main">
             <span class="chart-box__icon"><i data-lucide="bar-chart-3" class="lucide-icon lucide-icon--sm"></i></span>
-            <h3>Epidemic Curve (Epi-Curve)</h3>
+            <h3 id="epi-chart-title">Epidemic Curve (Epi-Curve)</h3>
           </div>
           <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
         </div>
-        <p>Cases over time by case status — Unclassified through Confirmed.</p>
+        <p>Cases over time by case status for the selected dates.</p>
         <div class="chart-height-main">
           <canvas id="epi-chart"></canvas>
         </div>
@@ -265,10 +266,17 @@ function buildEpiChart(ctx, payload, emptyMsgId) {
     }));
   }
 
-  // Determine maxTicksLimit based on label count for readability
-  var maxTicks = 12;
-  if (!isEmpty && payload.labels && payload.labels.length > 14) {
-    maxTicks = 10;
+  var maxTicks = (payload.labels || []).length || 12;
+  var isDaily = payload.interval === 'day';
+  if (!isDaily && maxTicks > 14) {
+    maxTicks = 12;
+  }
+
+  var epiTitle = document.getElementById('epi-chart-title');
+  if (epiTitle) {
+    epiTitle.textContent = payload.period_title
+      ? 'Epidemic Curve — ' + payload.period_title
+      : 'Epidemic Curve (Epi-Curve)';
   }
 
   return new Chart(ctx, {
@@ -285,7 +293,7 @@ function buildEpiChart(ctx, payload, emptyMsgId) {
         x: { 
           stacked: true, 
           grid: { display: false }, 
-          ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B', maxTicksLimit: maxTicks, maxRotation: 45, minRotation: 0 } 
+          ticks: { font: { family: 'Inter', size: 10 }, color: '#64748B', maxTicksLimit: maxTicks, autoSkip: !isDaily, maxRotation: 45, minRotation: 0 } 
         },
         y: {
           stacked: true,
@@ -451,7 +459,7 @@ async function loadAnalytics() {
 var appliedAnalyticsFilters = {
   syndrome: '',
   barangay: '',
-  time_range: 'current_year',
+  time_range: 'current_month',
 };
 
 function readAnalyticsFilterControls() {
@@ -472,7 +480,7 @@ function readAnalyticsFilterControls() {
 function hasActiveAnalyticsFilters(filters) {
   var barangayEl = document.getElementById('filter-barangay');
   var barangayActive = barangayEl && !barangayEl.disabled && filters.barangay;
-  return Boolean(filters.syndrome) || filters.time_range !== 'current_year' || Boolean(barangayActive);
+  return Boolean(filters.syndrome) || filters.time_range !== 'current_month' || Boolean(barangayActive);
 }
 
 function updateAnalyticsFilterState() {
@@ -501,14 +509,14 @@ document.getElementById('apply-analytics-filters').addEventListener('click', fun
 
 document.getElementById('clear-analytics-filters').addEventListener('click', function() {
   document.getElementById('filter-syndrome').value = '';
-  document.getElementById('filter-time').value = 'current_year';
+  document.getElementById('filter-time').value = 'current_month';
   var barangay = document.getElementById('filter-barangay');
   if (barangay && !barangay.disabled && barangay.options.length) {
     barangay.selectedIndex = 0;
   }
   appliedAnalyticsFilters = readAnalyticsFilterControls();
   appliedAnalyticsFilters.syndrome = '';
-  appliedAnalyticsFilters.time_range = 'current_year';
+  appliedAnalyticsFilters.time_range = 'current_month';
   if (barangay && !barangay.disabled) {
     appliedAnalyticsFilters.barangay = '';
   }

@@ -14,7 +14,7 @@ from myapp.barangay_scope import (
     is_city_wide_role, resolve_user_barangay, BARANGAY_SCOPED_ROLES,
 )
 from .analytics_service import (
-    SYNDROME_CATEGORY_OPTIONS, get_analytics_payload, get_barangay_options,
+    SYNDROME_CATEGORY_OPTIONS, VALID_TIME_RANGES, get_analytics_payload, get_barangay_options,
 )
 from reports.weather_service import fetch_bago_city_weather
 from reports.aptas_service import get_aptas_dashboard_context, resolve_aptas_barangay_filter
@@ -277,10 +277,10 @@ def api_analytics_data(request):
         else:
             barangay_id = '-1'
 
-    time_range = request.GET.get('time_range', 'current_year').strip()
+    time_range = request.GET.get('time_range', 'current_month').strip()
 
-    if time_range not in ('current_year', 'last_3_months', 'last_6_months', 'last_30_days'):
-        time_range = 'current_year'
+    if time_range not in VALID_TIME_RANGES:
+        time_range = 'current_month'
 
     valid_categories = {value for value, _ in SYNDROME_CATEGORY_OPTIONS if value}
     if symptom_category and symptom_category not in valid_categories:

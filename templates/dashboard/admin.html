@@ -115,7 +115,7 @@
       <!-- Epi-Curve Chart -->
       <div class="col-md-6">
         <div class="pulse-panel" style="padding: 1.25rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px;">
-          <h4 style="margin-top:0; margin-bottom: 1rem; font-size: 1rem; color: var(--color-text);">Epidemic Curve</h4>
+          <h4 id="overview-epi-title" style="margin-top:0; margin-bottom: 1rem; font-size: 1rem; color: var(--color-text);">Epidemic Curve</h4>
           <div style="position: relative; height: 250px;">
             <canvas id="overview-epi-chart"></canvas>
           </div>
@@ -216,7 +216,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   };
 
   try {
-    const res = await fetch('{% url "api_analytics" %}');
+    const res = await fetch('{% url "api_analytics" %}?time_range=current_month');
     const data = await res.json();
     
     if (!data.ok) {
@@ -232,9 +232,13 @@ document.addEventListener('DOMContentLoaded', async function() {
         type: 'bar',
       }));
       
-      var epiMaxTicks = 12;
-      if (data.epi_curve.labels && data.epi_curve.labels.length > 14) {
-        epiMaxTicks = 10;
+      var epiMaxTicks = (data.epi_curve.labels || []).length;
+      if (data.epi_curve.interval !== 'day' && epiMaxTicks > 14) {
+        epiMaxTicks = 12;
+      }
+      var epiTitle = document.getElementById('overview-epi-title');
+      if (epiTitle && data.epi_curve.period_title) {
+        epiTitle.textContent = 'Epidemic Curve — ' + data.epi_curve.period_title;
       }
       
       new Chart(epiCanvas.getContext('2d'), {
@@ -249,7 +253,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             tooltip: { mode: 'index', intersect: false }
           },
           scales: {
-            x: { stacked: true, grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B', maxTicksLimit: epiMaxTicks, maxRotation: 45, minRotation: 0 } },
+            x: { stacked: true, grid: { display: false }, ticks: { font: { family: 'Inter', size: 10 }, color: '#64748B', maxTicksLimit: epiMaxTicks, autoSkip: data.epi_curve.interval !== 'day', maxRotation: 45, minRotation: 0 } },
             y: { stacked: true, grid: { color: 'rgba(241, 245, 249, 0.9)' }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B', precision: 0 }, border: { display: false }, beginAtZero: true }
           }
         })
