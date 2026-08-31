@@ -71,11 +71,17 @@
   }
 
   function apply(theme) {
+    document.documentElement.classList.add('theme-instant');
     document.documentElement.setAttribute('data-theme', theme);
     document.documentElement.style.colorScheme = theme;
     syncToggleButtons(theme);
     applyChartTheme(theme);
     document.dispatchEvent(new CustomEvent('pulse-theme-change', { detail: { theme: theme } }));
+    window.requestAnimationFrame(function () {
+      window.requestAnimationFrame(function () {
+        document.documentElement.classList.remove('theme-instant');
+      });
+    });
   }
 
   function setTheme(theme) {
