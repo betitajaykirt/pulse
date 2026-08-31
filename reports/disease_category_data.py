@@ -10,8 +10,9 @@ from reports.pidsr_schema import LEGACY_DISEASE_LABEL_MAP, DISEASE_LABELS, norma
 DISEASE_CATEGORY_CHOICES = [
     ('', 'All Disease Categories'),
     ('vector_borne', 'Vector-Borne Diseases'),
-    ('airborne', 'Airborne Diseases'),
+    ('airborne', 'Airborne / Respiratory Diseases'),
     ('waterborne_foodborne', 'Waterborne & Foodborne Diseases'),
+    ('zoonotic_vpd', 'Zoonotic & Vaccine-Preventable'),
 ]
 
 VALID_DISEASE_CATEGORIES = frozenset(
@@ -29,21 +30,44 @@ CATEGORY_DISEASE_LABELS: dict[str, tuple[str, ...]] = {
     'vector_borne': (
         'Dengue Fever',
         'Dengue',
+        'Malaria',
+        'Acute Hemorrhagic Fever Syndrome',
     ),
     'airborne': (
+        'COVID-19',
+        'Human Avian Influenza',
+        'Measles',
         'Meningococcal Disease',
-        'Respiratory Illness',
+        'Middle East Respiratory Syndrome',
+        'Severe Acute Respiratory Syndrome',
+        'Bacterial Meningitis',
+        'Diphtheria',
+        'Influenza-Like Illness',
         'Influenza-like Illness (ILI)',
+        'Pertussis',
+        'Respiratory Illness',
+        'Acute Encephalitis Syndrome',
     ),
     'waterborne_foodborne': (
         'Leptospirosis',
+        'Typhoid and Paratyphoid Fever',
         'Typhoid Fever',
+        'Acute Bloody Diarrhea',
         'Diarrheal Disease',
         'Acute Gastroenteritis',
-        'Anthrax',
+        'Cholera',
+        'Acute Viral Hepatitis',
+        'Paralytic Shellfish Poisoning',
         'Hand, Foot, and Mouth Disease',
         'Hand, Foot and Mouth Disease (HFMD)',
-        'Cholera',
+    ),
+    'zoonotic_vpd': (
+        'Anthrax',
+        'Rabies',
+        'Adverse Event Following Immunization',
+        'Acute Flaccid Paralysis',
+        'Neonatal Tetanus',
+        'Non-Neonatal Tetanus',
     ),
 }
 
@@ -136,12 +160,13 @@ def _legacy_aliases_for_disease(canonical_label: str) -> tuple[str, ...]:
 def disease_label_filter_q(disease_label: str) -> Q:
     """Build a queryset ``Q`` object for a single monitored disease."""
     label = (disease_label or '').strip()
-    if not label or label not in VALID_MONITORED_DISEASES:
+    canonical = normalize_disease_label(label)
+    if canonical not in VALID_MONITORED_DISEASES and label not in VALID_MONITORED_DISEASES:
         return Q()
 
-    canonical = normalize_disease_label(label)
+    match_root = canonical if canonical in VALID_MONITORED_DISEASES else label
     combined = Q()
-    for match_label in (canonical, *_legacy_aliases_for_disease(canonical)):
+    for match_label in (match_root, *_legacy_aliases_for_disease(match_root)):
         combined |= _disease_label_match_q(match_label)
     return combined
 

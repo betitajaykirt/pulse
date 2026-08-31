@@ -2,25 +2,25 @@
 PIDSR disease → category mapping and default threshold seed data.
 """
 
-from reports.pidsr_schema import DISEASE_LABELS
+from reports.pidsr_schema import DISEASE_LABELS, PIDSR_CATEGORY_I, PIDSR_CATEGORY_II
 
 # Maps ML / syndrome labels to PIDSR surveillance category levels
 DISEASE_PIDSR_CATEGORY = {
-    'Dengue Fever': 'Category 2',
+    **{label: 'Category 1' for label in PIDSR_CATEGORY_I},
+    **{label: 'Category 2' for label in PIDSR_CATEGORY_II},
     'Dengue': 'Category 2',
-    'Leptospirosis': 'Category 2',
     'Typhoid Fever': 'Category 2',
-    'Anthrax': 'Category 1',
-    'Meningococcal Disease': 'Category 2',
     'Diarrheal Disease': 'Category 2',
-    'Hand, Foot, and Mouth Disease': 'Category 2',
-    'Hand, Foot and Mouth Disease (HFMD)': 'Category 2',
+    'Hand, Foot and Mouth Disease (HFMD)': 'Category 1',
     'Respiratory Illness': 'Category 2',
     'Acute Gastroenteritis': 'Category 2',
-    'Cholera': 'Category 1',
     'Polio': 'Category 1',
-    'Rabies': 'Category 1',
     'Influenza-like Illness (ILI)': 'Category 2',
+    'AEFI': 'Category 1',
+    'AFP': 'Category 1',
+    'PSP': 'Category 1',
+    'MERS': 'Category 1',
+    'SARS': 'Category 1',
     'Inconclusive Syndromic Pattern': 'Category 2',
     'Insufficient Data for Prediction': 'Category 2',
 }
@@ -75,7 +75,7 @@ def seed_disease_category_thresholds(verbose=True):
     return created, updated
 
 
-# Legacy outbreak-threshold labels superseded by the 7 PIDSR disease targets
+# Legacy outbreak-threshold labels superseded by the full PIDSR disease list
 LEGACY_OUTBREAK_LABELS = (
     'Acute Gastroenteritis',
     'Acute Gastroenteritis (AGE)',
@@ -83,26 +83,34 @@ LEGACY_OUTBREAK_LABELS = (
     'Influenza-like Illness (ILI)',
     'Respiratory Illness',
     'Hand, Foot and Mouth Disease (HFMD)',
+    'Diarrheal Disease',
+    'Typhoid Fever',
 )
 
 # Default per-disease outbreak thresholds (case count / rolling window days)
+_CATEGORY_1_CASE_THRESHOLD = 1
+_CATEGORY_2_CASE_THRESHOLD = 3
+_SPECIAL_CASE_THRESHOLDS = {
+    'Meningococcal Disease': 2,
+    'Hand, Foot, and Mouth Disease': 5,
+    'Bacterial Meningitis': 2,
+}
+
 DEFAULT_OUTBREAK_THRESHOLDS = [
-    {'disease_label': 'Dengue Fever', 'case_threshold': 3, 'rolling_window_days': 7},
-    {'disease_label': 'Leptospirosis', 'case_threshold': 3, 'rolling_window_days': 7},
-    {'disease_label': 'Typhoid Fever', 'case_threshold': 3, 'rolling_window_days': 7},
-    {'disease_label': 'Anthrax', 'case_threshold': 1, 'rolling_window_days': 7},
-    {'disease_label': 'Meningococcal Disease', 'case_threshold': 2, 'rolling_window_days': 7},
-    {'disease_label': 'Diarrheal Disease', 'case_threshold': 3, 'rolling_window_days': 7},
     {
-        'disease_label': 'Hand, Foot, and Mouth Disease',
-        'case_threshold': 5,
+        'disease_label': label,
+        'case_threshold': _SPECIAL_CASE_THRESHOLDS.get(
+            label,
+            _CATEGORY_1_CASE_THRESHOLD if label in PIDSR_CATEGORY_I else _CATEGORY_2_CASE_THRESHOLD,
+        ),
         'rolling_window_days': 7,
-    },
+    }
+    for label in DISEASE_LABELS
 ]
 
 
 def seed_outbreak_thresholds(verbose=True):
-    """Sync disease-specific outbreak thresholds to the 7 PIDSR disease targets."""
+    """Sync disease-specific outbreak thresholds to the PIDSR Category I + II list."""
     from myapp.models import OutbreakThreshold
 
     removed, _ = OutbreakThreshold.objects.filter(

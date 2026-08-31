@@ -5,16 +5,27 @@ Core inference lives in ``ml_engine.py``; this module re-exports the public API
 used by notebooks, tests, and legacy imports.
 """
 from ml_engine import *  # noqa: F403
-from reports.pidsr_schema import DISEASE_LABELS, INCONCLUSIVE_SYNDROMIC_LABEL, SYNDROMIC_FEATURE_COLUMNS
+from reports.pidsr_schema import (
+    DISEASE_LABELS,
+    GROUP_A_SYSTEMIC,
+    GROUP_B_PAIN,
+    GROUP_C_GI,
+    GROUP_D_SKIN_VASCULAR,
+    GROUP_E_EXPOSURE,
+    GROUP_N_NEUROLOGICAL,
+    GROUP_R_RESPIRATORY,
+    INCONCLUSIVE_SYNDROMIC_LABEL,
+    SYNDROMIC_FEATURE_COLUMNS,
+)
 
 # Legacy aliases for notebooks / seed scripts
-GROUP_A_SYMPTOMS = SYNDROMIC_FEATURE_COLUMNS[:7]
-GROUP_B_SYMPTOMS = SYNDROMIC_FEATURE_COLUMNS[7:14]
-GROUP_C_SYMPTOMS = SYNDROMIC_FEATURE_COLUMNS[14:28]
-GROUP_D_SYMPTOMS = SYNDROMIC_FEATURE_COLUMNS[28:38]
-GROUP_R_SYMPTOMS = SYNDROMIC_FEATURE_COLUMNS[38:43]
-GROUP_N_SYMPTOMS = SYNDROMIC_FEATURE_COLUMNS[43:48]
-GROUP_E_SYMPTOMS = SYNDROMIC_FEATURE_COLUMNS[48:]
+GROUP_A_SYMPTOMS = GROUP_A_SYSTEMIC
+GROUP_B_SYMPTOMS = GROUP_B_PAIN
+GROUP_C_SYMPTOMS = GROUP_C_GI
+GROUP_D_SYMPTOMS = GROUP_D_SKIN_VASCULAR
+GROUP_R_SYMPTOMS = GROUP_R_RESPIRATORY
+GROUP_N_SYMPTOMS = GROUP_N_NEUROLOGICAL
+GROUP_E_SYMPTOMS = GROUP_E_EXPOSURE
 
 
 def _build_mock_training_set():
@@ -41,5 +52,5 @@ def _build_mock_training_set():
     ]
     rows[0]['disease_label'] = 'Dengue Fever'
     rows[1]['disease_label'] = 'Leptospirosis'
-    rows[2]['disease_label'] = 'Diarrheal Disease'
+    rows[2]['disease_label'] = 'Acute Bloody Diarrhea'
     return ensure_climate_columns(pd.DataFrame(rows))

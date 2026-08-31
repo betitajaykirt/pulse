@@ -2,7 +2,7 @@
 DOH PIDSR Machine Learning inference engine.
 
 Stage 1: Isolation Forest outbreak screening
-Stage 2: Random Forest multi-class classification (7 monitored diseases)
+Stage 2: Random Forest multi-class classification (PIDSR Category I + II diseases)
          with Group E exposure-based confidence gating
 """
 from __future__ import annotations

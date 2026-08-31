@@ -11,16 +11,10 @@ barangays_bago = [
     "San Jose", "Santa Cruz", "Tabunan", "Taloc"
 ]
 
-# 2. Your 7 Exact Monitored Diseases
-diseases = [
-    "Dengue Fever",
-    "Leptospirosis",
-    "Typhoid Fever",
-    "Anthrax",
-    "Meningococcal Disease",
-    "Diarrheal Disease",
-    "Hand, Foot, and Mouth Disease"
-]
+from reports.pidsr_schema import DISEASE_LABELS
+
+# PIDSR Category I + II monitored diseases
+diseases = list(DISEASE_LABELS)
 
 # 3-Year Date Range (Jan 1, 2023 - Aug 1, 2026)
 start_date = datetime(2023, 1, 1)

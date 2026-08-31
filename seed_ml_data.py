@@ -2,23 +2,22 @@
 """
 PULSE PIDSR Historical Training Data Generator.
 
-Builds a 1,000-row synthetic corpus using disease-specific symptom and
-Group E exposure probabilities (official DOH PIDSR monitored diseases).
+Builds a synthetic corpus using disease-specific symptom and
+Group E exposure probabilities for PIDSR Category I and II diseases.
 """
 from __future__ import annotations
 
-import random
 from datetime import date, timedelta
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from ml_engine import CLIMATE_DEFAULTS, TARGET_COLUMN, ensure_climate_columns
+from ml_engine import TARGET_COLUMN, ensure_climate_columns
 from reports.pidsr_schema import DISEASE_LABELS, SYNDROMIC_FEATURE_COLUMNS
 
 RANDOM_SEED = 42
-NUM_SAMPLES = 1000
+NUM_SAMPLES = 2700
 OUTPUT_CSV = Path(__file__).resolve().parent / 'historical_training_data.csv'
 PIDSR_CSV = Path(__file__).resolve().parent / 'pidsr_ml_training_data.csv'
 
@@ -27,26 +26,170 @@ BARANGAYS = [
     'Malingin', 'Pacol', 'Sagasa', 'Tabunan', 'Abuanan', 'Busay', 'Caridad',
 ]
 
-# Sampling weights aligned with user script (maps HFMD label to canonical name)
-DISEASE_SAMPLE_LABELS = [
-    'Dengue Fever',
-    'Leptospirosis',
-    'Typhoid Fever',
-    'Anthrax',
-    'Meningococcal Disease',
-    'Diarrheal Disease',
-    'Hand, Foot, and Mouth Disease',
-]
-DISEASE_SAMPLE_PROBS = [0.25, 0.20, 0.15, 0.05, 0.10, 0.15, 0.10]
-
-CLIMATE_BY_DISEASE = {
-    'Dengue Fever': {'temperature': (27.5, 31.5), 'humidity': (78, 96), 'rainfall': (0.5, 18.0)},
-    'Leptospirosis': {'temperature': (25.5, 28.5), 'humidity': (88, 97), 'rainfall': (10.0, 28.0)},
-    'Typhoid Fever': {'temperature': (28.0, 31.0), 'humidity': (65, 78), 'rainfall': (0.0, 3.0)},
-    'Anthrax': {'temperature': (27.0, 30.0), 'humidity': (60, 75), 'rainfall': (0.0, 2.0)},
-    'Meningococcal Disease': {'temperature': (22.0, 26.5), 'humidity': (52, 70), 'rainfall': (0.0, 2.0)},
-    'Diarrheal Disease': {'temperature': (28.0, 31.0), 'humidity': (65, 80), 'rainfall': (0.0, 5.0)},
-    'Hand, Foot, and Mouth Disease': {'temperature': (27.5, 30.5), 'humidity': (70, 85), 'rainfall': (0.0, 4.0)},
+# high = likely present, medium = sometimes, exposure = Group E flags
+DISEASE_PROFILES = {
+    'Acute Flaccid Paralysis': {
+        'high': ['acute_flaccid_paralysis', 'marked_weakness'],
+        'medium': ['fever', 'tingling_numbness', 'muscle_spasms'],
+        'exposure': ['has_known_community_cases'],
+        'climate': {'temperature': (26.0, 30.0), 'humidity': (70, 88), 'rainfall': (0.0, 6.0)},
+    },
+    'Adverse Event Following Immunization': {
+        'high': ['fever', 'injection_site_reaction'],
+        'medium': ['rash', 'body_malaise', 'vomiting', 'severe_restlessness'],
+        'exposure': ['recent_immunization'],
+        'climate': {'temperature': (26.0, 31.0), 'humidity': (60, 80), 'rainfall': (0.0, 4.0)},
+    },
+    'Anthrax': {
+        'high': ['painless_skin_lesion', 'fever', 'chest_pain'],
+        'medium': ['trouble_breathing', 'sore_throat', 'bloody_diarrhea', 'hemoptysis'],
+        'exposure': ['has_livestock_wool_hides', 'has_animal_contact'],
+        'climate': {'temperature': (27.0, 30.0), 'humidity': (60, 75), 'rainfall': (0.0, 2.0)},
+    },
+    'COVID-19': {
+        'high': ['fever', 'dry_cough', 'loss_of_smell_taste'],
+        'medium': ['sore_throat', 'trouble_breathing', 'body_malaise', 'headache', 'runny_nose'],
+        'exposure': ['has_known_community_cases', 'has_recent_travel'],
+        'climate': {'temperature': (26.0, 31.0), 'humidity': (65, 85), 'rainfall': (0.0, 8.0)},
+    },
+    'Hand, Foot, and Mouth Disease': {
+        'high': ['vesicle_mouth_ulcers', 'palmar_plantar_vesicles', 'fever'],
+        'medium': ['rash', 'itchy_skin', 'sore_throat', 'anorexia'],
+        'exposure': ['has_known_community_cases'],
+        'climate': {'temperature': (27.5, 30.5), 'humidity': (70, 85), 'rainfall': (0.0, 4.0)},
+    },
+    'Human Avian Influenza': {
+        'high': ['fever', 'dry_cough', 'trouble_breathing'],
+        'medium': ['sore_throat', 'body_malaise', 'diarrhea', 'conjunctival_suffusion'],
+        'exposure': ['poultry_exposure'],
+        'climate': {'temperature': (24.0, 29.0), 'humidity': (70, 90), 'rainfall': (0.0, 10.0)},
+    },
+    'Measles': {
+        'high': ['fever', 'rash', 'koplik_spots', 'runny_nose'],
+        'medium': ['dry_cough', 'conjunctival_suffusion', 'photophobia'],
+        'exposure': ['has_known_community_cases'],
+        'climate': {'temperature': (26.0, 31.0), 'humidity': (60, 80), 'rainfall': (0.0, 5.0)},
+    },
+    'Meningococcal Disease': {
+        'high': ['fever', 'neck_stiffness', 'headache', 'petechiae'],
+        'medium': ['drowsiness', 'seizure', 'altered_consciousness', 'photophobia', 'vomiting'],
+        'exposure': ['has_known_community_cases'],
+        'climate': {'temperature': (22.0, 26.5), 'humidity': (52, 70), 'rainfall': (0.0, 2.0)},
+    },
+    'Middle East Respiratory Syndrome': {
+        'high': ['fever', 'dry_cough', 'trouble_breathing'],
+        'medium': ['sore_throat', 'diarrhea', 'body_malaise', 'headache'],
+        'exposure': ['has_recent_travel', 'has_animal_contact'],
+        'climate': {'temperature': (28.0, 36.0), 'humidity': (30, 55), 'rainfall': (0.0, 1.0)},
+    },
+    'Neonatal Tetanus': {
+        'high': ['inability_to_suck', 'trismus', 'muscle_spasms'],
+        'medium': ['severe_restlessness', 'fever'],
+        'exposure': ['unhygienic_cord_care'],
+        'climate': {'temperature': (26.0, 31.0), 'humidity': (70, 90), 'rainfall': (0.0, 8.0)},
+    },
+    'Paralytic Shellfish Poisoning': {
+        'high': ['tingling_numbness', 'acute_flaccid_paralysis', 'vomiting'],
+        'medium': ['nausea', 'trouble_breathing', 'headache'],
+        'exposure': ['shellfish_ingestion'],
+        'climate': {'temperature': (27.0, 31.0), 'humidity': (70, 90), 'rainfall': (0.0, 6.0)},
+    },
+    'Rabies': {
+        'high': ['hydrophobia', 'muscle_spasms', 'altered_consciousness'],
+        'medium': ['fever', 'tingling_numbness', 'severe_restlessness', 'trouble_swallowing'],
+        'exposure': ['animal_bite', 'has_animal_contact'],
+        'climate': {'temperature': (26.0, 31.0), 'humidity': (65, 85), 'rainfall': (0.0, 6.0)},
+    },
+    'Severe Acute Respiratory Syndrome': {
+        'high': ['fever', 'dry_cough', 'trouble_breathing'],
+        'medium': ['headache', 'body_malaise', 'diarrhea', 'chills'],
+        'exposure': ['has_recent_travel', 'has_known_community_cases'],
+        'climate': {'temperature': (24.0, 30.0), 'humidity': (60, 85), 'rainfall': (0.0, 8.0)},
+    },
+    'Acute Bloody Diarrhea': {
+        'high': ['bloody_diarrhea', 'fever', 'abdominal_colic'],
+        'medium': ['diarrhea', 'tenesmus', 'mucus_in_stool', 'thirst'],
+        'exposure': ['has_contaminated_food_water'],
+        'climate': {'temperature': (28.0, 31.0), 'humidity': (65, 80), 'rainfall': (0.0, 5.0)},
+    },
+    'Acute Encephalitis Syndrome': {
+        'high': ['fever', 'altered_consciousness', 'seizure'],
+        'medium': ['headache', 'neck_stiffness', 'photophobia', 'vomiting'],
+        'exposure': ['has_known_community_cases'],
+        'climate': {'temperature': (26.0, 31.0), 'humidity': (70, 90), 'rainfall': (2.0, 15.0)},
+    },
+    'Acute Hemorrhagic Fever Syndrome': {
+        'high': ['fever', 'petechiae', 'epistaxis_bleeding', 'gum_bleeding'],
+        'medium': ['ecchymoses', 'easy_bruisability', 'hematemesis', 'body_malaise'],
+        'exposure': ['has_stagnant_water', 'has_recent_travel'],
+        'climate': {'temperature': (27.0, 32.0), 'humidity': (75, 95), 'rainfall': (1.0, 20.0)},
+    },
+    'Acute Viral Hepatitis': {
+        'high': ['jaundice', 'dark_urine', 'anorexia'],
+        'medium': ['pale_stools', 'right_upper_quadrant_pain', 'nausea', 'fever', 'extreme_tiredness'],
+        'exposure': ['has_contaminated_food_water'],
+        'climate': {'temperature': (26.0, 31.0), 'humidity': (65, 85), 'rainfall': (0.0, 8.0)},
+    },
+    'Bacterial Meningitis': {
+        'high': ['fever', 'neck_stiffness', 'headache'],
+        'medium': ['photophobia', 'altered_consciousness', 'vomiting', 'seizure'],
+        'exposure': ['has_known_community_cases'],
+        'climate': {'temperature': (24.0, 29.0), 'humidity': (55, 75), 'rainfall': (0.0, 4.0)},
+    },
+    'Cholera': {
+        'high': ['rice_water_stool', 'loose_watery_stool', 'thirst'],
+        'medium': ['vomiting', 'dry_moist_lips', 'marked_weakness', 'diarrhea'],
+        'exposure': ['has_contaminated_food_water'],
+        'climate': {'temperature': (28.0, 32.0), 'humidity': (70, 90), 'rainfall': (2.0, 18.0)},
+    },
+    'Dengue Fever': {
+        'high': ['fever', 'headache', 'reticular_pain', 'myalgia', 'tourniquet_test_positive'],
+        'medium': ['rash', 'petechiae', 'nausea', 'joint_swelling', 'gum_bleeding'],
+        'exposure': ['has_stagnant_water'],
+        'climate': {'temperature': (27.5, 31.5), 'humidity': (78, 96), 'rainfall': (0.5, 18.0)},
+    },
+    'Diphtheria': {
+        'high': ['sore_throat', 'bull_neck', 'trouble_swallowing'],
+        'medium': ['fever', 'stridor', 'dry_cough'],
+        'exposure': ['has_known_community_cases'],
+        'climate': {'temperature': (24.0, 29.0), 'humidity': (55, 75), 'rainfall': (0.0, 4.0)},
+    },
+    'Influenza-Like Illness': {
+        'high': ['fever', 'dry_cough', 'sore_throat'],
+        'medium': ['runny_nose', 'myalgia', 'headache', 'body_malaise'],
+        'exposure': ['has_known_community_cases'],
+        'climate': {'temperature': (23.0, 28.0), 'humidity': (55, 75), 'rainfall': (0.0, 6.0)},
+    },
+    'Leptospirosis': {
+        'high': ['fever', 'chills', 'myalgia', 'conjunctival_suffusion'],
+        'medium': ['jaundice', 'headache', 'sore_muscles', 'nausea'],
+        'exposure': ['has_flood_exposure', 'has_stagnant_water'],
+        'climate': {'temperature': (25.5, 28.5), 'humidity': (88, 97), 'rainfall': (10.0, 28.0)},
+    },
+    'Malaria': {
+        'high': ['fever', 'chills', 'diaphoresis'],
+        'medium': ['headache', 'body_malaise', 'nausea', 'extreme_tiredness'],
+        'exposure': ['has_recent_travel', 'has_stagnant_water'],
+        'climate': {'temperature': (26.0, 32.0), 'humidity': (75, 95), 'rainfall': (2.0, 20.0)},
+    },
+    'Non-Neonatal Tetanus': {
+        'high': ['trismus', 'muscle_spasms'],
+        'medium': ['trouble_swallowing', 'severe_restlessness', 'chest_pain'],
+        'exposure': ['has_animal_contact'],
+        'climate': {'temperature': (26.0, 31.0), 'humidity': (65, 85), 'rainfall': (0.0, 8.0)},
+    },
+    'Pertussis': {
+        'high': ['cough_paroxysms', 'post_tussive_vomiting'],
+        'medium': ['dry_cough', 'runny_nose', 'fever'],
+        'exposure': ['has_known_community_cases'],
+        'climate': {'temperature': (24.0, 29.0), 'humidity': (60, 80), 'rainfall': (0.0, 5.0)},
+    },
+    'Typhoid and Paratyphoid Fever': {
+        'high': ['fever', 'headache', 'anorexia', 'constipation'],
+        'medium': ['abdominal_discomfort', 'diarrhea', 'marked_weakness', 'nausea'],
+        'exposure': ['has_contaminated_food_water'],
+        'climate': {'temperature': (28.0, 31.0), 'humidity': (65, 78), 'rainfall': (0.0, 3.0)},
+    },
 }
 
 
@@ -55,141 +198,41 @@ def _rand(rng: np.random.Generator) -> float:
 
 
 def _generate_symptom_row(disease: str, rng: np.random.Generator) -> dict:
-    """Disease-conditioned probabilistic symptom + exposure assignment."""
     row = {col: 0 for col in SYNDROMIC_FEATURE_COLUMNS}
+    profile = DISEASE_PROFILES.get(disease, {})
+    high = set(profile.get('high') or ())
+    medium = set(profile.get('medium') or ())
+    exposure = set(profile.get('exposure') or ())
 
-    # Systemic
-    row['fever'] = int(
-        disease in ('Dengue Fever', 'Leptospirosis', 'Typhoid Fever', 'Meningococcal Disease')
-        or _rand(rng) > 0.4
-    )
-    row['chills'] = int(
-        disease in ('Leptospirosis', 'Typhoid Fever') and _rand(rng) > 0.3
-    )
-    row['diaphoresis'] = int(_rand(rng) > 0.7)
-    row['body_malaise'] = int(_rand(rng) > 0.3)
-    row['marked_weakness'] = int(
-        disease in ('Typhoid Fever', 'Dengue Fever') and _rand(rng) > 0.4
-    )
-    row['extreme_tiredness'] = int(_rand(rng) > 0.6)
-    row['drowsiness'] = int(
-        disease == 'Meningococcal Disease' and _rand(rng) > 0.4
-    )
-
-    # Pain
-    row['headache'] = int(
-        disease in ('Dengue Fever', 'Leptospirosis', 'Meningococcal Disease', 'Typhoid Fever')
-        and _rand(rng) > 0.2
-    )
-    row['reticular_pain'] = int(disease == 'Dengue Fever' and _rand(rng) > 0.3)
-    row['joint_swelling'] = int(disease == 'Dengue Fever' and _rand(rng) > 0.5)
-    row['myalgia'] = int(
-        disease in ('Leptospirosis', 'Dengue Fever') and _rand(rng) > 0.2
-    )
-    row['sore_muscles'] = int(_rand(rng) > 0.6)
-    row['neck_stiffness'] = int(
-        disease == 'Meningococcal Disease' and _rand(rng) > 0.2
-    )
-    row['chest_pain'] = int(disease == 'Anthrax' and _rand(rng) > 0.5)
-
-    # GI
-    row['anorexia'] = int(
-        disease in ('Typhoid Fever', 'Diarrheal Disease') and _rand(rng) > 0.3
-    )
-    row['nausea'] = int(
-        disease in ('Typhoid Fever', 'Diarrheal Disease', 'Dengue Fever') and _rand(rng) > 0.3
-    )
-    row['vomiting'] = int(
-        disease in ('Diarrheal Disease', 'Meningococcal Disease') and _rand(rng) > 0.4
-    )
-    row['hematemesis'] = int(disease == 'Dengue Fever' and _rand(rng) > 0.8)
-    row['diarrhea'] = int(
-        disease in ('Diarrheal Disease', 'Typhoid Fever') and _rand(rng) > 0.2
-    )
-    row['loose_watery_stool'] = int(
-        disease == 'Diarrheal Disease' and _rand(rng) > 0.3
-    )
-    row['bloody_diarrhea'] = int(
-        disease in ('Diarrheal Disease', 'Anthrax') and _rand(rng) > 0.7
-    )
-    row['mucus_in_stool'] = int(disease == 'Diarrheal Disease' and _rand(rng) > 0.6)
-    row['tenesmus'] = int(disease == 'Diarrheal Disease' and _rand(rng) > 0.6)
-    row['abdominal_discomfort'] = int(
-        disease in ('Typhoid Fever', 'Diarrheal Disease') and _rand(rng) > 0.3
-    )
-    row['abdominal_colic'] = int(disease == 'Diarrheal Disease' and _rand(rng) > 0.5)
-    row['constipation'] = int(disease == 'Typhoid Fever' and _rand(rng) > 0.5)
-    row['thirst'] = int(disease == 'Diarrheal Disease' and _rand(rng) > 0.4)
-    row['dry_moist_lips'] = int(disease == 'Diarrheal Disease' and _rand(rng) > 0.4)
-
-    # Skin / vascular
-    row['rash'] = int(
-        disease in ('Dengue Fever', 'Hand, Foot, and Mouth Disease') and _rand(rng) > 0.3
-    )
-    row['petechiae'] = int(
-        disease in ('Dengue Fever', 'Meningococcal Disease') and _rand(rng) > 0.4
-    )
-    row['ecchymoses'] = int(disease == 'Dengue Fever' and _rand(rng) > 0.7)
-    row['easy_bruisability'] = int(disease == 'Dengue Fever' and _rand(rng) > 0.6)
-    row['epistaxis_bleeding'] = int(disease == 'Dengue Fever' and _rand(rng) > 0.7)
-    row['painless_skin_lesion'] = int(disease == 'Anthrax' and _rand(rng) > 0.2)
-    row['itchy_skin'] = int(
-        disease in ('Hand, Foot, and Mouth Disease', 'Dengue Fever') and _rand(rng) > 0.5
-    )
-    row['vesicle_mouth_ulcers'] = int(
-        disease == 'Hand, Foot, and Mouth Disease' and _rand(rng) > 0.2
-    )
-    row['conjunctival_suffusion'] = int(disease == 'Leptospirosis' and _rand(rng) > 0.2)
-    row['jaundice'] = int(disease == 'Leptospirosis' and _rand(rng) > 0.4)
-
-    # Respiratory
-    row['dry_cough'] = int(disease == 'Anthrax' and _rand(rng) > 0.5)
-    row['sore_throat'] = int(
-        disease in ('Hand, Foot, and Mouth Disease', 'Anthrax') and _rand(rng) > 0.4
-    )
-    row['runny_nose'] = int(_rand(rng) > 0.8)
-    row['trouble_breathing'] = int(disease == 'Anthrax' and _rand(rng) > 0.5)
-    row['trouble_swallowing'] = int(
-        disease in ('Anthrax', 'Hand, Foot, and Mouth Disease') and _rand(rng) > 0.6
-    )
-
-    # Neurological
-    row['seizure'] = int(disease == 'Meningococcal Disease' and _rand(rng) > 0.6)
-    row['altered_consciousness'] = int(
-        disease == 'Meningococcal Disease' and _rand(rng) > 0.5
-    )
-    row['severe_restlessness'] = int(_rand(rng) > 0.8)
-    row['acute_flaccid_paralysis'] = int(
-        disease == 'Hand, Foot, and Mouth Disease' and _rand(rng) > 0.8
-    )
-    row['tourniquet_test_positive'] = int(disease == 'Dengue Fever' and _rand(rng) > 0.3)
-
-    # Group E exposure (gating features)
-    row['has_flood_exposure'] = int(disease == 'Leptospirosis' and _rand(rng) > 0.15)
-    row['has_stagnant_water'] = int(disease == 'Dengue Fever' and _rand(rng) > 0.2)
-    row['has_animal_contact'] = int(
-        disease in ('Leptospirosis', 'Anthrax') and _rand(rng) > 0.3
-    )
-    row['has_livestock_wool_hides'] = int(disease == 'Anthrax' and _rand(rng) > 0.2)
-    row['has_contaminated_food_water'] = int(
-        disease in ('Typhoid Fever', 'Diarrheal Disease') and _rand(rng) > 0.2
-    )
-    row['has_recent_travel'] = int(_rand(rng) > 0.7)
-    row['has_known_community_cases'] = int(
-        disease in ('Meningococcal Disease', 'Hand, Foot, and Mouth Disease', 'Dengue Fever')
-        and _rand(rng) > 0.4
-    )
-
+    for col in SYNDROMIC_FEATURE_COLUMNS:
+        if col in high:
+            row[col] = int(_rand(rng) > 0.18)
+        elif col in medium:
+            row[col] = int(_rand(rng) > 0.45)
+        elif col in exposure:
+            row[col] = int(_rand(rng) > 0.22)
+        else:
+            row[col] = int(_rand(rng) > 0.97)
     return row
 
 
 def _attach_context(row: dict, disease: str, rng: np.random.Generator, start: date, end: date) -> dict:
     row['age'] = int(rng.integers(1, 73))
+    if disease == 'Neonatal Tetanus':
+        row['age'] = 0
+    elif disease == 'Hand, Foot, and Mouth Disease':
+        row['age'] = int(rng.integers(1, 13))
+    elif disease == 'Pertussis':
+        row['age'] = int(rng.integers(0, 10))
     row['sex'] = rng.choice(['Male', 'Female'])
     row['barangay'] = str(rng.choice(BARANGAYS))
     day_offset = int(rng.integers(0, max((end - start).days, 1)))
     row['submission_date'] = (start + timedelta(days=day_offset)).isoformat()
-    climate = CLIMATE_BY_DISEASE.get(disease, CLIMATE_BY_DISEASE['Typhoid Fever'])
+    climate = DISEASE_PROFILES.get(disease, {}).get('climate') or {
+        'temperature': (26.0, 31.0),
+        'humidity': (65, 85),
+        'rainfall': (0.0, 6.0),
+    }
     row['temperature'] = round(float(rng.uniform(*climate['temperature'])), 1)
     row['humidity'] = round(float(rng.uniform(*climate['humidity'])), 1)
     row['rainfall'] = round(float(rng.uniform(*climate['rainfall'])), 2)
@@ -205,8 +248,8 @@ def build_historical_training_dataframe(
     rng = np.random.default_rng(random_seed)
     end = date.today()
     start = end - timedelta(days=365)
-
-    y_labels = rng.choice(DISEASE_SAMPLE_LABELS, size=num_samples, p=DISEASE_SAMPLE_PROBS)
+    labels = list(DISEASE_LABELS)
+    y_labels = rng.choice(labels, size=num_samples)
     records = []
     for disease in y_labels:
         row = _generate_symptom_row(str(disease), rng)
@@ -239,7 +282,7 @@ if __name__ == '__main__':
     print('PULSE PIDSR Training Data Generator')
     print('=' * 72)
     print(f'Rows generated : {len(frame)}')
-    print(f'Symptom features: {len(SYNDROMIC_FEATURE_COLUMNS)} (48 clinical + 7 exposure)')
+    print(f'Symptom features: {len(SYNDROMIC_FEATURE_COLUMNS)}')
     print(f'Disease classes : {len(DISEASE_LABELS)}')
     print(f'Output (ML pipe): {OUTPUT_CSV}')
     print(f'Output (PIDSR)  : {PIDSR_CSV}')
