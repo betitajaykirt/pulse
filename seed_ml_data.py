@@ -17,7 +17,8 @@ from ml_engine import TARGET_COLUMN, ensure_climate_columns
 from reports.pidsr_schema import DISEASE_LABELS, SYNDROMIC_FEATURE_COLUMNS
 
 RANDOM_SEED = 42
-NUM_SAMPLES = 2700
+SAMPLES_PER_CLASS = 300
+NUM_SAMPLES = SAMPLES_PER_CLASS * len(DISEASE_LABELS)
 OUTPUT_CSV = Path(__file__).resolve().parent / 'historical_training_data.csv'
 PIDSR_CSV = Path(__file__).resolve().parent / 'pidsr_ml_training_data.csv'
 
@@ -249,11 +250,18 @@ def build_historical_training_dataframe(
     end = date.today()
     start = end - timedelta(days=365)
     labels = list(DISEASE_LABELS)
-    y_labels = rng.choice(labels, size=num_samples)
+    per_class = max(int(num_samples // max(len(labels), 1)), 1)
     records = []
-    for disease in y_labels:
-        row = _generate_symptom_row(str(disease), rng)
-        records.append(_attach_context(row, str(disease), rng, start, end))
+    for disease in labels:
+        for _ in range(per_class):
+            row = _generate_symptom_row(str(disease), rng)
+            records.append(_attach_context(row, str(disease), rng, start, end))
+    remainder = int(num_samples) - len(records)
+    if remainder > 0:
+        extra = rng.choice(labels, size=remainder)
+        for disease in extra:
+            row = _generate_symptom_row(str(disease), rng)
+            records.append(_attach_context(row, str(disease), rng, start, end))
 
     column_order = (
         ['age', 'sex', 'barangay', 'submission_date', 'temperature', 'humidity', 'rainfall']
@@ -283,7 +291,7 @@ if __name__ == '__main__':
     print('=' * 72)
     print(f'Rows generated : {len(frame)}')
     print(f'Symptom features: {len(SYNDROMIC_FEATURE_COLUMNS)}')
-    print(f'Disease classes : {len(DISEASE_LABELS)}')
+    print(f'Per class      : {SAMPLES_PER_CLASS}')
     print(f'Output (ML pipe): {OUTPUT_CSV}')
     print(f'Output (PIDSR)  : {PIDSR_CSV}')
     print('\nClass distribution:')
