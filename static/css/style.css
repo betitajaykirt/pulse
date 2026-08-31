@@ -1314,7 +1314,17 @@ select {
 .pill-badge.badge-discarded,
 .badge-discarded { background: rgba(100, 116, 139, 0.1); color: var(--muted); }
 .pill-badge.badge-probable,
-.badge-probable { background: rgba(245, 158, 11, 0.12); color: #C2410C; }
+.badge-probable { background: rgba(234, 88, 12, 0.12); color: #C2410C; }
+.pill-badge.badge-pidsr-cat1,
+.badge-pidsr-cat1 {
+  background: #FEF2F2; color: #991B1B; border: 1px solid #FECACA;
+  margin-left: .35rem; font-size: .68rem; padding: .22rem .5rem;
+}
+.pill-badge.badge-pidsr-cat2,
+.badge-pidsr-cat2 {
+  background: #EFF6FF; color: #1E40AF; border: 1px solid #BFDBFE;
+  margin-left: .35rem; font-size: .68rem; padding: .22rem .5rem;
+}
 
 /* Dynamic Risk Level Badges */
 .pill-badge.badge-risk-critical { background: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe; border-radius: 9999px; padding: 0.125rem 0.625rem; font-weight: 600; font-size: 0.75rem; }
@@ -2382,6 +2392,8 @@ tbody tr:last-child td { border-bottom: none; }
 .map-case-popup__ml-tag {
   color: #64748b; font-weight: 600; font-size: .76rem;
 }
+.map-case-popup__ml-tag.map-pidsr-cat1 { color: #991B1B; }
+.map-case-popup__ml-tag.map-pidsr-cat2 { color: #1E40AF; }
 .map-case-popup__officer-grid {
   display: grid; grid-template-columns: 1fr 1fr; gap: .65rem 1rem;
 }

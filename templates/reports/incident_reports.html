@@ -1,5 +1,5 @@
 {% extends "dashboard/base_dashboard.html" %}
-{% load pulse_dates %}
+{% load pulse_dates pidsr_tags %}
 {% block page_title %}Health Incident Reports{% endblock %}
 {% block content %}
 <div class="pulse-page">
@@ -46,7 +46,7 @@
               <label for="filter-syndrome">Disease</label>
               <select id="filter-syndrome" name="syndrome" class="input-soft input-soft--plain">
                 <option value="">All Diseases</option>
-                {% for s in syndrome_types %}<option value="{{ s }}" {% if syndrome == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+                {% for s in syndrome_types %}<option value="{{ s }}" {% if syndrome == s %}selected{% endif %}>{{ s }}{% if s|pidsr_category %} ({{ s|pidsr_category }}){% endif %}</option>{% endfor %}
               </select>
             </div>
             <div class="form-group">
@@ -167,7 +167,10 @@
               data-date="{{ r.report_date|md_datetime }}"
               data-remarks="{{ r.remarks|default:'No remarks provided.' }}">
             <td data-label="Barangay">{{ r.barangay_name|default:"—" }}</td>
-            <td data-label="Disease">{{ r.display_disease }}</td>
+            <td data-label="Disease">
+              {{ r.display_disease }}
+              {% pidsr_category_badge r.display_disease %}
+            </td>
             <td data-label="Cases"><strong>{{ r.case_count }}</strong></td>
             <td data-label="Classification">
               <span class="pill-badge {% if r.status == 'Confirmed' %}badge-danger{% elif r.status == 'Probable' %}badge-probable{% elif r.status == 'Suspected' %}badge-suspected{% else %}badge-info{% endif %}">{{ r.status }}</span>

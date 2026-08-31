@@ -1,5 +1,5 @@
 {% extends "dashboard/base_dashboard.html" %}
-{% load pulse_dates %}
+{% load pulse_dates pidsr_tags %}
 {% block page_title %}Case Records{% endblock %}
 {% block content %}
 <div class="pulse-page">
@@ -125,6 +125,7 @@
             <td data-label="Barangay">{{ r.barangay_name|default:"—" }}</td>
             <td data-label="Predicted Disease">
               <strong>{{ r.ml_prediction.primary }}</strong>
+              {% pidsr_category_badge r.ml_prediction.primary %}
               {% if r.ml_prediction.is_lab_confirmed %}
                 <div class="um-muted" style="font-size:.75rem;margin-top:.15rem;">Lab confirmed</div>
               {% elif r.ml_prediction.confidence_pct %}

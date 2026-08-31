@@ -45,7 +45,31 @@ def resolve_pidsr_category(disease_label: str) -> str:
     """Return PIDSR category level for a disease label (defaults to Category 2)."""
     if not disease_label:
         return 'Category 2'
-    return DISEASE_PIDSR_CATEGORY.get(disease_label.strip(), 'Category 2')
+    text = disease_label.strip()
+    if text in DISEASE_PIDSR_CATEGORY:
+        return DISEASE_PIDSR_CATEGORY[text]
+    from reports.pidsr_schema import normalize_disease_label
+    return DISEASE_PIDSR_CATEGORY.get(normalize_disease_label(text), 'Category 2')
+
+
+def pidsr_category_display(disease_label: str) -> str:
+    """Officer-facing label: 'Category I' or 'Category II', or empty if unknown."""
+    if not (disease_label or '').strip():
+        return ''
+    from reports.ml_display import is_inconclusive_disease_label
+    from reports.pidsr_schema import normalize_disease_label
+
+    text = disease_label.strip()
+    if is_inconclusive_disease_label(text):
+        return ''
+    raw = DISEASE_PIDSR_CATEGORY.get(text) or DISEASE_PIDSR_CATEGORY.get(
+        normalize_disease_label(text), ''
+    )
+    if raw == 'Category 1':
+        return 'Category I'
+    if raw == 'Category 2':
+        return 'Category II'
+    return ''
 
 
 def seed_disease_category_thresholds(verbose=True):

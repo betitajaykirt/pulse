@@ -1,5 +1,5 @@
 {% extends "dashboard/base_dashboard.html" %}
-{% load pulse_dates %}
+{% load pulse_dates pidsr_tags %}
 {% block page_title %}Case Confirmation{% endblock %}
 {% block content %}
 <div class="pulse-page">
@@ -73,6 +73,7 @@
             <td data-label="Barangay">{{ r.barangay_name|default:"—" }}</td>
             <td data-label="ML Disease">
               <span class="pill-badge badge-info">{{ item.ml_disease }}</span>
+              {% pidsr_category_badge item.ml_disease %}
               {% if r.is_anomaly %}
               <span class="pill-badge badge-danger" style="margin-left:.25rem;">Anomaly</span>
               {% endif %}
@@ -291,7 +292,7 @@
               <select id="confirmed_disease" name="confirmed_disease" class="input-soft" required>
                 <option value="">Select confirmed disease…</option>
                 {% for syndrome in syndrome_types %}
-                  <option value="{{ syndrome }}">{{ syndrome }}</option>
+                  <option value="{{ syndrome }}">{{ syndrome }}{% if syndrome|pidsr_category %} ({{ syndrome|pidsr_category }}){% endif %}</option>
                 {% endfor %}
                 <option value="Other / Non-specific">Other / Non-specific</option>
               </select>
@@ -459,7 +460,7 @@ function openLabModal(p) {
       detailCell('City', p.city) +
       detailCell('Date of Onset', p.onset_date) +
       detailCell('Date Reported', p.reported_at) +
-      detailCell('ML Predicted Disease', p.disease) +
+      detailCell('ML Predicted Disease', p.disease + (p.pidsr_category ? ' (' + p.pidsr_category + ')' : '')) +
       detailCell('Status', p.status) +
       studentHtml +
     '</div>';

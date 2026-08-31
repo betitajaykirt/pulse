@@ -478,6 +478,7 @@ def _remarks_field(remarks: str, label: str) -> str:
 def _patient_profile_for_report(report) -> dict:
     """Full patient card used in the lab confirmation modal before OCR upload."""
     from reports.ocr_service import split_person_name
+    from myapp.threshold_data import pidsr_category_display
 
     display = _patient_display_for_report(report)
     patient_cases = list(report.patient_case.all()) if hasattr(report, 'patient_case') else []
@@ -546,6 +547,9 @@ def _patient_profile_for_report(report) -> dict:
         'onset_date': format_display_date(display.get('onset_date') or report.date_of_onset),
         'reported_at': format_display_datetime(report.report_date),
         'disease': report.syndrome_type or report.suspected_disease or '—',
+        'pidsr_category': pidsr_category_display(
+            report.syndrome_type or report.suspected_disease or ''
+        ),
         'status': report.status or '—',
         'classification': (report.case_classification or '').title() or '—',
         'is_student': is_student,

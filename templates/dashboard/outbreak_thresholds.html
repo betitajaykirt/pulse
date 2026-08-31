@@ -1,5 +1,5 @@
 {% extends "dashboard/base_dashboard.html" %}
-{% load static %}
+{% load static pidsr_tags %}
 
 {% block page_title %}Outbreak Thresholds{% endblock %}
 
@@ -21,6 +21,7 @@
         <thead>
           <tr>
             <th>Disease Label</th>
+            <th>PIDSR Category</th>
             <th>Case Threshold</th>
             <th>Rolling Window (Days)</th>
             <th>Status</th>
@@ -31,6 +32,7 @@
           {% for t in thresholds %}
           <tr>
             <td class="font-medium">{{ t.disease_label }}</td>
+            <td>{% pidsr_category_badge t.disease_label %}</td>
             <td>{{ t.case_threshold }}</td>
             <td>{{ t.rolling_window_days }}</td>
             <td>
@@ -57,7 +59,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="5" class="text-center py-4 text-muted">No specific disease thresholds configured.</td>
+            <td colspan="6" class="text-center py-4 text-muted">No specific disease thresholds configured.</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -85,7 +87,7 @@
         <select class="form-control" id="diseaseLabel" name="disease_label" required>
           <option value="">Select a monitored disease…</option>
           {% for disease in monitored_diseases %}
-          <option value="{{ disease }}">{{ disease }}</option>
+          <option value="{{ disease }}">{{ disease }}{% if disease|pidsr_category %} — {{ disease|pidsr_category }}{% endif %}</option>
           {% endfor %}
         </select>
       </div>

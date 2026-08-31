@@ -1,4 +1,5 @@
 {% extends "dashboard/base_dashboard.html" %}
+{% load pidsr_tags %}
 {% block page_title %}Surveillance Analytics{% endblock %}
 {% block content %}
 <div class="pulse-page dash-home">
@@ -83,7 +84,7 @@
             <label for="filter-syndrome">Disease</label>
             <select id="filter-syndrome" class="input-soft input-soft--plain" aria-label="Disease">
               {% for value, label in symptom_category_choices %}
-              <option value="{{ value }}">{{ label }}</option>
+              <option value="{{ value }}">{{ label }}{% if value|pidsr_category %} ({{ value|pidsr_category }}){% endif %}</option>
               {% endfor %}
             </select>
           </div>

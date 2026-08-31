@@ -1,6 +1,6 @@
 {% extends "dashboard/base_dashboard.html" %}
 
-{% load static %}
+{% load static pidsr_tags %}
 
 {% block page_title %}Geospatial Hotspot Map{% endblock %}
 
@@ -158,7 +158,7 @@
               <label for="filter-disease">Disease</label>
               <select id="filter-disease" class="input-soft input-soft--plain">
                 {% for value, label in disease_choices %}
-                <option value="{{ value }}">{{ label }}</option>
+                <option value="{{ value }}">{{ label }}{% if value|pidsr_category %} ({{ value|pidsr_category }}){% endif %}</option>
                 {% endfor %}
               </select>
             </div>
@@ -186,7 +186,7 @@
               <label for="filter-disease">Disease</label>
               <select id="filter-disease" class="input-soft input-soft--plain">
                 {% for value, label in disease_choices %}
-                <option value="{{ value }}">{{ label }}</option>
+                <option value="{{ value }}">{{ label }}{% if value|pidsr_category %} ({{ value|pidsr_category }}){% endif %}</option>
                 {% endfor %}
               </select>
             </div>
@@ -1222,11 +1222,17 @@
 
 
 
+    function pidsrCategoryTag(cat) {
+      if (!cat) return '';
+      var cls = cat === 'Category I' ? 'map-pidsr-cat1' : 'map-pidsr-cat2';
+      return ' <span class="map-case-popup__ml-tag ' + cls + '">' + escapeMapPopupHtml(cat) + '</span>';
+    }
+
     function mapPopupMlDiseaseDisplay(c) {
       var status = (c.status || '').trim();
       if (status === 'Confirmed') {
         var confirmedName = c.confirmed_disease || c.syndrome_type || c.suspected_disease || 'Unknown';
-        return escapeMapPopupHtml(confirmedName) + ' <span class="map-case-popup__ml-tag">(Lab Confirmed)</span>';
+        return escapeMapPopupHtml(confirmedName) + ' <span class="map-case-popup__ml-tag">(Lab Confirmed)</span>' + pidsrCategoryTag(c.pidsr_category);
       }
 
       var top = c.ml_top_predicted_disease || c.ml_predicted_disease;
@@ -1243,7 +1249,7 @@
             var storedLabel = c.suspected_disease || c.syndrome_type;
             var inconclusiveLabels = ['inconclusive syndromic pattern', 'insufficient data for prediction', 'undetermined', ''];
             if (inconclusiveLabels.indexOf(storedLabel.toLowerCase()) === -1) {
-              return escapeMapPopupHtml(storedLabel);
+              return escapeMapPopupHtml(storedLabel) + pidsrCategoryTag(c.pidsr_category);
             }
           }
           return 'Inconclusive Syndromic Pattern';
@@ -1255,6 +1261,7 @@
       html += '<div>';
       if (secondary) html += '<strong>Primary:</strong> ';
       html += escapeMapPopupHtml(top);
+      html += pidsrCategoryTag(c.pidsr_category);
       if (confPct != null) {
         html += ' <span class="map-case-popup__ml-tag">(' + confPct + '% confidence)</span>';
       } else if (status === 'Probable' || status === 'Suspected') {

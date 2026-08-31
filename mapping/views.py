@@ -16,6 +16,7 @@ from myapp.barangay_scope import (
     is_barangay_scoped_role,
 )
 from myapp.mitigation_utils import mitigation_suggestions_for_report
+from myapp.threshold_data import pidsr_category_display
 from reports.ml_display import (
     ml_top_prediction_for_report,
     parse_ml_confidence,
@@ -407,6 +408,7 @@ def api_cases(request):
             'suspected_disease':   (r.suspected_disease or '').strip(),
             'confirmed_disease':   confirmed_disease,
             'ml_predicted_disease': ml_predicted,
+            'pidsr_category': pidsr_category_display(action_disease or ml_predicted or confirmed_disease),
             'ml_top_predicted_disease': ml_top_prediction_for_report(r) or ml_predicted,
             'ml_classification_confidence': ml_confidence,
             'ml_confidence_pct':   ml_display.get('confidence_pct'),
