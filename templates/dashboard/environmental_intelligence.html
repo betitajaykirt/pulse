@@ -160,18 +160,22 @@ document.addEventListener("DOMContentLoaded", function() {
                     type: 'linear',
                     display: true,
                     position: 'left',
+                    ticks: { color: (window.PulseTheme && window.PulseTheme.chartColors().tick) || '#64748B' },
                     title: {
                         display: true,
-                        text: 'Cases / Rainfall (mm)'
+                        text: 'Cases / Rainfall (mm)',
+                        color: (window.PulseTheme && window.PulseTheme.chartColors().tick) || '#64748B'
                     }
                 },
                 y1: {
                     type: 'linear',
                     display: true,
                     position: 'right',
+                    ticks: { color: (window.PulseTheme && window.PulseTheme.chartColors().tick) || '#64748B' },
                     title: {
                         display: true,
-                        text: 'Temperature (°C)'
+                        text: 'Temperature (°C)',
+                        color: (window.PulseTheme && window.PulseTheme.chartColors().tick) || '#64748B'
                     },
                     grid: {
                         drawOnChartArea: false, // only want the grid lines for one axis to show up

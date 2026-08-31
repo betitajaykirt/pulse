@@ -11,9 +11,12 @@
       </div>
     </a>
 
-    <button type="button" class="nc-navbar__toggle" id="navbar-toggle" aria-label="Toggle navigation" aria-expanded="false">
-      <span></span><span></span><span></span>
-    </button>
+    <div class="nc-navbar__toolbar">
+      {% include "partials/theme_toggle.html" %}
+      <button type="button" class="nc-navbar__toggle" id="navbar-toggle" aria-label="Toggle navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
 
     <nav class="nc-navbar__center" id="navbar-menu">
       <a href="{% url 'login' %}#hero" class="nc-navbar__link">Home</a>
@@ -31,6 +34,7 @@
     </nav>
 
     <div class="nc-navbar__actions">
+      {% include "partials/theme_toggle.html" %}
       {% if session_user_id %}
         <a href="{% url 'dashboard' %}" class="nc-btn nc-btn--primary">Dashboard</a>
         <a href="{% url 'logout' %}" class="nc-btn nc-btn--outline">Log Out</a>

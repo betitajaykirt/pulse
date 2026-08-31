@@ -3,12 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
   <title>{% block title %}PULSE{% endblock %} — PULSE</title>
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem('pulse-theme');
+        var theme = (stored === 'dark' || stored === 'light')
+          ? stored
+          : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+        document.documentElement.style.colorScheme = theme;
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
   {% load static %}
-  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260811c">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20260901a">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   {% block extra_css %}{% endblock %}
 </head>
@@ -16,6 +31,7 @@
 {% block body %}{% endblock %}
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="{% static 'js/theme.js' %}?v=20260901a"></script>
 <script src="{% static 'js/date-format.js' %}"></script>
 <script src="{% static 'js/app.js' %}"></script>
 {% block extra_js %}{% endblock %}

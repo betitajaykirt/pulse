@@ -222,7 +222,13 @@
 const API_URL = '{% url "api_analytics" %}';
 const CHART_PRIMARY = '#0F4C81';
 const CHART_SECONDARY = '#00A6A6';
-const CHART_GRID = 'rgba(241, 245, 249, 0.9)';
+function themeChart() {
+  return (window.PulseTheme && window.PulseTheme.chartColors()) || {
+    tick: '#64748B',
+    grid: 'rgba(241, 245, 249, 0.9)',
+    emptyBg: 'rgba(241, 245, 249, 0.4)',
+  };
+}
 let epiChart = null;
 let demoChart = null;
 let diseaseChart = null;
@@ -242,7 +248,7 @@ function emptyChartData() {
     datasets: [{
       label: 'No data',
       data: [0, 0, 0, 0, 0, 0],
-      backgroundColor: 'rgba(241, 245, 249, 0.4)',
+      backgroundColor: themeChart().emptyBg,
       borderColor: 'rgba(148, 163, 184, 0.5)',
       borderDash: [5, 5],
       borderWidth: 2,
@@ -294,13 +300,13 @@ function buildEpiChart(ctx, payload, emptyMsgId) {
         x: { 
           stacked: true, 
           grid: { display: false }, 
-          ticks: { font: { family: 'Inter', size: 10 }, color: '#64748B', maxTicksLimit: maxTicks, autoSkip: !isDaily, maxRotation: 45, minRotation: 0 } 
+          ticks: { font: { family: 'Inter', size: 10 }, color: themeChart().tick, maxTicksLimit: maxTicks, autoSkip: !isDaily, maxRotation: 45, minRotation: 0 } 
         },
         y: {
           stacked: true,
           beginAtZero: true,
-          ticks: { precision: 0, font: { family: 'Inter', size: 11 }, color: '#64748B' },
-          grid: { color: CHART_GRID, drawBorder: false },
+          ticks: { precision: 0, font: { family: 'Inter', size: 11 }, color: themeChart().tick },
+          grid: { color: themeChart().grid, drawBorder: false },
           border: { display: false },
         },
       },
@@ -332,11 +338,11 @@ function buildGroupedBarChart(ctx, payload, emptyMsgId) {
         tooltip: { enabled: !isEmpty, mode: 'index', intersect: false },
       },
       scales: {
-        x: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B' } },
+        x: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: themeChart().tick } },
         y: {
           beginAtZero: true,
-          ticks: { precision: 0, font: { family: 'Inter', size: 11 }, color: '#64748B' },
-          grid: { color: CHART_GRID, drawBorder: false },
+          ticks: { precision: 0, font: { family: 'Inter', size: 11 }, color: themeChart().tick },
+          grid: { color: themeChart().grid, drawBorder: false },
           border: { display: false },
         },
       },
@@ -357,7 +363,7 @@ function buildPieChart(ctx, payload, emptyMsgId) {
       maintainAspectRatio: false,
       cutout: '65%',
       plugins: {
-        legend: { display: !isEmpty, position: 'bottom', labels: { font: { family: 'Inter', size: 11 }, usePointStyle: true, color: '#64748B' } },
+        legend: { display: !isEmpty, position: 'bottom', labels: { font: { family: 'Inter', size: 11 }, usePointStyle: true, color: themeChart().tick } },
         tooltip: { enabled: !isEmpty },
       },
     }
@@ -377,12 +383,12 @@ function buildHorizontalBarChart(ctx, payload, emptyMsgId) {
       maintainAspectRatio: false,
       indexAxis: 'y',
       plugins: {
-        legend: { display: !isEmpty, position: 'top', labels: { font: { family: 'Inter', size: 11 }, usePointStyle: true, color: '#64748B' } },
+        legend: { display: !isEmpty, position: 'top', labels: { font: { family: 'Inter', size: 11 }, usePointStyle: true, color: themeChart().tick } },
         tooltip: { enabled: !isEmpty },
       },
       scales: {
-        x: { grid: { color: CHART_GRID }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B' }, border: { display: false }, beginAtZero: true },
-        y: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B' }, border: { display: false } }
+        x: { grid: { color: themeChart().grid }, ticks: { font: { family: 'Inter', size: 11 }, color: themeChart().tick }, border: { display: false }, beginAtZero: true },
+        y: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: themeChart().tick }, border: { display: false } }
       }
     }
   });
@@ -529,6 +535,9 @@ document.addEventListener('DOMContentLoaded', function() {
   appliedAnalyticsFilters = readAnalyticsFilterControls();
   updateAnalyticsFilterState();
   loadAnalytics();
+});
+document.addEventListener('pulse-theme-change', function() {
+  if (typeof loadAnalytics === 'function') loadAnalytics();
 });
 </script>
 {% endblock %}

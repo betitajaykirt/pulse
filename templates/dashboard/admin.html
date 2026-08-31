@@ -195,15 +195,17 @@
 document.addEventListener('DOMContentLoaded', async function() {
   if (typeof Chart === 'undefined') return;
 
+  const tick = (window.PulseTheme && window.PulseTheme.chartColors().tick) || '#64748B';
+  const grid = (window.PulseTheme && window.PulseTheme.chartColors().grid) || 'rgba(241, 245, 249, 0.9)';
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { position: 'bottom', labels: { font: { family: 'Inter', size: 11 }, usePointStyle: true, color: '#64748B' } }
+      legend: { position: 'bottom', labels: { font: { family: 'Inter', size: 11 }, usePointStyle: true, color: tick } }
     },
     scales: {
-      x: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B' } },
-      y: { grid: { color: 'rgba(241, 245, 249, 0.9)' }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B' }, border: { display: false } }
+      x: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: tick } },
+      y: { grid: { color: grid }, ticks: { font: { family: 'Inter', size: 11 }, color: tick }, border: { display: false } }
     }
   };
   
@@ -211,7 +213,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { position: 'bottom', labels: { font: { family: 'Inter', size: 11 }, usePointStyle: true, color: '#64748B' } }
+      legend: { position: 'bottom', labels: { font: { family: 'Inter', size: 11 }, usePointStyle: true, color: tick } }
     }
   };
 
@@ -253,8 +255,8 @@ document.addEventListener('DOMContentLoaded', async function() {
             tooltip: { mode: 'index', intersect: false }
           },
           scales: {
-            x: { stacked: true, grid: { display: false }, ticks: { font: { family: 'Inter', size: 10 }, color: '#64748B', maxTicksLimit: epiMaxTicks, autoSkip: data.epi_curve.interval !== 'day', maxRotation: 45, minRotation: 0 } },
-            y: { stacked: true, grid: { color: 'rgba(241, 245, 249, 0.9)' }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B', precision: 0 }, border: { display: false }, beginAtZero: true }
+            x: { stacked: true, grid: { display: false }, ticks: { font: { family: 'Inter', size: 10 }, color: tick, maxTicksLimit: epiMaxTicks, autoSkip: data.epi_curve.interval !== 'day', maxRotation: 45, minRotation: 0 } },
+            y: { stacked: true, grid: { color: grid }, ticks: { font: { family: 'Inter', size: 11 }, color: tick, precision: 0 }, border: { display: false }, beginAtZero: true }
           }
         })
       });
@@ -298,8 +300,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         options: Object.assign({}, chartOptions, { 
           indexAxis: 'y',
           scales: {
-            x: { grid: { color: 'rgba(241, 245, 249, 0.9)' }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B' }, border: { display: false }, beginAtZero: true },
-            y: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: '#64748B' } }
+            x: { grid: { color: grid }, ticks: { font: { family: 'Inter', size: 11 }, color: tick }, border: { display: false }, beginAtZero: true },
+            y: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: tick } }
           }
         })
       });

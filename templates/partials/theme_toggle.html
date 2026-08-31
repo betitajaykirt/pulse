@@ -1,0 +1,13 @@
+<button type="button"
+        class="theme-toggle{% if extra_class %} {{ extra_class }}{% endif %}"
+        data-theme-toggle
+        aria-label="Switch to dark mode"
+        aria-pressed="false"
+        title="Switch to dark mode">
+  <span class="theme-toggle__icon theme-toggle__icon--moon" aria-hidden="true">
+    <i data-lucide="moon" class="lucide-icon lucide-icon--sm"></i>
+  </span>
+  <span class="theme-toggle__icon theme-toggle__icon--sun" aria-hidden="true">
+    <i data-lucide="sun" class="lucide-icon lucide-icon--sm"></i>
+  </span>
+</button>
