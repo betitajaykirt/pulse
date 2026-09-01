@@ -212,7 +212,7 @@ def _generate_symptom_row(disease: str, rng: np.random.Generator) -> dict:
             row[col] = int(_rand(rng) > 0.45)
         elif col in exposure:
             row[col] = int(_rand(rng) > 0.22)
-        else:
+    else:
             row[col] = int(_rand(rng) > 0.97)
     return row
 
