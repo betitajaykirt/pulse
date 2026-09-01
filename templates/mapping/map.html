@@ -371,7 +371,7 @@
 
     /* ── Custom panes for correct z-stacking ─────────────────────── */
 
-    /* Stacking order: Tiles → Heatmap (340) → Boundaries (350) → Cluster circles (650) → Pins (750) */
+    /* Stacking order: Tiles → Heatmap (340) → Boundaries (400) → Cluster (620) → Pins (650) → Popup (800) */
 
     if (!map.getPane('heatmapPane')) {
 
@@ -383,14 +383,21 @@
 
     if (!map.getPane('cluster-pane')) {
       map.createPane('cluster-pane');
-      map.getPane('cluster-pane').style.zIndex = '650';
+      map.getPane('cluster-pane').style.zIndex = '620';
       map.getPane('cluster-pane').style.pointerEvents = 'none';
     }
 
     if (!map.getPane('pins-pane')) {
       map.createPane('pins-pane');
-      map.getPane('pins-pane').style.zIndex = '750';
+      map.getPane('pins-pane').style.zIndex = '650';
       map.getPane('pins-pane').style.pointerEvents = 'auto';
+    }
+
+    if (map.getPane('popupPane')) {
+      map.getPane('popupPane').style.zIndex = '800';
+    }
+    if (map.getPane('tooltipPane')) {
+      map.getPane('tooltipPane').style.zIndex = '670';
     }
 
     var clusterSvgRenderer = L.svg({ pane: 'cluster-pane', padding: 0.5 });
@@ -642,6 +649,10 @@
 
     function hydrateCasePopupScores(c) {
       if (!c || c._aptasLive) return Promise.resolve(c);
+      if (c.aptas_stored) {
+        c._aptasLive = true;
+        return Promise.resolve(c);
+      }
       return fetch(caseScoresEndpoint(c.id), { credentials: 'same-origin', cache: 'no-store' })
         .then(function (r) {
           if (!r.ok) throw new Error('Scores HTTP ' + r.status);
@@ -1960,7 +1971,10 @@
 
     loadMapData(true);
 
-    setInterval(function () { loadMapData(false); }, 60000);
+    setInterval(function () {
+      if (map && map._popup) return;
+      loadMapData(false);
+    }, 60000);
 
   });
 

@@ -14,11 +14,12 @@ from django.utils import timezone
 from myapp.models import (
     Barangay,
     PatientCase,
+    RiskAssessment,
     SurveillanceReport,
     SurveillanceSession,
     User,
 )
-from reports.pidsr_schema import DISEASE_LABELS
+from reports.pidsr_schema import DISEASE_LABELS, PIDSR_SYMPTOM_LABELS
 from reports.signals import reconcile_after_report_delete
 
 DEMO_MARKER = '[PULSE-DEMO]'
@@ -101,6 +102,83 @@ def _symptoms_for(disease: str) -> list[str]:
     return list(SYMPTOMS_BY_DISEASE.get(disease) or ['fever', 'body_malaise'])
 
 
+def _secondary_for(disease: str, rng: random.Random) -> str:
+    others = [label for label in DISEASE_LABELS if label != disease]
+    return rng.choice(others) if others else 'Influenza-Like Illness'
+
+
+def _demo_remarks(*, patient_name, age, sex, purok, disease, symptoms, rng) -> str:
+    """Match live batch-submit remarks so map popups can show confidence + secondary."""
+    primary_conf = rng.uniform(0.54, 0.78)
+    secondary_conf = rng.uniform(0.14, 0.28)
+    labels = [PIDSR_SYMPTOM_LABELS.get(code, code.replace('_', ' ')) for code in symptoms]
+    parts = [
+        f'Patient: {patient_name}',
+        f'Age: {age}',
+        f'Sex: {sex}',
+        f'Address: {purok}',
+        f'ML Classification: {disease}',
+        f'ML Top Prediction: {disease}',
+        f'ML Confidence: {primary_conf * 100:.1f}%',
+        f'ML Secondary Prediction: {_secondary_for(disease, rng)}',
+        f'ML Secondary Confidence: {secondary_conf * 100:.1f}%',
+        'Multiple Probable: YES',
+        f'Symptoms: {", ".join(labels)}',
+        DEMO_MARKER,
+    ]
+    return ' | '.join(parts)
+
+
+def _persist_dummy_aptas(reports, stdout, style):
+    """Write BarangayRiskLog + RiskAssessment so the map can read stored scores."""
+    from reports.aptas_service import compute_and_log_barangay_risk
+    from reports.risk_service import _recommended_action
+
+    grouped = defaultdict(list)
+    for report in reports:
+        grouped[(report.barangay_id, report.syndrome_type)].append(report)
+
+    stdout.write(f'Persisting stored APTAS for {len(grouped)} barangay/disease group(s)...')
+    stdout.flush()
+    now = timezone.now()
+    saved = 0
+    for (_barangay_id, disease), group in grouped.items():
+        anchor = group[0]
+        barangay_name = anchor.barangay.barangay_name
+        try:
+            log = compute_and_log_barangay_risk(
+                barangay_name,
+                disease,
+                float(anchor.ml_anomaly_score or 0.22),
+                force_activate=False,
+                report=anchor,
+            )
+        except Exception as exc:
+            stdout.write(style.WARNING(f'  APTAS skipped for {barangay_name} / {disease}: {exc}'))
+            continue
+        level = (log.risk_level or 'Low').lower()
+        for report in group:
+            RiskAssessment.objects.create(
+                report_id=report.id,
+                barangay_id=report.barangay_id,
+                anomaly_score=Decimal(str(log.anomaly_score)),
+                risk_score=Decimal(str(float(log.final_risk_score) / 100.0)),
+                risk_level=level[:10],
+                model_version='aptas-engine-v1',
+                evaluation_status='completed',
+                evaluated_at=now,
+                recommended_action=_recommended_action(level, disease),
+                created_at=now,
+            )
+            saved += 1
+        stdout.write(
+            f'  {barangay_name} / {disease}: {len(group)} report(s) '
+            f'final={log.final_risk_score:.1f} {log.risk_level}'
+        )
+        stdout.flush()
+    stdout.write(style.SUCCESS(f'Stored APTAS on {saved} dummy report(s).'))
+
+
 def _age_for(disease: str, rng: random.Random) -> int:
     if disease == 'Neonatal Tetanus':
         return 0
@@ -138,6 +216,7 @@ def _purge_demo_reports():
         report_ids = list(demo_qs.values_list('id', flat=True))
         session_ids = list(demo_qs.exclude(session_id=None).values_list('session_id', flat=True))
         if report_ids:
+            RiskAssessment.objects.filter(report_id__in=report_ids).delete()
             PatientCase.objects.filter(surveillance_report_id__in=report_ids).delete()
         deleted, _ = demo_qs.delete()
         if session_ids:
@@ -192,6 +271,7 @@ class Command(BaseCommand):
             grouped[barangay_name].append((disease, count, row))
 
         now = timezone.now()
+        seeded_reports = []
         for barangay_name, jobs in grouped.items():
             submitter = _submitter_for(barangay_name)
             if not submitter:
@@ -240,18 +320,23 @@ class Command(BaseCommand):
                         validation_status='validated',
                         is_anomaly=False,
                         ml_anomaly_score=Decimal('0.2200'),
-                        remarks=(
-                            f'Purok: {purok}\n'
-                            f'Symptoms: {", ".join(symptoms)}\n'
-                            f'ML Predicted: {disease}\n'
-                            f'{DEMO_MARKER}'
-                        ),
+                        remarks=_demo_remarks(
+                        patient_name=patient_name,
+                        age=age,
+                        sex=sex,
+                        purok=purok,
+                        disease=disease,
+                        symptoms=symptoms,
+                        rng=rng,
+                    ),
                         latitude=pin_lat,
                         longitude=pin_lng,
                         report_date=now,
                         created_at=now,
                         updated_at=now,
                     )
+                    report.barangay = barangay
+                    seeded_reports.append(report)
                     PatientCase.objects.create(
                         session=session,
                         barangay_id=barangay.id,
@@ -278,6 +363,8 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING(
                 'Skipped missing barangays: ' + ', '.join(sorted(set(skipped)))
             ))
+        if seeded_reports:
+            _persist_dummy_aptas(seeded_reports, self.stdout, self.style)
         self.stdout.write(self.style.SUCCESS(
             f'Created {created} dummy reports across {len(grouped)} barangays. '
             'Open Geospatial Map (last 30 days) to view the pins.'

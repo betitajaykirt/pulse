@@ -8,7 +8,7 @@ from myapp.date_utils import format_display_date, format_display_datetime, parse
 from datetime import timedelta
 from accounts.auth_utils import login_required
 from myapp.models import (
-    Barangay, SurveillanceReport,
+    Barangay, SurveillanceReport, RiskAssessment,
     BarangayEpidemicStatus,
 )
 from myapp.barangay_scope import (
@@ -93,6 +93,28 @@ def _normalize_component_score(value, default=0.0):
         return default
 
 
+def _load_latest_aptas_logs():
+    """Stored BarangayRiskLog rows — one latest snapshot per barangay + syndrome."""
+    from reports.models import BarangayRiskLog
+
+    latest = {}
+    rows = BarangayRiskLog.objects.order_by('-created_at').only(
+        'barangay',
+        'syndrome',
+        'anomaly_score',
+        'temporal_score',
+        'environmental_score',
+        'spatial_score',
+        'final_risk_score',
+        'risk_level',
+    )
+    for log in rows:
+        key = ((log.barangay or '').casefold(), (log.syndrome or '').casefold())
+        if key not in latest:
+            latest[key] = log
+    return latest
+
+
 def _map_pin_aptas(report, assessment, risk_logs):
     """
     Pin scores from stored APTAS logs or the report's ML fields.
@@ -119,7 +141,7 @@ def _map_pin_aptas(report, assessment, risk_logs):
             'temporal_score': _normalize_component_score(log.temporal_score),
             'spatial_score': _normalize_component_score(log.spatial_score),
             'environmental_score': _normalize_component_score(log.environmental_score),
-        }, (log.risk_level or 'Low')
+        }, (log.risk_level or 'Low'), True
 
     raw = None
     if assessment and assessment.anomaly_score is not None:
@@ -140,7 +162,7 @@ def _map_pin_aptas(report, assessment, risk_logs):
         'temporal_score': 0.0,
         'spatial_score': 0.0,
         'environmental_score': 0.0,
-    }, classify_risk_level(anomaly * 100.0)
+    }, classify_risk_level(anomaly * 100.0), False
 
 
 def _barangay_epidemic_summary(barangay_ids):
@@ -340,6 +362,13 @@ def api_cases(request):
         base_qs.select_related('barangay', 'submitted_by', 'validated_by')
                .order_by('-report_date')
     )
+    report_ids = [r.id for r in rows]
+    latest_assessments = {}
+    if report_ids:
+        for ra in RiskAssessment.objects.filter(report_id__in=report_ids).order_by('report_id', '-created_at'):
+            if ra.report_id not in latest_assessments:
+                latest_assessments[ra.report_id] = ra
+    risk_logs = _load_latest_aptas_logs()
 
     def _officer_name(user):
         if not user:
@@ -409,7 +438,7 @@ def api_cases(request):
         weight = weight_map.get(r.case_classification, 0.25)
         heat_intensity = min(1.0, weight * (r.case_count / 3))
         mitigation = None
-        assessment = None
+        assessment = latest_assessments.get(r.id)
         risk_line, risk_score, risk_level = _risk_display(assessment, r)
         officer = r.submitted_by
         contact = ''
@@ -433,14 +462,7 @@ def api_cases(request):
         action_disease = _canonical_disease_for_actions(
             r, status_norm, ml_predicted, confirmed_disease,
         )
-        aptas_scores = {
-            'final_score': None,
-            'anomaly_score': None,
-            'temporal_score': None,
-            'spatial_score': None,
-            'environmental_score': None,
-        }
-        aptas_risk_level = ''
+        aptas_scores, aptas_risk_level, aptas_stored = _map_pin_aptas(r, assessment, risk_logs)
         purok = r.detailed_address or ''
 
         cases.append({
@@ -473,7 +495,7 @@ def api_cases(request):
             'officer_name':        _officer_name(officer),
             'officer_contact':     contact,
             'risk_score_line':     risk_line,
-            'risk_score':          None,
+            'risk_score':          risk_score,
             'risk_level':          risk_level,
             'aptas_risk_level':    aptas_risk_level,
             'final_score':         aptas_scores['final_score'],
@@ -481,6 +503,7 @@ def api_cases(request):
             'temporal_score':      aptas_scores['temporal_score'],
             'spatial_score':       aptas_scores['spatial_score'],
             'environmental_score': aptas_scores['environmental_score'],
+            'aptas_stored':        aptas_stored,
             'recommendations':     _recommendations_text(
                 mitigation,
                 assessment.recommended_action if assessment else None,

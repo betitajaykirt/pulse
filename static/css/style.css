@@ -2388,6 +2388,12 @@ html[data-theme="dark"] .map-layer-btn:hover {
   max-height: 80vh !important;
   overflow-y: auto !important; /* Internal scrolling only */
 }
+.leaflet-popup-pane {
+  z-index: 800 !important;
+}
+.leaflet-tooltip-pane {
+  z-index: 670 !important;
+}
 
 /* ── Single-case popup card ────────────────────────────────────── */
 .map-case-popup {
