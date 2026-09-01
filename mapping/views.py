@@ -8,24 +8,20 @@ from myapp.date_utils import format_display_date, format_display_datetime, parse
 from datetime import timedelta
 from accounts.auth_utils import login_required
 from myapp.models import (
-    Barangay, User, SurveillanceReport, RiskAssessment,
+    Barangay, SurveillanceReport,
     BarangayEpidemicStatus,
 )
 from myapp.barangay_scope import (
     is_city_wide_role, get_request_barangay, resolve_user_barangay,
     is_barangay_scoped_role,
 )
-from myapp.mitigation_utils import mitigation_suggestions_for_report
 from myapp.threshold_data import pidsr_category_display
 from reports.ml_display import (
     ml_top_prediction_for_report,
     parse_ml_confidence,
     predicted_disease_display,
 )
-from reports.report_risk_service import (
-    aptas_display_scores_for_report,
-    risk_level_for_report,
-)
+from reports.aptas_service import classify_risk_level
 from reports.disease_category_data import (
     DISEASE_CATEGORY_CHOICES,
     MONITORED_DISEASE_CHOICES,
@@ -88,6 +84,63 @@ def _canonical_disease_for_actions(report, status_norm, ml_predicted, confirmed_
         if candidate and not _is_inconclusive_disease_label(candidate):
             return candidate.strip()
     return 'the reported illness'
+
+
+def _normalize_component_score(value, default=0.0):
+    try:
+        return round(max(0.0, min(1.0, float(value))), 4)
+    except (TypeError, ValueError):
+        return default
+
+
+def _map_pin_aptas(report, assessment, risk_logs):
+    """
+    Pin scores from stored APTAS logs or the report's ML fields.
+
+    Live ``compute_aptas_breakdown`` is too slow for Vercel (N cases × many
+    Hostinger queries) and was returning an empty map after dummy seeding.
+    """
+    barangay = ''
+    if getattr(report, 'barangay', None):
+        barangay = report.barangay.barangay_name or ''
+    syndrome = (
+        ml_top_prediction_for_report(report)
+        or report.syndrome_type
+        or report.suspected_disease
+        or ''
+    ).strip()
+    log = risk_logs.get((barangay.casefold(), syndrome.casefold()))
+    if log:
+        final_raw = float(log.final_risk_score or 0.0)
+        final_norm = final_raw / 100.0 if final_raw > 1.5 else final_raw
+        return {
+            'final_score': _normalize_component_score(final_norm),
+            'anomaly_score': _normalize_component_score(log.anomaly_score),
+            'temporal_score': _normalize_component_score(log.temporal_score),
+            'spatial_score': _normalize_component_score(log.spatial_score),
+            'environmental_score': _normalize_component_score(log.environmental_score),
+        }, (log.risk_level or 'Low')
+
+    raw = None
+    if assessment and assessment.anomaly_score is not None:
+        raw = float(assessment.anomaly_score)
+    elif report.ml_anomaly_score is not None:
+        raw = float(report.ml_anomaly_score)
+    if raw is None:
+        anomaly = 0.22
+    elif raw < 0:
+        anomaly = max(0.0, min(1.0, 0.5 - raw))
+    elif raw <= 1.0:
+        anomaly = raw
+    else:
+        anomaly = min(1.0, raw / 100.0)
+    return {
+        'final_score': round(anomaly, 4),
+        'anomaly_score': round(anomaly, 4),
+        'temporal_score': 0.0,
+        'spatial_score': 0.0,
+        'environmental_score': 0.0,
+    }, classify_risk_level(anomaly * 100.0)
 
 
 def _barangay_epidemic_summary(barangay_ids):
@@ -285,15 +338,8 @@ def api_cases(request):
 
     rows = list(
         base_qs.select_related('barangay', 'submitted_by', 'validated_by')
-               .prefetch_related('patient_case')
                .order_by('-report_date')
     )
-    report_ids = [r.id for r in rows]
-    latest_assessments = {}
-    if report_ids:
-        for ra in RiskAssessment.objects.filter(report_id__in=report_ids).order_by('report_id', '-created_at'):
-            if ra.report_id not in latest_assessments:
-                latest_assessments[ra.report_id] = ra
 
     def _officer_name(user):
         if not user:
@@ -353,7 +399,6 @@ def api_cases(request):
         return fallback
 
     cases = []
-    aptas_cache = {}
     for r in rows:
         weight_map = {
             'confirmed': 1.0,
@@ -363,8 +408,8 @@ def api_cases(request):
         }
         weight = weight_map.get(r.case_classification, 0.25)
         heat_intensity = min(1.0, weight * (r.case_count / 3))
-        mitigation = mitigation_suggestions_for_report(r)
-        assessment = latest_assessments.get(r.id)
+        mitigation = None
+        assessment = None
         risk_line, risk_score, risk_level = _risk_display(assessment, r)
         officer = r.submitted_by
         contact = ''
@@ -388,15 +433,8 @@ def api_cases(request):
         action_disease = _canonical_disease_for_actions(
             r, status_norm, ml_predicted, confirmed_disease,
         )
-        aptas_scores = aptas_display_scores_for_report(r, assessment, aptas_cache)
-        aptas_risk_level = risk_level_for_report(r, assessment, aptas_cache)
-        
-        p_case = r.patient_case.first()
-        purok = ''
-        if p_case and p_case.purok_street:
-            purok = p_case.purok_street
-        elif r.detailed_address:
-            purok = r.detailed_address
+        aptas_scores, aptas_risk_level = _map_pin_aptas(r, assessment, {})
+        purok = r.detailed_address or ''
 
         cases.append({
             'id':                  r.id,
