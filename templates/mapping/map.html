@@ -632,8 +632,41 @@
       cityGeoUrl: "{% static 'ph-json/bago_city_boundary.geojson' %}",
 
       riskUrl: "{% url 'get_barangay_risk_map_data' %}",
+      caseScoresUrl: "{% url 'api_cases' %}",
 
     };
+
+    function caseScoresEndpoint(caseId) {
+      return MAP_CONFIG.caseScoresUrl + caseId + '/scores/';
+    }
+
+    function hydrateCasePopupScores(c) {
+      if (!c || c._aptasLive) return Promise.resolve(c);
+      return fetch(caseScoresEndpoint(c.id), { credentials: 'same-origin', cache: 'no-store' })
+        .then(function (r) {
+          if (!r.ok) throw new Error('Scores HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function (data) {
+          if (!data || !data.ok) return c;
+          c.final_score = data.final_score;
+          c.anomaly_score = data.anomaly_score;
+          c.temporal_score = data.temporal_score;
+          c.spatial_score = data.spatial_score;
+          c.environmental_score = data.environmental_score;
+          c.aptas_risk_level = data.aptas_risk_level;
+          if (data.ml_confidence_pct != null) c.ml_confidence_pct = data.ml_confidence_pct;
+          if (data.ml_secondary_predicted_disease) c.ml_secondary_predicted_disease = data.ml_secondary_predicted_disease;
+          if (data.ml_secondary_confidence_pct != null) c.ml_secondary_confidence_pct = data.ml_secondary_confidence_pct;
+          if (data.ml_top_predicted_disease) c.ml_top_predicted_disease = data.ml_top_predicted_disease;
+          c._aptasLive = true;
+          return c;
+        })
+        .catch(function (err) {
+          console.error('Case scores error:', err);
+          return c;
+        });
+    }
 
 
 
@@ -1153,16 +1186,28 @@
 
     function formatRiskMetric(value) {
 
-      if (value == null || value === '') return '0.00';
+      if (value == null || value === '') return '\u2014';
 
       var n = Number(value);
 
-      if (isNaN(n)) return '0.00';
+      if (isNaN(n)) return '\u2014';
 
       if (n > 1.5) return (n / 100).toFixed(2);
 
       return n.toFixed(2);
 
+    }
+
+    function formatMlConfidence(c) {
+      var pct = c.ml_confidence_pct;
+      if (pct == null && c.ml_classification_confidence != null) {
+        var raw = Number(c.ml_classification_confidence);
+        if (!isNaN(raw)) pct = raw > 1.5 ? raw : Math.round(raw * 1000) / 10;
+      }
+      if (pct == null || pct === '') return 'Not recorded';
+      var n = Number(pct);
+      if (isNaN(n)) return 'Not recorded';
+      return n.toFixed(1) + '%';
     }
 
 
@@ -1304,12 +1349,14 @@
       if (!clusterModel) return;
       var c = clusterModel.cases.find(function(item) { return item.id === caseId; });
       if (!c) return;
-      var html = buildCasePopup(c, clusterId);
       var ll = window.clusterMap[clusterId] ? [window.clusterMap[clusterId].lat, window.clusterMap[clusterId].lng] : [c.latitude, c.longitude];
-      L.popup({ maxWidth: 440, minWidth: 380, autoPan: true, autoPanPadding: [30, 30], className: 'custom-fixed-popup' })
+      var popup = L.popup({ maxWidth: 440, minWidth: 380, autoPan: true, autoPanPadding: [30, 30], className: 'custom-fixed-popup' })
         .setLatLng(ll)
-        .setContent(html)
+        .setContent(buildCasePopup(c, clusterId))
         .openOn(map);
+      hydrateCasePopupScores(c).then(function () {
+        popup.setContent(buildCasePopup(c, clusterId));
+      });
     };
 
     function buildCasePopup(c, fromClusterId) {
@@ -1344,6 +1391,7 @@
       html += '<div class="map-case-popup__section map-case-popup__section--details">';
       html += '<div class="map-case-popup__row"><strong>Patient:</strong> ' + escapeMapPopupHtml(c.patient_name || 'Unknown Resident') + '</div>';
       html += '<div class="map-case-popup__row map-case-popup__row--disease"><strong>ML Predicted Disease:</strong> ' + mapPopupMlDiseaseDisplay(c) + '</div>';
+      html += '<div class="map-case-popup__row"><strong>ML Confidence:</strong> ' + escapeMapPopupHtml(formatMlConfidence(c)) + '</div>';
       html += '<div class="map-case-popup__row"><strong>Barangay:</strong> ' + barangayDisplay + '</div>';
 
       html += '<div class="map-case-popup__row"><strong>Cases:</strong> ' + escapeMapPopupHtml(c.case_count) + '</div>';
@@ -1578,7 +1626,7 @@
         var appearance = casePinAppearance(c);
         var popupHtml = buildCasePopup(c, clusterId);
 
-        L.circleMarker(ll, {
+        var marker = L.circleMarker(ll, {
           pane: 'pins-pane',
           renderer: pinsSvgRenderer,
           radius: appearance.radius,
@@ -1591,6 +1639,11 @@
           .bindTooltip(buildCaseTooltip(c), { sticky: true, direction: 'top', className: 'hotspot-tip' })
           .bindPopup(popupHtml, { maxWidth: 440, minWidth: 380, autoPan: true, autoPanPadding: [30, 30], className: 'custom-fixed-popup' })
           .addTo(casePinsLayer);
+        marker.on('popupopen', function () {
+          hydrateCasePopupScores(c).then(function () {
+            marker.setPopupContent(buildCasePopup(c, clusterId));
+          });
+        });
       }
 
 

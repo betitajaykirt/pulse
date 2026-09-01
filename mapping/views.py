@@ -433,7 +433,14 @@ def api_cases(request):
         action_disease = _canonical_disease_for_actions(
             r, status_norm, ml_predicted, confirmed_disease,
         )
-        aptas_scores, aptas_risk_level = _map_pin_aptas(r, assessment, {})
+        aptas_scores = {
+            'final_score': None,
+            'anomaly_score': None,
+            'temporal_score': None,
+            'spatial_score': None,
+            'environmental_score': None,
+        }
+        aptas_risk_level = ''
         purok = r.detailed_address or ''
 
         cases.append({
@@ -466,7 +473,7 @@ def api_cases(request):
             'officer_name':        _officer_name(officer),
             'officer_contact':     contact,
             'risk_score_line':     risk_line,
-            'risk_score':          risk_score,
+            'risk_score':          None,
             'risk_level':          risk_level,
             'aptas_risk_level':    aptas_risk_level,
             'final_score':         aptas_scores['final_score'],
@@ -485,3 +492,42 @@ def api_cases(request):
         })
 
     return JsonResponse({'ok': True, 'cases': cases})
+
+
+def _scoped_report_qs(request):
+    role = request.session.get('role')
+    scoped_barangay = get_request_barangay(request)
+    qs = SurveillanceReport.objects.select_related('barangay', 'submitted_by', 'validated_by')
+    if scoped_barangay:
+        return qs.filter(barangay_id=scoped_barangay.id)
+    if is_city_wide_role(role):
+        return qs
+    return qs.none()
+
+
+@require_GET
+@login_required
+def api_case_scores(request, report_id):
+    """Live APTAS + ML confidence for one pin popup. Kept off the list API so pins still load."""
+    from reports.report_risk_service import aptas_display_scores_for_report, risk_level_for_report
+
+    report = _scoped_report_qs(request).filter(id=report_id).first()
+    if not report:
+        return JsonResponse({'ok': False, 'error': 'Case not found.'}, status=404)
+
+    scores = aptas_display_scores_for_report(report)
+    ml_display = predicted_disease_display(report)
+    return JsonResponse({
+        'ok': True,
+        'id': report.id,
+        'final_score': scores['final_score'],
+        'anomaly_score': scores['anomaly_score'],
+        'temporal_score': scores['temporal_score'],
+        'spatial_score': scores['spatial_score'],
+        'environmental_score': scores['environmental_score'],
+        'aptas_risk_level': risk_level_for_report(report),
+        'ml_confidence_pct': ml_display.get('confidence_pct'),
+        'ml_secondary_predicted_disease': ml_display.get('secondary') or '',
+        'ml_secondary_confidence_pct': ml_display.get('secondary_confidence_pct'),
+        'ml_top_predicted_disease': ml_top_prediction_for_report(report) or '',
+    })
