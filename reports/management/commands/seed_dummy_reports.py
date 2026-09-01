@@ -1,15 +1,12 @@
 """Seed dummy surveillance reports so sample pins appear on the geospatial map."""
 from __future__ import annotations
 
-import json
 import random
 from collections import defaultdict
 from datetime import date, timedelta
-from decimal import Decimal
 
 from django.core.management.base import BaseCommand
 from django.db.models.signals import pre_delete
-from django.utils import timezone
 
 from myapp.models import (
     Barangay,
@@ -19,7 +16,7 @@ from myapp.models import (
     SurveillanceSession,
     User,
 )
-from reports.pidsr_schema import DISEASE_LABELS, PIDSR_SYMPTOM_LABELS
+from reports.pidsr_schema import DISEASE_LABELS
 from reports.signals import reconcile_after_report_delete
 
 DEMO_MARKER = '[PULSE-DEMO]'
@@ -79,104 +76,27 @@ SYMPTOMS_BY_DISEASE = {
     'Middle East Respiratory Syndrome': ['fever', 'dry_cough', 'trouble_breathing'],
     'Neonatal Tetanus': ['trismus', 'muscle_spasms', 'severe_restlessness'],
     'Paralytic Shellfish Poisoning': ['tingling_numbness', 'vomiting', 'marked_weakness'],
-    'Rabies': ['hydrophobia', 'aerophobia', 'altered_consciousness'],
+    'Rabies': ['hydrophobia', 'muscle_spasms', 'altered_consciousness'],
     'Severe Acute Respiratory Syndrome': ['fever', 'dry_cough', 'trouble_breathing'],
     'Acute Bloody Diarrhea': ['bloody_diarrhea', 'fever', 'abdominal_discomfort'],
     'Acute Encephalitis Syndrome': ['fever', 'altered_consciousness', 'seizure'],
-    'Acute Hemorrhagic Fever Syndrome': ['fever', 'bleeding_gums', 'petechiae'],
+    'Acute Hemorrhagic Fever Syndrome': ['fever', 'gum_bleeding', 'petechiae'],
     'Acute Viral Hepatitis': ['jaundice', 'right_upper_quadrant_pain', 'anorexia'],
     'Bacterial Meningitis': ['fever', 'neck_stiffness', 'headache'],
-    'Cholera': ['loose_watery_stool', 'vomiting', 'severe_dehydration'],
-    'Dengue Fever': ['fever', 'headache', 'rash', 'bleeding_gums'],
-    'Diphtheria': ['sore_throat', 'pseudomembrane', 'fever'],
+    'Cholera': ['loose_watery_stool', 'vomiting', 'thirst'],
+    'Dengue Fever': ['fever', 'headache', 'rash', 'gum_bleeding'],
+    'Diphtheria': ['sore_throat', 'bull_neck', 'fever'],
     'Influenza-Like Illness': ['fever', 'dry_cough', 'body_malaise', 'headache'],
     'Leptospirosis': ['fever', 'myalgia', 'conjunctival_suffusion', 'jaundice'],
     'Malaria': ['fever', 'chills', 'diaphoresis', 'headache'],
     'Non-Neonatal Tetanus': ['trismus', 'muscle_spasms', 'neck_stiffness'],
-    'Pertussis': ['paroxysmal_cough', 'whoop', 'vomiting'],
+    'Pertussis': ['cough_paroxysms', 'post_tussive_vomiting', 'runny_nose'],
     'Typhoid and Paratyphoid Fever': ['fever', 'abdominal_discomfort', 'constipation', 'headache'],
 }
 
 
 def _symptoms_for(disease: str) -> list[str]:
     return list(SYMPTOMS_BY_DISEASE.get(disease) or ['fever', 'body_malaise'])
-
-
-def _secondary_for(disease: str, rng: random.Random) -> str:
-    others = [label for label in DISEASE_LABELS if label != disease]
-    return rng.choice(others) if others else 'Influenza-Like Illness'
-
-
-def _demo_remarks(*, patient_name, age, sex, purok, disease, symptoms, rng) -> str:
-    """Match live batch-submit remarks so map popups can show confidence + secondary."""
-    primary_conf = rng.uniform(0.54, 0.78)
-    secondary_conf = rng.uniform(0.14, 0.28)
-    labels = [PIDSR_SYMPTOM_LABELS.get(code, code.replace('_', ' ')) for code in symptoms]
-    parts = [
-        f'Patient: {patient_name}',
-        f'Age: {age}',
-        f'Sex: {sex}',
-        f'Address: {purok}',
-        f'ML Classification: {disease}',
-        f'ML Top Prediction: {disease}',
-        f'ML Confidence: {primary_conf * 100:.1f}%',
-        f'ML Secondary Prediction: {_secondary_for(disease, rng)}',
-        f'ML Secondary Confidence: {secondary_conf * 100:.1f}%',
-        'Multiple Probable: YES',
-        f'Symptoms: {", ".join(labels)}',
-        DEMO_MARKER,
-    ]
-    return ' | '.join(parts)
-
-
-def _persist_dummy_aptas(reports, stdout, style):
-    """Write BarangayRiskLog + RiskAssessment so the map can read stored scores."""
-    from reports.aptas_service import compute_and_log_barangay_risk
-    from reports.risk_service import _recommended_action
-
-    grouped = defaultdict(list)
-    for report in reports:
-        grouped[(report.barangay_id, report.syndrome_type)].append(report)
-
-    stdout.write(f'Persisting stored APTAS for {len(grouped)} barangay/disease group(s)...')
-    stdout.flush()
-    now = timezone.now()
-    saved = 0
-    for (_barangay_id, disease), group in grouped.items():
-        anchor = group[0]
-        barangay_name = anchor.barangay.barangay_name
-        try:
-            log = compute_and_log_barangay_risk(
-                barangay_name,
-                disease,
-                float(anchor.ml_anomaly_score or 0.22),
-                force_activate=False,
-                report=anchor,
-            )
-        except Exception as exc:
-            stdout.write(style.WARNING(f'  APTAS skipped for {barangay_name} / {disease}: {exc}'))
-            continue
-        level = (log.risk_level or 'Low').lower()
-        for report in group:
-            RiskAssessment.objects.create(
-                report_id=report.id,
-                barangay_id=report.barangay_id,
-                anomaly_score=Decimal(str(log.anomaly_score)),
-                risk_score=Decimal(str(float(log.final_risk_score) / 100.0)),
-                risk_level=level[:10],
-                model_version='aptas-engine-v1',
-                evaluation_status='completed',
-                evaluated_at=now,
-                recommended_action=_recommended_action(level, disease),
-                created_at=now,
-            )
-            saved += 1
-        stdout.write(
-            f'  {barangay_name} / {disease}: {len(group)} report(s) '
-            f'final={log.final_risk_score:.1f} {log.risk_level}'
-        )
-        stdout.flush()
-    stdout.write(style.SUCCESS(f'Stored APTAS on {saved} dummy report(s).'))
 
 
 def _age_for(disease: str, rng: random.Random) -> int:
@@ -237,6 +157,8 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        from reports.batch_service import save_batch_submission
+
         self.stdout.write('Starting dummy report seed...')
         self.stdout.flush()
 
@@ -270,8 +192,6 @@ class Command(BaseCommand):
                 continue
             grouped[barangay_name].append((disease, count, row))
 
-        now = timezone.now()
-        seeded_reports = []
         for barangay_name, jobs in grouped.items():
             submitter = _submitter_for(barangay_name)
             if not submitter:
@@ -280,82 +200,50 @@ class Command(BaseCommand):
             barangay = jobs[0][2]
             lat = float(barangay.latitude) if barangay.latitude is not None else 10.5376
             lng = float(barangay.longitude) if barangay.longitude is not None else 122.8380
-            total = sum(count for _d, count, _r in jobs)
-            session = SurveillanceSession.objects.create(
-                submitted_by_id=submitter.id,
-                case_classification='probable',
-                syndrome_type=jobs[0][0],
-                source_type='BHW',
-                patient_count=total,
-                session_date=now,
-                created_at=now,
-                updated_at=now,
-            )
-            seq = 0
+            cases = []
             for disease, count, _row in jobs:
                 for _ in range(count):
-                    seq += 1
                     onset = date.today() - timedelta(days=rng.randint(0, 12))
                     pin_lat, pin_lng = _jitter(lat, lng, rng)
-                    sex = rng.choice(['Male', 'Female'])
                     first = rng.choice(FIRST_NAMES)
                     last = rng.choice(LAST_NAMES)
-                    age = _age_for(disease, rng)
                     purok = f'Purok {rng.randint(1, 8)}, {barangay_name}'
-                    symptoms = _symptoms_for(disease)
-                    patient_name = f'{first} {last}'
-                    report = SurveillanceReport.objects.create(
-                        barangay_id=barangay.id,
-                        submitted_by_id=submitter.id,
-                        session=session,
-                        source_type='BHW',
-                        syndrome_type=disease,
-                        suspected_disease=disease,
-                        case_count=1,
-                        patient_name=patient_name,
-                        detailed_address=purok,
-                        date_of_onset=onset,
-                        case_classification='probable',
-                        status='Probable',
-                        validation_status='validated',
-                        is_anomaly=False,
-                        ml_anomaly_score=Decimal('0.2200'),
-                        remarks=_demo_remarks(
-                        patient_name=patient_name,
-                        age=age,
-                        sex=sex,
-                        purok=purok,
-                        disease=disease,
-                        symptoms=symptoms,
-                        rng=rng,
-                    ),
-                        latitude=pin_lat,
-                        longitude=pin_lng,
-                        report_date=now,
-                        created_at=now,
-                        updated_at=now,
-                    )
-                    report.barangay = barangay
-                    seeded_reports.append(report)
-                    PatientCase.objects.create(
-                        session=session,
-                        barangay_id=barangay.id,
-                        surveillance_report=report,
-                        sequence_no=seq,
-                        patient_name=patient_name,
-                        detailed_address=purok,
-                        age=age,
-                        sex=sex,
-                        purok_street=purok,
-                        latitude=pin_lat,
-                        longitude=pin_lng,
-                        date_of_onset=onset,
-                        symptoms_json=json.dumps(symptoms),
-                        created_at=now,
-                    )
-                    created += 1
+                    cases.append({
+                        'first_name': first,
+                        'last_name': last,
+                        'patient_name': f'{first} {last}',
+                        'barangay': barangay.id,
+                        'purok_street': purok,
+                        'detailed_address': purok,
+                        'latitude': pin_lat,
+                        'longitude': pin_lng,
+                        'date_of_onset': onset.isoformat(),
+                        'age': _age_for(disease, rng),
+                        'sex': rng.choice(['Male', 'Female']),
+                        'symptoms': _symptoms_for(disease),
+                    })
             self.stdout.write(
-                f'{barangay_name}: {total} case(s) via {submitter.email} (session #{session.id})'
+                f'Submitting {len(cases)} case(s) for {barangay_name} via Isolation Forest + Random Forest + APTAS...'
+            )
+            self.stdout.flush()
+            session, reports = save_batch_submission(
+                payload={'cases': cases},
+                submitted_by_id=submitter.id,
+                locked_barangay=barangay,
+            )
+            for report in reports:
+                remarks = (report.remarks or '').strip()
+                if DEMO_MARKER not in remarks:
+                    report.remarks = f'{remarks} | {DEMO_MARKER}' if remarks else DEMO_MARKER
+                    report.save(update_fields=['remarks'])
+            created += len(reports)
+            scores = ', '.join(
+                str(r.ml_anomaly_score if r.ml_anomaly_score is not None else '—')
+                for r in reports
+            )
+            self.stdout.write(
+                f'{barangay_name}: {len(reports)} case(s) session #{session.id} '
+                f'anomaly=[{scores}] via {submitter.email}'
             )
             self.stdout.flush()
 
@@ -363,9 +251,8 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING(
                 'Skipped missing barangays: ' + ', '.join(sorted(set(skipped)))
             ))
-        if seeded_reports:
-            _persist_dummy_aptas(seeded_reports, self.stdout, self.style)
         self.stdout.write(self.style.SUCCESS(
-            f'Created {created} dummy reports across {len(grouped)} barangays. '
+            f'Created {created} dummy reports across {len(grouped)} barangays '
+            'through Isolation Forest, Random Forest, and APTAS. '
             'Open Geospatial Map (last 30 days) to view the pins.'
         ))

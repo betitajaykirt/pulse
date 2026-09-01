@@ -252,14 +252,11 @@ def detect_anomalies(
     return result
 
 
-def train_and_classify_result(
+def fit_random_forest_classifier(
     train_data: pd.DataFrame,
-    incoming_patient: pd.DataFrame,
     *,
     random_state: int = 42,
-    confidence_threshold: float = DEFAULT_CLASSIFICATION_CONFIDENCE,
-    low_confidence_label: str = INCONCLUSIVE_SYNDROMIC_LABEL,
-) -> dict:
+) -> tuple[RandomForestClassifier, LabelEncoder]:
     if train_data.empty:
         raise ValueError('train_data must contain at least one labeled row.')
     if TARGET_COLUMN not in train_data.columns:
@@ -269,7 +266,6 @@ def train_and_classify_result(
     y_raw = train_data[TARGET_COLUMN].astype(str).str.strip()
     label_encoder = LabelEncoder()
     y_train = label_encoder.fit_transform(y_raw)
-
     classifier = RandomForestClassifier(
         n_estimators=300,
         max_depth=None,
@@ -279,7 +275,17 @@ def train_and_classify_result(
         n_jobs=-1,
     )
     classifier.fit(x_train, y_train)
+    return classifier, label_encoder
 
+
+def classify_with_fitted_forest(
+    classifier: RandomForestClassifier,
+    label_encoder: LabelEncoder,
+    incoming_patient: pd.DataFrame,
+    *,
+    confidence_threshold: float = DEFAULT_CLASSIFICATION_CONFIDENCE,
+    low_confidence_label: str = INCONCLUSIVE_SYNDROMIC_LABEL,
+) -> dict:
     if incoming_patient.empty:
         return {
             'disease_label': low_confidence_label,
@@ -324,6 +330,30 @@ def train_and_classify_result(
         'has_multiple_probable': has_multiple_probable,
         'exposure_gated': not np.allclose(proba, gated_proba),
     }
+
+
+def train_and_classify_result(
+    train_data: pd.DataFrame,
+    incoming_patient: pd.DataFrame,
+    *,
+    random_state: int = 42,
+    confidence_threshold: float = DEFAULT_CLASSIFICATION_CONFIDENCE,
+    low_confidence_label: str = INCONCLUSIVE_SYNDROMIC_LABEL,
+    fitted_classifier: Optional[tuple] = None,
+) -> dict:
+    if fitted_classifier is None:
+        classifier, label_encoder = fit_random_forest_classifier(
+            train_data, random_state=random_state,
+        )
+    else:
+        classifier, label_encoder = fitted_classifier
+    return classify_with_fitted_forest(
+        classifier,
+        label_encoder,
+        incoming_patient,
+        confidence_threshold=confidence_threshold,
+        low_confidence_label=low_confidence_label,
+    )
 
 
 def train_and_classify(

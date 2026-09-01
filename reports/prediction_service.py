@@ -18,6 +18,7 @@ from ml_engine import (
     TARGET_COLUMN,
     detect_anomalies,
     ensure_climate_columns,
+    fit_random_forest_classifier,
     patient_case_to_feature_row,
     train_and_classify_result,
 )
@@ -137,13 +138,21 @@ def analyze_patient_case(
     symptoms: Sequence[str],
     barangay_name: str = '',
     submission_datetime=None,
+    train_df: Optional[pd.DataFrame] = None,
+    outbreak_train_df: Optional[pd.DataFrame] = None,
+    climate: Optional[dict] = None,
+    fitted_classifier=None,
+    same_day_prior_cases: int = 0,
 ) -> Dict[str, Any]:
-    train_df = _load_training_frame()
-    outbreak_train_df = _get_outbreak_training_data()
+    if train_df is None:
+        train_df = _load_training_frame()
+    if outbreak_train_df is None:
+        outbreak_train_df = _get_outbreak_training_data()
     now = submission_datetime or timezone.now()
     symptoms = normalize_symptom_codes(symptoms)
     symptom_count = len(symptoms)
-    climate = get_climate_features_for_timestamp(now)
+    if climate is None:
+        climate = get_climate_features_for_timestamp(now)
 
     feature_row = patient_case_to_feature_row(
         age=age,
@@ -175,7 +184,7 @@ def analyze_patient_case(
     ).exclude(status__in=['Discarded', 'Closed']).count()
 
     incoming_outbreak_row = pd.DataFrame([{
-        'active_cases': db_today_cases + 1,
+        'active_cases': db_today_cases + max(int(same_day_prior_cases), 0) + 1,
         'rainfall_mm': climate.get('rainfall', CLIMATE_DEFAULTS['rainfall']),
         'temperature_c': climate.get('temperature', CLIMATE_DEFAULTS['temperature']),
         'humidity_pct': climate.get('humidity', CLIMATE_DEFAULTS['humidity']),
@@ -201,6 +210,7 @@ def analyze_patient_case(
                 incoming,
                 confidence_threshold=CLASSIFICATION_CONFIDENCE_THRESHOLD,
                 low_confidence_label=INCONCLUSIVE_SYNDROMIC_LABEL,
+                fitted_classifier=fitted_classifier,
             )
             disease_label = clf['disease_label']
             top_predicted = clf.get('top_predicted_disease') or ''
@@ -241,17 +251,32 @@ def analyze_batch_cases(
     barangay_names: Optional[dict] = None,
 ) -> List[Dict[str, Any]]:
     barangay_names = barangay_names or {}
+    train_df = _load_training_frame()
+    outbreak_train_df = _get_outbreak_training_data()
+    climate = get_climate_features_for_timestamp()
+    fitted_classifier = None
+    try:
+        fitted_classifier = fit_random_forest_classifier(train_df)
+    except Exception:
+        logger.exception('Shared Random Forest fit failed; falling back to per-case training.')
     results = []
+    barangay_batch_counts: Dict[str, int] = {}
     for idx, case in enumerate(cases, start=1):
         symptoms = normalize_symptom_codes(case.get('symptoms') or [])
         brgy_id = case.get('barangay') or case.get('barangay_id')
         brgy_name = barangay_names.get(str(brgy_id), '')
+        prior_in_batch = barangay_batch_counts.get(brgy_name, 0)
         try:
             results.append(analyze_patient_case(
                 age=int(case['age']),
                 sex=case['sex'],
                 symptoms=symptoms,
                 barangay_name=brgy_name,
+                train_df=train_df,
+                outbreak_train_df=outbreak_train_df,
+                climate=climate,
+                fitted_classifier=fitted_classifier,
+                same_day_prior_cases=prior_in_batch,
             ))
         except Exception as exc:
             logger.exception('ML analysis failed for patient #%s: %s', idx, exc)
@@ -265,4 +290,5 @@ def analyze_batch_cases(
                 'case_classification': 'unassigned',
                 'symptom_count': len(symptoms),
             })
+        barangay_batch_counts[brgy_name] = prior_in_batch + 1
     return results
