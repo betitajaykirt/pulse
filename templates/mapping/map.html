@@ -204,6 +204,15 @@
             {% endif %}
 
             <div class="form-group">
+              <label for="filter-pidsr-category">PIDSR Category</label>
+              <select id="filter-pidsr-category" class="input-soft input-soft--plain">
+                {% for value, label in pidsr_category_choices %}
+                <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="form-group">
               <label for="filter-disease-category">Disease Category</label>
               <select id="filter-disease-category" class="input-soft input-soft--plain">
                 {% for value, label in disease_category_choices %}
@@ -804,6 +813,7 @@
       disease: '',
       classif: '',
       diseaseCategory: '',
+      pidsrCategory: '',
     };
 
 
@@ -825,6 +835,7 @@
         disease: (document.getElementById('filter-disease') || {}).value || '',
         classif: (document.getElementById('filter-classif') || {}).value || '',
         diseaseCategory: (document.getElementById('filter-disease-category') || {}).value || '',
+        pidsrCategory: (document.getElementById('filter-pidsr-category') || {}).value || '',
       };
 
     }
@@ -833,7 +844,7 @@
 
     function hasActiveMapFilters(filters) {
 
-      return !!(filters.barangay || filters.disease || filters.classif || filters.diseaseCategory);
+      return !!(filters.barangay || filters.disease || filters.classif || filters.diseaseCategory || filters.pidsrCategory);
 
     }
 
@@ -921,6 +932,8 @@
 
       var categoryEl = document.getElementById('filter-disease-category');
 
+      var pidsrEl = document.getElementById('filter-pidsr-category');
+
       if (barangayEl && !barangayEl.disabled) barangayEl.value = '';
 
       if (diseaseEl) diseaseEl.value = '';
@@ -929,7 +942,9 @@
 
       if (categoryEl) categoryEl.value = '';
 
-      mapAppliedFilters = { barangay: '', disease: '', classif: '', diseaseCategory: '' };
+      if (pidsrEl) pidsrEl.value = '';
+
+      mapAppliedFilters = { barangay: '', disease: '', classif: '', diseaseCategory: '', pidsrCategory: '' };
 
       syncMapBoundarySelection('');
 
@@ -1896,6 +1911,8 @@
 
       const diseaseCategoryF = mapAppliedFilters.diseaseCategory || '';
 
+      const pidsrCategoryF = mapAppliedFilters.pidsrCategory || '';
+
       const classifF = mapAppliedFilters.classif || '';
 
       const casesUrl = "{% url 'api_cases' %}";
@@ -1909,6 +1926,8 @@
       if (diseaseF) params.set('disease', diseaseF);
 
       if (diseaseCategoryF) params.set('disease_category', diseaseCategoryF);
+
+      if (pidsrCategoryF) params.set('pidsr_category', pidsrCategoryF);
 
       if (classifF) params.set('case_classification', classifF);
 

@@ -25,10 +25,13 @@ from reports.aptas_service import classify_risk_level
 from reports.disease_category_data import (
     DISEASE_CATEGORY_CHOICES,
     MONITORED_DISEASE_CHOICES,
+    PIDSR_CATEGORY_FILTER_CHOICES,
     VALID_DISEASE_CATEGORIES,
     VALID_MONITORED_DISEASES,
+    VALID_PIDSR_CATEGORY_FILTERS,
     filter_surveillance_reports_by_disease_category,
     filter_surveillance_reports_by_disease_label,
+    filter_surveillance_reports_by_pidsr_category,
 )
 
 
@@ -227,6 +230,7 @@ def map_view(request):
             'barangay_scoped': is_barangay_scoped_role(role),
             'disease_choices': MONITORED_DISEASE_CHOICES,
             'disease_category_choices': DISEASE_CATEGORY_CHOICES,
+            'pidsr_category_choices': PIDSR_CATEGORY_FILTER_CHOICES,
         })
     except Exception as e:
         return HttpResponse(f'<h1>Map Error</h1><pre>{e}</pre>', status=500)
@@ -319,6 +323,7 @@ def api_cases(request):
     time_range = request.GET.get('time_range', '30')
     disease_label = request.GET.get('disease', '').strip()
     disease_category = request.GET.get('disease_category', '').strip()
+    pidsr_category = request.GET.get('pidsr_category', '').strip()
     barangay_name = request.GET.get('barangay', '').strip()
     case_classif = request.GET.get('case_classification', '').strip()
 
@@ -354,6 +359,11 @@ def api_cases(request):
         if disease_category not in VALID_DISEASE_CATEGORIES:
             return JsonResponse({'ok': False, 'error': 'Invalid disease category filter.'}, status=400)
         base_qs = filter_surveillance_reports_by_disease_category(base_qs, disease_category)
+
+    if pidsr_category:
+        if pidsr_category not in VALID_PIDSR_CATEGORY_FILTERS:
+            return JsonResponse({'ok': False, 'error': 'Invalid PIDSR category filter.'}, status=400)
+        base_qs = filter_surveillance_reports_by_pidsr_category(base_qs, pidsr_category)
 
     if case_classif:
         base_qs = base_qs.filter(case_classification=case_classif)

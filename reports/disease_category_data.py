@@ -5,7 +5,14 @@ from __future__ import annotations
 
 from django.db.models import Q
 
-from reports.pidsr_schema import LEGACY_DISEASE_LABEL_MAP, DISEASE_LABELS, normalize_disease_label
+from reports.pidsr_schema import (
+    DISEASE_LABELS,
+    INCONCLUSIVE_SYNDROMIC_LABEL,
+    LEGACY_DISEASE_LABEL_MAP,
+    PIDSR_CATEGORY_I,
+    PIDSR_CATEGORY_II,
+    normalize_disease_label,
+)
 
 DISEASE_CATEGORY_CHOICES = [
     ('', 'All Disease Categories'),
@@ -24,6 +31,24 @@ MONITORED_DISEASE_CHOICES = [('', 'All Diseases')] + [
 ]
 
 VALID_MONITORED_DISEASES = frozenset(DISEASE_LABELS)
+
+PIDSR_CATEGORY_FILTER_CHOICES = [
+    ('', 'All PIDSR Categories'),
+    ('category_1', 'Category I'),
+    ('category_2', 'Category II'),
+]
+
+VALID_PIDSR_CATEGORY_FILTERS = frozenset(
+    value for value, _ in PIDSR_CATEGORY_FILTER_CHOICES if value
+)
+
+_PIDSR_CATEGORY_FILTER_LABELS = {
+    'category_1': tuple(PIDSR_CATEGORY_I),
+    'category_2': tuple(PIDSR_CATEGORY_II) + (
+        INCONCLUSIVE_SYNDROMIC_LABEL,
+        'Insufficient Data for Prediction',
+    ),
+}
 
 # Monitored + legacy labels grouped by transmission route
 CATEGORY_DISEASE_LABELS: dict[str, tuple[str, ...]] = {
@@ -174,6 +199,43 @@ def disease_label_filter_q(disease_label: str) -> Q:
 def filter_surveillance_reports_by_disease_label(qs, disease_label: str):
     """Filter a ``SurveillanceReport`` queryset by monitored disease label."""
     clause = disease_label_filter_q(disease_label)
+    if not clause:
+        return qs
+    return qs.filter(clause).distinct()
+
+
+def _normalize_pidsr_category_filter(pidsr_category: str) -> str:
+    slug = (pidsr_category or '').strip().lower().replace(' ', '_')
+    aliases = {
+        'category_i': 'category_1',
+        'category_ii': 'category_2',
+        '1': 'category_1',
+        '2': 'category_2',
+        'i': 'category_1',
+        'ii': 'category_2',
+    }
+    return aliases.get(slug, slug)
+
+
+def pidsr_category_filter_q(pidsr_category: str) -> Q:
+    """Build a queryset ``Q`` for PIDSR Category I or Category II diseases."""
+    slug = _normalize_pidsr_category_filter(pidsr_category)
+    labels = _PIDSR_CATEGORY_FILTER_LABELS.get(slug)
+    if not labels:
+        return Q()
+
+    combined = Q()
+    for label in labels:
+        if label in VALID_MONITORED_DISEASES:
+            combined |= disease_label_filter_q(label)
+        else:
+            combined |= _disease_label_match_q(label)
+    return combined
+
+
+def filter_surveillance_reports_by_pidsr_category(qs, pidsr_category: str):
+    """Filter a ``SurveillanceReport`` queryset by PIDSR Category I or II."""
+    clause = pidsr_category_filter_q(pidsr_category)
     if not clause:
         return qs
     return qs.filter(clause).distinct()
