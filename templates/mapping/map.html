@@ -1459,7 +1459,7 @@
 
       html += '<div class="map-case-popup__section map-case-popup__section--divider map-case-popup__officer-grid">';
 
-      html += '<div class="map-case-popup__officer-item"><span class="map-case-popup__officer-label">Officer in Charge</span><span class="map-case-popup__officer-value">' + escapeMapPopupHtml(c.officer_name || 'Not recorded') + '</span></div>';
+      html += '<div class="map-case-popup__officer-item"><span class="map-case-popup__officer-label">Catchment Nurse</span><span class="map-case-popup__officer-value">' + escapeMapPopupHtml(c.officer_name || 'Not assigned') + '</span></div>';
 
       html += '<div class="map-case-popup__officer-item"><span class="map-case-popup__officer-label">Contact</span><span class="map-case-popup__officer-value">' + escapeMapPopupHtml(c.officer_contact || 'Not available') + '</span></div>';
 
@@ -1582,7 +1582,7 @@
             html += '<div class="cluster-accordion__detail-row"><strong>Purok:</strong> ' + escapeMapPopupHtml(c.purok) + '</div>';
         }
         html += '<div class="cluster-accordion__detail-row"><strong>Status:</strong> ' + escapeMapPopupHtml((c.status || '').trim() || '\u2014') + '</div>';
-        html += '<div class="cluster-accordion__detail-row"><strong>Officer:</strong> ' + escapeMapPopupHtml(c.officer_name || 'Not recorded') + '</div>';
+        html += '<div class="cluster-accordion__detail-row"><strong>Catchment Nurse:</strong> ' + escapeMapPopupHtml(c.officer_name || 'Not assigned') + '</div>';
 
         if (c.final_score != null || c.anomaly_score != null) {
             html += '<div style="margin-top:6px;">' + buildRiskFactorGrid(c) + '</div>';

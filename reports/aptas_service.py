@@ -79,8 +79,9 @@ PIDSR_STATUS_HEADLINE = {
 }
 
 
-def _enrich_card_context(card: Dict[str, Any]) -> Dict[str, Any]:
+def _enrich_card_context(card: Dict[str, Any], *, nurses_by_barangay: dict | None = None) -> Dict[str, Any]:
     """Attach report-level context (officer, purok, coordinates, active cases) to a card."""
+    from myapp.barangay_scope import catchment_nurse_officer_fields
     from myapp.models import Alert
 
     barangay_name = card.get('barangay', '')
@@ -90,30 +91,27 @@ def _enrich_card_context(card: Dict[str, Any]) -> Dict[str, Any]:
     active_qs = _active_reports_qs(barangay_name, syndrome_name) if barangay_name else None
     card['active_cases'] = active_qs.count() if active_qs else 0
 
-    # Find anchor report for officer, purok, coordinates
+    # Find anchor report for purok and coordinates
     anchor = (
-        active_qs.select_related('submitted_by')
-        .order_by('-report_date')
-        .first()
+        active_qs.order_by('-report_date').first()
     ) if active_qs else None
+
+    if nurses_by_barangay is not None:
+        nurse = nurses_by_barangay.get((barangay_name or '').strip().casefold())
+        officer_fields = catchment_nurse_officer_fields(nurse)
+    else:
+        officer_fields = catchment_nurse_officer_fields(barangay_name=barangay_name)
+    card['officer_name'] = officer_fields['officer_name']
+    card['officer_contact'] = officer_fields['officer_contact']
 
     if anchor:
         card['purok'] = (anchor.detailed_address or '').strip()
         card['latitude'] = float(anchor.latitude) if anchor.latitude is not None else None
         card['longitude'] = float(anchor.longitude) if anchor.longitude is not None else None
-        if anchor.submitted_by_id and anchor.submitted_by:
-            officer = anchor.submitted_by
-            card['officer_name'] = f'{officer.first_name} {officer.last_name}'.strip()
-            card['officer_contact'] = officer.contact_number or ''
-        else:
-            card['officer_name'] = ''
-            card['officer_contact'] = ''
     else:
         card['purok'] = ''
         card['latitude'] = None
         card['longitude'] = None
-        card['officer_name'] = ''
-        card['officer_contact'] = ''
 
     # Trigger source
     if not card.get('trigger_source'):
@@ -248,7 +246,14 @@ def get_aptas_dashboard_context(*, barangay_name=None, limit=12):
         return (pidsr_rank, level_rank, -float(card.get('final_risk_score') or 0))
 
     merged_alerts = sorted(pidsr_cards + ml_cards, key=_sort_key)[:limit]
-    merged_alerts = [_enrich_card_context(card) for card in merged_alerts]
+    from myapp.barangay_scope import catchment_nurses_by_barangay
+    nurses_by_barangay = catchment_nurses_by_barangay(
+        [card.get('barangay') for card in merged_alerts]
+    )
+    merged_alerts = [
+        _enrich_card_context(card, nurses_by_barangay=nurses_by_barangay)
+        for card in merged_alerts
+    ]
 
     critical_count = sum(1 for c in pidsr_cards + ml_cards if c['risk_level'] == 'Critical')
     high_count = sum(1 for c in pidsr_cards + ml_cards if c['risk_level'] == 'High')

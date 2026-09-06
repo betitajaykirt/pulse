@@ -137,7 +137,7 @@
                         <div><dt>Status</dt><dd>${escapeHtml(notif.case_status || 'Active')}</dd></div>
                         <div><dt>Disease</dt><dd>${escapeHtml(notif.disease || '—')}</dd></div>
                         <div><dt>Location</dt><dd>${escapeHtml(formatLocation(notif))}</dd></div>
-                        <div><dt>Officer</dt><dd>${escapeHtml(formatOfficer(notif))}</dd></div>
+                        <div><dt>Catchment Nurse</dt><dd>${escapeHtml(formatOfficer(notif))}</dd></div>
                         <div><dt>Contact</dt><dd>${escapeHtml(formatContact(notif))}</dd></div>
                     </dl>
                     <div class="pulse-alert-card__recommendations">
@@ -147,7 +147,7 @@
                     ${queuedNote}
                     <div class="toast-actions pulse-alert-card__actions">
                         <button type="button" class="btn btn-secondary toast-dismiss-btn">Acknowledge</button>
-                        ${contactTel || notif.officer_email ? `<a href="${escapeHtml(contactHref)}" class="btn btn-outline pulse-alert-card__contact-btn">Contact Officer</a>` : ''}
+                        ${contactTel || notif.officer_email ? `<a href="${escapeHtml(contactHref)}" class="btn btn-outline pulse-alert-card__contact-btn">Contact Nurse</a>` : ''}
                         <a href="${escapeHtml(mapUrl)}" class="btn btn-primary pulse-alert-card__map-btn">View on Map</a>
                     </div>
                 </div>

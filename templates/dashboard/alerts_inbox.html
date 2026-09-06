@@ -321,7 +321,7 @@
     subtitleParts.push('Triggered by ' + escHtml(d.triggerSource || 'Spatial Cluster Spike'));
     var subtitleHtml = '<p style="margin:0 0 6px;">' + subtitleParts.join(' • ') + '</p>';
     if (d.officerName) {
-      subtitleHtml += '<p style="margin:0;">Officer: ' + escHtml(d.officerName);
+      subtitleHtml += '<p style="margin:0;">Catchment Nurse: ' + escHtml(d.officerName);
       if (d.officerContact) subtitleHtml += ' (' + escHtml(d.officerContact) + ')';
       subtitleHtml += '</p>';
     }
@@ -356,7 +356,7 @@
       ['Active Cases', d.activeCases || '0'],
       ['Purok / Address', d.purok || '—'],
       ['Trigger', d.triggerSource || 'Spatial Cluster Spike'],
-      ['Officer', d.officerName || '—'],
+      ['Catchment Nurse', d.officerName || '—'],
       ['Contact', d.officerContact || '—'],
     ];
     details.forEach(function(pair) {

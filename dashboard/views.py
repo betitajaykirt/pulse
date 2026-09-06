@@ -12,7 +12,8 @@ from myapp.models import (
 from accounts.auth_utils import role_required
 from myapp.barangay_scope import (
     is_city_wide_role, resolve_user_barangay, BARANGAY_SCOPED_ROLES,
-    get_request_barangay,
+    get_request_barangay, catchment_nurses_by_barangay,
+    catchment_nurse_officer_fields,
 )
 from .bhw_activity import barangay_filter_choices, build_bhw_activity_entries
 from .analytics_service import (
@@ -527,7 +528,7 @@ def api_notifications(request):
         )
 
     def _resolve_context_report(notif):
-        qs = SurveillanceReport.objects.select_related('submitted_by', 'barangay').filter(
+        qs = SurveillanceReport.objects.select_related('barangay').filter(
             barangay__barangay_name__iexact=notif.barangay_name,
             status__in=ACTIVE_SURVEILLANCE_STATUSES,
         ).order_by('-report_date')
@@ -538,11 +539,8 @@ def api_notifications(request):
                 return report
         return qs.first()
 
-    def _serialize_notification(notif, is_read):
+    def _serialize_notification(notif, is_read, nurses_by_barangay=None):
         report = _resolve_context_report(notif)
-        officer_name = ''
-        officer_contact = ''
-        officer_email = ''
         case_status = 'Active'
         street_address = ''
         latitude = None
@@ -555,11 +553,17 @@ def api_notifications(request):
                 latitude = float(report.latitude)
             if report.longitude is not None:
                 longitude = float(report.longitude)
-            if report.submitted_by_id:
-                officer = report.submitted_by
-                officer_name = f'{officer.first_name} {officer.last_name}'.strip()
-                officer_contact = officer.contact_number or ''
-                officer_email = officer.email or ''
+
+        if nurses_by_barangay is not None:
+            nurse = nurses_by_barangay.get((notif.barangay_name or '').strip().casefold())
+            officer_fields = catchment_nurse_officer_fields(nurse)
+        else:
+            officer_fields = catchment_nurse_officer_fields(
+                barangay_name=notif.barangay_name,
+            )
+        officer_name = officer_fields['officer_name']
+        officer_contact = officer_fields['officer_contact']
+        officer_email = officer_fields['officer_email']
 
         map_params = {'barangay': notif.barangay_name}
         if latitude is not None and longitude is not None:
@@ -599,12 +603,15 @@ def api_notifications(request):
 
     data = []
     unread_count = 0
+    nurses_by_barangay = catchment_nurses_by_barangay(
+        [notif.barangay_name for notif in notifications_list]
+    )
 
     for notif in notifications_list:
         is_read = notif.id in read_notification_ids
         if not is_read:
             unread_count += 1
-        data.append(_serialize_notification(notif, is_read))
+        data.append(_serialize_notification(notif, is_read, nurses_by_barangay))
 
     return JsonResponse({
         'ok': True, 

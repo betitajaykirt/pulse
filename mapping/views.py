@@ -13,7 +13,8 @@ from myapp.models import (
 )
 from myapp.barangay_scope import (
     is_city_wide_role, get_request_barangay, resolve_user_barangay,
-    is_barangay_scoped_role,
+    is_barangay_scoped_role, catchment_nurses_by_barangay,
+    catchment_nurse_officer_fields,
 )
 from myapp.threshold_data import pidsr_category_display
 from reports.ml_display import (
@@ -380,11 +381,6 @@ def api_cases(request):
                 latest_assessments[ra.report_id] = ra
     risk_logs = _load_latest_aptas_logs()
 
-    def _officer_name(user):
-        if not user:
-            return ''
-        return f'{user.first_name} {user.last_name}'.strip()
-
     def _confirmed_by_name(admin):
         if not admin:
             return 'System Administrator'
@@ -437,6 +433,10 @@ def api_cases(request):
                 return f'{intro} {base}'
         return fallback
 
+    nurses_by_barangay = catchment_nurses_by_barangay([
+        r.barangay.barangay_name for r in rows if r.barangay
+    ])
+
     cases = []
     for r in rows:
         weight_map = {
@@ -450,10 +450,9 @@ def api_cases(request):
         mitigation = None
         assessment = latest_assessments.get(r.id)
         risk_line, risk_score, risk_level = _risk_display(assessment, r)
-        officer = r.submitted_by
-        contact = ''
-        if officer:
-            contact = officer.contact_number or officer.email or ''
+        barangay_name = r.barangay.barangay_name if r.barangay else ''
+        nurse = nurses_by_barangay.get(barangay_name.casefold())
+        officer_fields = catchment_nurse_officer_fields(nurse)
         status_norm = (r.status or '').strip()
         classif_norm = (r.case_classification or '').strip().lower()
         confirmed_by = _confirmed_by_name(r.validated_by)
@@ -502,8 +501,8 @@ def api_cases(request):
             'heat_intensity':      heat_intensity,
             'epidemic_threshold_status': r.epidemic_threshold_status or '',
             'mitigation_suggestions': mitigation,
-            'officer_name':        _officer_name(officer),
-            'officer_contact':     contact,
+            'officer_name':        officer_fields['officer_name'],
+            'officer_contact':     officer_fields['officer_contact'] or officer_fields['officer_email'],
             'risk_score_line':     risk_line,
             'risk_score':          risk_score,
             'risk_level':          risk_level,
