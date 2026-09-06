@@ -2439,7 +2439,19 @@ html[data-theme="dark"] .map-layer-btn:hover {
 }
 .hotspot-tip::before { border-top-color: var(--text); }
 
-/* Stop popup scaling and overflow on zoom out */
+/* Case cards scale with Leaflet zoom via --map-popup-scale */
+#map {
+  --map-popup-scale: 1;
+}
+.leaflet-popup.custom-fixed-popup .map-popup-scale {
+  transform: scale(var(--map-popup-scale, 1));
+  transform-origin: bottom center;
+  will-change: transform;
+}
+.leaflet-popup.custom-fixed-popup {
+  overflow: visible;
+}
+
 .custom-fixed-popup .leaflet-popup-content-wrapper {
   max-width: 440px !important;
   width: 420px !important;
@@ -3956,6 +3968,22 @@ html[data-theme="dark"] .map-case-popup__badge--low { color: #86EFAC; }
 html[data-theme="dark"] .map-case-popup__badge--moderate { color: #FCD34D; }
 html[data-theme="dark"] .map-case-popup__badge--high { color: #FCA5A5; }
 html[data-theme="dark"] .map-case-popup__badge--critical { color: #DDD6FE; }
+html[data-theme="dark"] .map-case-popup__row,
+html[data-theme="dark"] .map-case-popup__row strong,
+html[data-theme="dark"] .map-case-popup__officer-value,
+html[data-theme="dark"] .map-case-popup__risk-pill-value {
+  color: var(--text);
+}
+html[data-theme="dark"] .map-case-popup__officer-label,
+html[data-theme="dark"] .map-case-popup__risk-heading,
+html[data-theme="dark"] .map-case-popup__risk-pill-label,
+html[data-theme="dark"] .map-case-popup__threshold,
+html[data-theme="dark"] .map-case-popup__ml-tag {
+  color: var(--muted);
+}
+html[data-theme="dark"] .map-case-popup__risk-pill {
+  background: var(--input-bg);
+}
 
 html[data-theme="dark"] .nc-avatar { border-color: var(--surface); }
 

@@ -350,6 +350,33 @@
 
     var MAP_VIEW = Object.freeze({ center: [10.5389, 122.8366], zoom: 13 });
 
+    function popupScaleForZoom(zoom) {
+      var scale = Math.pow(1.18, zoom - MAP_VIEW.zoom);
+      return Math.max(0.42, Math.min(1.35, scale));
+    }
+
+    function applyMapPopupScale() {
+      var scale = popupScaleForZoom(map.getZoom());
+      map.getContainer().style.setProperty('--map-popup-scale', String(scale));
+    }
+
+    function wrapPopupForScale(popupEl) {
+      if (!popupEl) return;
+      var first = popupEl.firstElementChild;
+      if (first && first.classList.contains('map-popup-scale')) return;
+      var wrap = document.createElement('div');
+      wrap.className = 'map-popup-scale';
+      while (popupEl.firstChild) wrap.appendChild(popupEl.firstChild);
+      popupEl.appendChild(wrap);
+    }
+
+    map.on('popupopen', function (e) {
+      wrapPopupForScale(e.popup && e.popup.getElement());
+      applyMapPopupScale();
+    });
+    map.on('zoom zoomend', applyMapPopupScale);
+    applyMapPopupScale();
+
     var streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxNativeZoom: TILE_ZOOM.maxNative,
@@ -1395,7 +1422,7 @@
       var html = '<div class="map-case-popup">';
 
       if (fromClusterId) {
-          html += '<div style="padding:10px 16px 8px;border-bottom:1px solid var(--border-light,#e2e8f0); position: sticky; top: 0; background: white; z-index: 10;">';
+          html += '<div style="padding:10px 16px 8px;border-bottom:1px solid var(--border-light,#e2e8f0); position: sticky; top: 0; background: var(--surface); z-index: 10;">';
           html += '<button type="button" class="nc-btn nc-btn--soft nc-btn--sm" style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:6px 12px;" onclick="openClusterPopupContext(\'' + fromClusterId + '\')">';
           html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> Back to Cluster List</button>';
           html += '</div>';
