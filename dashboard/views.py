@@ -12,7 +12,9 @@ from myapp.models import (
 from accounts.auth_utils import role_required
 from myapp.barangay_scope import (
     is_city_wide_role, resolve_user_barangay, BARANGAY_SCOPED_ROLES,
+    get_request_barangay,
 )
+from .bhw_activity import barangay_filter_choices, build_bhw_activity_entries
 from .analytics_service import (
     SYNDROME_CATEGORY_OPTIONS, VALID_TIME_RANGES, get_analytics_payload, get_barangay_options,
 )
@@ -159,6 +161,54 @@ def system_logs_view(request):
     return render(request, 'dashboard/system_logs.html', {
         'system_logs': system_logs,
         'audit_logs': audit_logs,
+    })
+
+
+@role_required('admin', 'super_admin', 'health_officer', 'catchment_nurse')
+def bhw_activity_logs_view(request):
+    role = request.session.get('role')
+    city_wide = is_city_wide_role(role)
+    scoped_barangay = get_request_barangay(request)
+    locked_barangay = ''
+    if not city_wide:
+        locked_barangay = (
+            scoped_barangay.barangay_name if scoped_barangay else ''
+        ) or (request.session.get('barangay_text') or '').strip()
+        if not locked_barangay:
+            return render(request, 'dashboard/bhw_activity_logs.html', {
+                'activities': [],
+                'city_wide': False,
+                'locked_barangay': '',
+                'barangays': [],
+                'selected_barangay': '',
+                'activity_filter': '',
+                'search': '',
+                'privacy_locked': True,
+            })
+
+    selected_barangay = locked_barangay
+    if city_wide:
+        selected_barangay = (request.GET.get('barangay') or '').strip()
+
+    activity_filter = (request.GET.get('activity') or '').strip()
+    search = (request.GET.get('search') or '').strip()
+    if activity_filter not in ('', 'submitted', 'signed_in'):
+        activity_filter = ''
+
+    activities = build_bhw_activity_entries(
+        barangay_name=selected_barangay or None,
+        activity=activity_filter,
+        search=search,
+    )
+    return render(request, 'dashboard/bhw_activity_logs.html', {
+        'activities': activities,
+        'city_wide': city_wide,
+        'locked_barangay': locked_barangay,
+        'barangays': list(barangay_filter_choices()) if city_wide else [],
+        'selected_barangay': selected_barangay,
+        'activity_filter': activity_filter,
+        'search': search,
+        'privacy_locked': False,
     })
 
 

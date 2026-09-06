@@ -59,6 +59,10 @@
       <span class="nav-icon"><i data-lucide="users" class="lucide-icon lucide-icon--sm"></i></span>
       <span>Manage BHWs</span>
     </a>
+    <a href="{% url 'bhw_activity_logs' %}" class="nav-item {% if request.resolver_match.url_name == 'bhw_activity_logs' %}active{% endif %}">
+      <span class="nav-icon"><i data-lucide="clipboard-clock" class="lucide-icon lucide-icon--sm"></i></span>
+      <span>BHW Activity</span>
+    </a>
     {% endif %}
 
     <div class="nav-section-label">Surveillance</div>
@@ -122,7 +126,11 @@
       <span class="nav-icon"><i data-lucide="file-text" class="lucide-icon lucide-icon--sm"></i></span>
       <span>Incident Reports</span>
     </a>
-    <a href="{% url 'system_logs' %}" class="nav-item {% if 'logs' in request.path %}active{% endif %}">
+    <a href="{% url 'bhw_activity_logs' %}" class="nav-item {% if request.resolver_match.url_name == 'bhw_activity_logs' %}active{% endif %}">
+      <span class="nav-icon"><i data-lucide="clipboard-clock" class="lucide-icon lucide-icon--sm"></i></span>
+      <span>BHW Activity</span>
+    </a>
+    <a href="{% url 'system_logs' %}" class="nav-item {% if request.resolver_match.url_name == 'system_logs' %}active{% endif %}">
       <span class="nav-icon"><i data-lucide="scroll-text" class="lucide-icon lucide-icon--sm"></i></span>
       <span>System Logs</span>
     </a>

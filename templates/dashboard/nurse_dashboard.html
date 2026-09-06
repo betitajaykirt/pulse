@@ -93,6 +93,15 @@
         <p>View and track your submitted reports{% if pending_reports %} — <strong>{{ pending_reports }} pending</strong>{% endif %}</p>
         <span class="dash-widget-card__link">Open <i data-lucide="arrow-right" class="lucide-icon lucide-icon--xs"></i></span>
       </a>
+      <a href="{% url 'bhw_activity_logs' %}" class="dash-widget-card">
+        <div class="dash-widget-card__head">
+          <div class="dash-widget-card__icon dash-widget-card__icon--primary"><i data-lucide="clipboard-clock" class="lucide-icon lucide-icon--sm"></i></div>
+          <span class="dash-widget-menu" aria-hidden="true"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></span>
+        </div>
+        <h4>BHW Activity</h4>
+        <p>Review submissions from BHWs in {{ barangay_name }} only</p>
+        <span class="dash-widget-card__link">Open <i data-lucide="arrow-right" class="lucide-icon lucide-icon--xs"></i></span>
+      </a>
       <a href="{% url 'case_records' %}" class="dash-widget-card">
         <div class="dash-widget-card__head">
           <div class="dash-widget-card__icon dash-widget-card__icon--teal"><i data-lucide="clipboard-list" class="lucide-icon lucide-icon--sm"></i></div>

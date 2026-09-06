@@ -1,0 +1,138 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block page_title %}BHW Activity Log{% endblock %}
+{% block content %}
+<div class="pulse-page">
+
+  <header class="pulse-page-header">
+    <div class="pulse-page-header__text">
+      <span class="pulse-eyebrow">Oversight</span>
+      <h2>BHW Activity Log</h2>
+      {% if city_wide %}
+      <p>Field activity from Barangay Health Workers across Bago City. Filter by barangay to review one catchment at a time.</p>
+      {% else %}
+      <p>Field activity from Barangay Health Workers in <strong>{{ locked_barangay|default:"your assigned barangay" }}</strong> only.</p>
+      {% endif %}
+    </div>
+  </header>
+
+  {% if privacy_locked %}
+  <div class="pulse-panel">
+    <div class="pulse-empty">
+      <i data-lucide="shield-off" class="lucide-icon"></i>
+      <p>No assigned barangay is on this account, so activity logs are hidden.</p>
+    </div>
+  </div>
+  {% else %}
+
+  <div class="pulse-panel">
+    <form method="GET" action="{% url 'bhw_activity_logs' %}">
+      <div class="pulse-filter-search">
+        <span class="pulse-search-bar__icon" aria-hidden="true">
+          <i data-lucide="search" class="lucide-icon lucide-icon--sm"></i>
+        </span>
+        <input type="text" name="search" class="input-soft input-soft--plain"
+               value="{{ search }}" placeholder="Search BHW name, barangay, or case details…">
+        <button type="submit" class="nc-btn nc-btn--primary nc-btn--sm">Search</button>
+      </div>
+
+      <details class="filter-drawer" {% if selected_barangay or activity_filter %}open{% endif %} style="margin-top:1rem;">
+        <summary>
+          <i data-lucide="chevron-right" class="lucide-icon lucide-icon--xs filter-drawer__chevron"></i>
+          Filters
+          {% if selected_barangay or activity_filter %}
+            <span class="pill-badge badge-info" style="margin-left:.35rem;">Applied</span>
+          {% endif %}
+        </summary>
+        <div class="filter-drawer__panel">
+          <div class="filter-drawer__grid">
+            {% if city_wide %}
+            <div class="form-group">
+              <label for="filter-barangay">Barangay</label>
+              <select id="filter-barangay" name="barangay" class="input-soft input-soft--plain">
+                <option value="">All Barangays</option>
+                {% for b in barangays %}
+                <option value="{{ b.barangay_name }}" {% if selected_barangay == b.barangay_name %}selected{% endif %}>{{ b.barangay_name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            {% else %}
+            <div class="form-group">
+              <label>Barangay</label>
+              <input type="text" class="input-soft input-soft--plain" value="{{ locked_barangay }}" disabled>
+            </div>
+            {% endif %}
+            <div class="form-group">
+              <label for="filter-activity">Activity</label>
+              <select id="filter-activity" name="activity" class="input-soft input-soft--plain">
+                <option value="">All activities</option>
+                <option value="submitted" {% if activity_filter == 'submitted' %}selected{% endif %}>Submitted case report</option>
+                <option value="signed_in" {% if activity_filter == 'signed_in' %}selected{% endif %}>Signed in</option>
+              </select>
+            </div>
+          </div>
+          <div class="filter-drawer__actions">
+            <button type="submit" class="nc-btn nc-btn--primary nc-btn--sm">Apply Filters</button>
+            <a href="{% url 'bhw_activity_logs' %}" class="nc-btn nc-btn--outline nc-btn--sm">Clear</a>
+          </div>
+        </div>
+      </details>
+    </form>
+  </div>
+
+  <section class="dash-section">
+    <div class="pulse-panel pulse-table-panel">
+      <div class="pulse-table-panel__head">
+        <h3>{% if city_wide %}City-wide BHW activity{% else %}{{ locked_barangay }} BHW activity{% endif %}</h3>
+        <span class="pulse-count-badge">{{ activities|length }} record{{ activities|length|pluralize }}</span>
+      </div>
+      <div class="pulse-table-wrap table-wrapper">
+        <table class="pulse-table">
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Barangay</th>
+              <th>BHW</th>
+              <th>Activity</th>
+              <th>Details</th>
+              <th>Status</th>
+              <th>Reference</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in activities %}
+            <tr class="pulse-table__row">
+              <td data-label="When"><span class="um-date">{{ row.when|date:"M d, Y H:i" }}</span></td>
+              <td data-label="Barangay">{{ row.barangay }}</td>
+              <td data-label="BHW"><strong>{{ row.worker }}</strong></td>
+              <td data-label="Activity">
+                {% if row.activity_key == 'submitted' %}
+                <span class="pill-badge badge-info">{{ row.activity }}</span>
+                {% elif row.activity_key == 'signed_in' %}
+                <span class="pill-badge badge-muted">{{ row.activity }}</span>
+                {% else %}
+                {{ row.activity }}
+                {% endif %}
+              </td>
+              <td data-label="Details">{{ row.detail }}</td>
+              <td data-label="Status">{{ row.status }}</td>
+              <td data-label="Reference" class="um-muted">{{ row.ref }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="7">
+                <div class="pulse-empty">
+                  <i data-lucide="clipboard-list" class="lucide-icon"></i>
+                  <p>No BHW activity matches these filters.</p>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+</div>
+{% endblock %}

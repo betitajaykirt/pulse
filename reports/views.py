@@ -122,9 +122,18 @@ def _process_batch_submission(request, locked_barangay=None):
     except Exception as exc:
         return JsonResponse({'ok': False, 'error': f'Server error while saving: {exc}'}, status=500)
 
+    barangay_label = ''
+    if locked_barangay:
+        barangay_label = locked_barangay.barangay_name
+    elif reports and getattr(reports[0], 'barangay', None):
+        barangay_label = reports[0].barangay.barangay_name
     log_system(
         'batch_report_submitted',
-        f'Session #{session.id} with {len(reports)} patient case(s) submitted.',
+        (
+            f'Session #{session.id} with {len(reports)} patient case(s) submitted'
+            + (f' in {barangay_label}' if barangay_label else '')
+            + '.'
+        ),
         user_role=request.session.get('role'),
         user_id=uid,
         module='reports',
@@ -263,7 +272,15 @@ def _process_report_submission(request, barangays, locked_barangay=None):
 
     log_system(
         'report_submitted',
-        f'Report #{report.id} submitted for barangay #{barangay_id}.',
+        (
+            f'Report #{report.id} submitted'
+            + (
+                f' in {locked_barangay.barangay_name}'
+                if locked_barangay
+                else f' for barangay #{barangay_id}'
+            )
+            + '.'
+        ),
         user_role=request.session.get('role'),
         user_id=uid,
         module='reports',
