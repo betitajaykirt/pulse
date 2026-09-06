@@ -2803,6 +2803,16 @@ html[data-theme="dark"] .map-layer-btn:hover {
 .pin-hint { font-size: .78rem; color: var(--muted); margin-top: .35rem; }
 .pin-info-row { display: flex; align-items: center; gap: .4rem; }
 .patient-chevron { color: var(--muted); display: inline-flex; }
+.pin-map-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  flex-wrap: wrap;
+  margin-bottom: .45rem;
+}
+.pin-map-toolbar .map-active-label { margin-bottom: 0; }
+.pin-map-toolbar .nc-btn { display: inline-flex; align-items: center; gap: .35rem; }
 .map-active-label { font-size: .82rem; color: var(--secondary); font-weight: 600; margin-bottom: .45rem; }
 #submit-status { margin-top: .85rem; font-size: .85rem; font-weight: 500; }
 #submit-status.error { color: var(--danger); }

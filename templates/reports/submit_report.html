@@ -50,8 +50,14 @@
 
     <div class="form-section">
       <div class="form-section-title">Location Pin (Shared Map)</div>
-      <div id="map-active-label" class="map-active-label">Active: Patient #1</div>
-      <small style="color:var(--muted);display:block;margin-bottom:.5rem;">One map updates the active patient only. Click the map to drop a pin for the focused patient block.</small>
+      <div class="pin-map-toolbar">
+        <div id="map-active-label" class="map-active-label">Active: Patient #1</div>
+        <button type="button" id="btn-use-location" class="nc-btn nc-btn--outline nc-btn--sm">
+          <i data-lucide="locate-fixed" class="lucide-icon lucide-icon--xs"></i>
+          Use my current location
+        </button>
+      </div>
+      <small style="color:var(--muted);display:block;margin-bottom:.5rem;">Pins the active patient's point of care. Use your current GPS location, or click / drag the pin if you need to adjust it.</small>
       <div id="pin-map" class="pulse-map"></div>
       <div id="pin-info" class="pin-hint pin-info-row" style="display:none;">
         <i data-lucide="map-pin" class="lucide-icon lucide-icon--xs"></i>
@@ -115,6 +121,7 @@ function createPatient() {
     barangay_id: DEFAULT_BARANGAY_ID || (BARANGAY_OPTIONS[0] ? String(BARANGAY_OPTIONS[0].id) : ''),
     latitude: null,
     longitude: null,
+    gps_accuracy: null,
     date_of_onset: '',
     age: '',
     sex: '',
@@ -427,7 +434,7 @@ function renderPatientList() {
             ${barangaySelectHtml(p)}
           </div>
           <div class="pin-hint">
-            Coordinates: ${p.latitude != null ? p.latitude + ', ' + p.longitude : 'No pin yet — activate this patient and click the map below'}
+            Coordinates: ${p.latitude != null ? p.latitude + ', ' + p.longitude : 'No pin yet — use current location or click the map below'}
           </div>
         </div>
       </div>
@@ -590,6 +597,7 @@ L.control.layers(
 ).addTo(pinMap);
 
 let pinMarker = null;
+let accuracyCircle = null;
 let assignedBarangayFeature = null;
 let assignedBarangayLayer = null;
 
@@ -704,16 +712,78 @@ function attachPinMarkerDragHandler(marker, patient) {
       }
       return;
     }
+    patient.gps_accuracy = null;
     updateMapForActivePatient();
     renderPatientList();
     setActivePatient(patient.id);
   });
 }
 
+function clearAccuracyCircle() {
+  if (accuracyCircle) {
+    pinMap.removeLayer(accuracyCircle);
+    accuracyCircle = null;
+  }
+}
+
+function applyLocationToActivePatient(lat, lng, accuracyMeters) {
+  const p = patients.find(x => x.id === activePatientId);
+  if (!p) {
+    showPinMapToast('Activate a patient first, then pin the point of care.');
+    return false;
+  }
+  if (!trySetPatientLocation(p, lat, lng)) return false;
+  p.gps_accuracy = accuracyMeters && Number(accuracyMeters) > 0 ? Number(accuracyMeters) : null;
+  renderPatientList();
+  setActivePatient(p.id);
+  return true;
+}
+
+function setLocateButtonState(busy, label) {
+  const btn = document.getElementById('btn-use-location');
+  if (!btn) return;
+  btn.disabled = !!busy;
+  const icon = '<i data-lucide="locate-fixed" class="lucide-icon lucide-icon--xs"></i>';
+  btn.innerHTML = icon + ' ' + (label || 'Use my current location');
+  if (window.lucide) lucide.createIcons();
+}
+
+function useCurrentLocation() {
+  if (!navigator.geolocation) {
+    showPinMapToast('This browser cannot read GPS. Click the map to drop the pin instead.');
+    return;
+  }
+  setLocateButtonState(true, 'Getting location…');
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      setLocateButtonState(false);
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const accuracy = pos.coords.accuracy;
+      const ok = applyLocationToActivePatient(lat, lng, accuracy);
+      if (ok) {
+        pinMap.setView([lat, lng], Math.max(pinMap.getZoom(), 17));
+      }
+    },
+    (err) => {
+      setLocateButtonState(false);
+      if (err && err.code === 1) {
+        showPinMapToast('Location permission was denied. Allow location access, or click the map to pin the case.');
+      } else if (err && err.code === 3) {
+        showPinMapToast('GPS timed out. Move outdoors or click the map to pin the case.');
+      } else {
+        showPinMapToast('Could not read your current location. Click the map to drop the pin.');
+      }
+    },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+  );
+}
+
 function updateMapForActivePatient() {
   const p = patients.find(x => x.id === activePatientId);
   if (!p) return;
   if (pinMarker) { pinMap.removeLayer(pinMarker); pinMarker = null; }
+  clearAccuracyCircle();
   if (p.latitude != null && p.longitude != null) {
     pinMarker = L.marker([p.latitude, p.longitude], {
       draggable: true,
@@ -724,8 +794,18 @@ function updateMapForActivePatient() {
       })
     }).addTo(pinMap);
     attachPinMarkerDragHandler(pinMarker, p);
+    if (p.gps_accuracy) {
+      accuracyCircle = L.circle([p.latitude, p.longitude], {
+        radius: Math.min(p.gps_accuracy, 120),
+        color: '#2563eb',
+        weight: 1,
+        fillColor: '#2563eb',
+        fillOpacity: 0.08,
+      }).addTo(pinMap);
+    }
     pinMap.setView([p.latitude, p.longitude], Math.max(pinMap.getZoom(), 15));
-    document.getElementById('pin-coords').textContent = p.latitude + ', ' + p.longitude;
+    const accuracyNote = p.gps_accuracy ? ' · GPS ±' + Math.round(p.gps_accuracy) + ' m' : '';
+    document.getElementById('pin-coords').textContent = p.latitude + ', ' + p.longitude + accuracyNote;
     document.getElementById('pin-info').style.display = 'block';
   } else {
     document.getElementById('pin-info').style.display = 'none';
@@ -733,19 +813,17 @@ function updateMapForActivePatient() {
 }
 
 pinMap.on('click', function(e) {
-  const p = patients.find(x => x.id === activePatientId);
-  if (!p) return;
-  if (!trySetPatientLocation(p, e.latlng.lat, e.latlng.lng)) return;
-  updateMapForActivePatient();
-  renderPatientList();
-  setActivePatient(p.id);
+  applyLocationToActivePatient(e.latlng.lat, e.latlng.lng);
 });
+
+document.getElementById('btn-use-location').addEventListener('click', useCurrentLocation);
 
 document.getElementById('clear-pin').addEventListener('click', () => {
   const p = patients.find(x => x.id === activePatientId);
   if (!p) return;
   p.latitude = null;
   p.longitude = null;
+  p.gps_accuracy = null;
   updateMapForActivePatient();
   renderPatientList();
   setActivePatient(p.id);
