@@ -182,11 +182,13 @@ def get_pidsr_threshold_alert_cards(*, barangay_name: str | None = None) -> list
 
     cards: list[Dict[str, Any]] = []
     for row in qs:
+        disease = row.disease_label or 'Unknown disease'
+        if not _is_trackable_syndrome(disease):
+            continue
         status = (row.threshold_status or '').strip()
         risk_level = PIDSR_STATUS_RISK_LEVEL.get(status, 'High')
         headline = PIDSR_STATUS_HEADLINE.get(status, 'THRESHOLD ALERT')
         brgy_name = row.barangay.barangay_name if row.barangay else ''
-        disease = row.disease_label or 'Unknown disease'
         window_days = _latest_threshold_window_days(row.barangay_id, disease)
         case_word = 'case' if row.confirmed_count == 1 else 'cases'
         summary = (
@@ -218,8 +220,47 @@ def get_pidsr_threshold_alert_cards(*, barangay_name: str | None = None) -> list
     return cards
 
 
+def deactivate_inconclusive_alerts() -> None:
+    """Retire live APTAS/PIDSR signals that still use an inconclusive label."""
+    from django.db.models import Q
+    from myapp.models import Alert
+
+    inconclusive_q = (
+        Q(syndrome__iexact='Inconclusive Syndromic Pattern')
+        | Q(syndrome__icontains='inconclusive')
+        | Q(syndrome__iexact='Insufficient Data for Prediction')
+        | Q(syndrome__iexact='Undetermined')
+        | Q(syndrome='')
+    )
+    BarangayRiskLog.objects.filter(is_active_alert=True).filter(inconclusive_q).update(
+        is_active_alert=False,
+    )
+
+    alert_q = (
+        Q(alert_type__iexact='Inconclusive Syndromic Pattern')
+        | Q(alert_type__icontains='inconclusive')
+        | Q(alert_type__iexact='Insufficient Data for Prediction')
+        | Q(alert_type__iexact='Undetermined')
+    )
+    Alert.objects.filter(status='active').filter(alert_q).update(status='resolved')
+
+    try:
+        from dashboard.models import AppNotification
+
+        notif_q = (
+            Q(disease__iexact='Inconclusive Syndromic Pattern')
+            | Q(disease__icontains='inconclusive')
+            | Q(disease__iexact='Insufficient Data for Prediction')
+            | Q(disease__iexact='Undetermined')
+        )
+        AppNotification.objects.filter(notif_q).delete()
+    except Exception:
+        logger.debug('Inconclusive AppNotification cleanup skipped', exc_info=True)
+
+
 def get_aptas_dashboard_context(*, barangay_name=None, limit=12):
     """Build template context for APTAS alert cards (ML signals + PIDSR thresholds)."""
+    deactivate_inconclusive_alerts()
     base_qs = BarangayRiskLog.objects.all()
     if barangay_name:
         base_qs = base_qs.filter(barangay__iexact=barangay_name)
@@ -237,7 +278,8 @@ def get_aptas_dashboard_context(*, barangay_name=None, limit=12):
     ml_cards = [
         _aptas_ml_log_to_card(log)
         for log in active_qs
-        if (log.barangay.casefold(), log.syndrome.casefold()) not in pidsr_keys
+        if _is_trackable_syndrome(log.syndrome)
+        and (log.barangay.casefold(), log.syndrome.casefold()) not in pidsr_keys
     ]
 
     def _sort_key(card: Dict[str, Any]):
@@ -366,7 +408,11 @@ def _disease_match_terms(label: str) -> set[str]:
 
 
 def _is_trackable_syndrome(syndrome_name: str) -> bool:
-    return (syndrome_name or '').strip().lower() not in INCONCLUSIVE_SYNDROME_LABELS
+    from reports.ml_display import is_alertable_disease_label
+
+    if (syndrome_name or '').strip().lower() in INCONCLUSIVE_SYNDROME_LABELS:
+        return False
+    return is_alertable_disease_label(syndrome_name)
 
 
 def _syndrome_match_q(syndrome_name: str) -> Q:
@@ -764,6 +810,8 @@ def compute_and_log_barangay_risk(
     final_score = compute_final_risk_score(anomaly, temporal, environmental, spatial)
     risk_level = classify_risk_level(final_score)
     is_active = should_activate_aptas_alert(final_score, anomaly, force_activate=force_activate)
+    if not _is_trackable_syndrome(syndrome):
+        is_active = False
 
     if deactivate_previous:
         BarangayRiskLog.objects.filter(
@@ -844,7 +892,10 @@ def compute_aptas_breakdown(
         'spatial_score': spatial,
         'final_risk_score': final_score,
         'risk_level': classify_risk_level(final_score),
-        'is_active_alert': should_activate_aptas_alert(final_score, anomaly),
+        'is_active_alert': (
+            should_activate_aptas_alert(final_score, anomaly)
+            and _is_trackable_syndrome(syndrome)
+        ),
     }
 
 

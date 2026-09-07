@@ -15,6 +15,7 @@ from myapp.models import (
 )
 from myapp.barangay_scope import CITY_WIDE_ROLES, BARANGAY_SCOPED_ROLES
 from reports.aptas_service import compute_and_log_barangay_risk
+from reports.ml_display import is_alertable_disease_label, report_has_alertable_disease
 
 logger = logging.getLogger(__name__)
 
@@ -83,10 +84,11 @@ def trigger_aptas_for_report(report_id, *, is_anomaly=False):
     )
 
     is_active_alert = False
-    if aptas_log:
-        is_active_alert = aptas_log.is_active_alert
-    else:
-        is_active_alert = risk_level in ('high', 'critical')
+    if report_has_alertable_disease(report):
+        if aptas_log:
+            is_active_alert = aptas_log.is_active_alert
+        else:
+            is_active_alert = risk_level in ('high', 'critical')
 
     if is_active_alert:
         _create_alert(assessment, report.barangay, report, is_anomaly=is_anomaly, alert_level=risk_level)
@@ -178,6 +180,12 @@ def _get_purok_for_report(report):
 
 def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level=None):
     """Create a legacy-format alert row (pulse_db.alerts), or update if exists today."""
+    if not report_has_alertable_disease(report):
+        logger.info(
+            'Skipped APTAS alert for report %s — inconclusive until clinically validated.',
+            getattr(report, 'id', None),
+        )
+        return None
     if not alert_level:
         alert_level = 'critical' if is_anomaly else 'high'
         
@@ -278,6 +286,15 @@ def trigger_threshold_outbreak_alert(*, report_id, threshold_result):
     """
     report = SurveillanceReport.objects.filter(id=report_id).select_related('barangay').first()
     if not report:
+        return None
+
+    disease_label = (
+        threshold_result.get('disease_label')
+        or report.syndrome_type
+        or report.suspected_disease
+        or ''
+    )
+    if not is_alertable_disease_label(disease_label):
         return None
 
     status = threshold_result.get('status', '')

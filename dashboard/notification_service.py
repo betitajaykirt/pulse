@@ -28,7 +28,11 @@ def notification_is_still_relevant(notif, active_alert_ids: set[int] | None = No
         barangay_id=barangay.id,
         status__in=ACTIVE_SURVEILLANCE_STATUSES,
     )
+    from reports.ml_display import is_alertable_disease_label
+
     disease = (notif.disease or '').strip()
+    if not is_alertable_disease_label(disease):
+        return False
     if disease:
         qs = qs.filter(_syndrome_match_q(disease))
     return qs.exists()

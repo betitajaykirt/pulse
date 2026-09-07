@@ -220,7 +220,12 @@ def process_confirmation_threshold_check(
         updated_at=now,
     )
 
-    if result['status'] in (THRESHOLD_STATUS_PROBABLE, THRESHOLD_STATUS_OUTBREAK):
+    from reports.ml_display import is_alertable_disease_label
+
+    if (
+        result['status'] in (THRESHOLD_STATUS_PROBABLE, THRESHOLD_STATUS_OUTBREAK)
+        and is_alertable_disease_label(disease_label)
+    ):
         trigger_threshold_outbreak_alert(
             report_id=report.id,
             threshold_result=result,

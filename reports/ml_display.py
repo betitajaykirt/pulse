@@ -21,6 +21,17 @@ def is_inconclusive_disease_label(label: str) -> bool:
     return (label or '').strip().lower() in _INCONCLUSIVE_DISEASE_LABELS
 
 
+def is_alertable_disease_label(label: str) -> bool:
+    """Alerts require a specific disease, not an inconclusive ML placeholder."""
+    return not is_inconclusive_disease_label(label)
+
+
+def report_has_alertable_disease(report) -> bool:
+    return is_alertable_disease_label(
+        getattr(report, 'syndrome_type', None) or getattr(report, 'suspected_disease', None)
+    )
+
+
 def parse_ml_top_prediction(remarks: str) -> str:
     if not remarks:
         return ''
