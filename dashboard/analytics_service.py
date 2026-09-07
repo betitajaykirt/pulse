@@ -1,12 +1,17 @@
 """Live surveillance analytics — always queried from the database."""
-from datetime import timedelta
+from datetime import date, timedelta
+import re
 
-from django.db.models import Count, F, Q
+from django.db.models import Count, F, Max, Min, Q
 from django.db.models.functions import Coalesce, TruncDate, TruncMonth, TruncWeek
 from django.utils import timezone
 
 from myapp.models import Barangay, PatientCase, SurveillanceReport, SYMPTOM_CATEGORY_CHOICES
-from reports.ml_display import is_inconclusive_disease_label
+from reports.ml_display import (
+    is_inconclusive_disease_label,
+    ml_top_prediction_for_report,
+    predicted_disease_display,
+)
 from reports.pidsr_schema import normalize_disease_label
 
 # Kept for import compatibility; disease filters now use live case labels.
@@ -56,6 +61,7 @@ def _age_from_birthdate(birthdate, today=None):
 
 
 VALID_TIME_RANGES = (
+    'all_active',
     'current_month',
     'last_30_days',
     'last_3_months',
@@ -63,9 +69,15 @@ VALID_TIME_RANGES = (
     'current_year',
 )
 
+_REMARKS_AGE_RE = re.compile(r'Age:\s*(\d+)', re.IGNORECASE)
+_REMARKS_SEX_RE = re.compile(r'Sex:\s*(Male|Female)', re.IGNORECASE)
+_SKIP_DISEASE_LABELS = frozenset({'unknown', '—', '-', 'n/a', 'na', 'none'})
+
 
 def _time_window(time_range, today=None):
     today = today or timezone.now().date()
+    if time_range == 'all_active':
+        return None, today
     if time_range == 'current_month':
         return today.replace(day=1), today
     if time_range == 'last_30_days':
@@ -77,34 +89,27 @@ def _time_window(time_range, today=None):
     return today.replace(month=1, day=1), today
 
 
-def _inconclusive_q():
-    return (
-        Q(syndrome_type__icontains='inconclusive')
-        | Q(syndrome_type__icontains='unclassified')
-        | Q(syndrome_type__icontains='insufficient data')
-        | Q(syndrome_type__icontains='pending')
-        | Q(syndrome_type__exact='')
-        | Q(syndrome_type__isnull=True)
-    )
-
-
 def _apply_disease_filter(qs, disease=''):
+    """Match stored labels and ML remarks the same way Case Monitoring does."""
     disease = (disease or '').strip()
     if not disease:
         return qs
-    return qs.filter(
-        Q(syndrome_type__icontains=disease)
-        | Q(suspected_disease__icontains=disease)
-    )
+    from reports.disease_category_data import _disease_label_match_q, disease_label_filter_q
+
+    clause = disease_label_filter_q(disease)
+    if not clause:
+        clause = _disease_label_match_q(disease)
+    if not clause:
+        return qs
+    return qs.filter(clause).distinct()
 
 
-def _base_queryset(symptom_category='', barangay_id='', time_range='current_month'):
+def _base_queryset(symptom_category='', barangay_id='', time_range='all_active'):
     """All open surveillance reports in the selected window, read live from MySQL."""
+    qs = SurveillanceReport.objects.exclude(status__in=INACTIVE_STATUSES).select_related('barangay')
     start, end = _time_window(time_range)
-    qs = (
-        SurveillanceReport.objects.exclude(status__in=INACTIVE_STATUSES)
-        .select_related('barangay')
-        .filter(
+    if start is not None:
+        qs = qs.filter(
             Q(date_of_onset__gte=start, date_of_onset__lte=end)
             | Q(
                 date_of_onset__isnull=True,
@@ -112,11 +117,31 @@ def _base_queryset(symptom_category='', barangay_id='', time_range='current_mont
                 report_date__date__lte=end,
             )
         )
-    )
     qs = _apply_disease_filter(qs, symptom_category)
     if barangay_id:
         qs = qs.filter(barangay_id=barangay_id)
     return qs
+
+
+def _as_date(value):
+    if value is None:
+        return None
+    if isinstance(value, date) and not hasattr(value, 'hour'):
+        return value
+    if hasattr(value, 'date') and callable(value.date):
+        try:
+            return value.date()
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def _period_key(dt):
+    resolved = _as_date(dt)
+    if resolved is None:
+        text = str(dt or '')
+        return text[:10] if len(text) >= 10 else None
+    return resolved.isoformat()
 
 
 def _with_event_date(qs):
@@ -172,12 +197,21 @@ def _pad_period_keys(period_keys, interval, start_date=None, end_date=None):
     return filled
 
 
-def build_epi_curve_data(qs, time_range='current_month'):
+def build_epi_curve_data(qs, time_range='all_active'):
     today = timezone.now().date()
-    expected_start, expected_end = _time_window(time_range, today)
-    span_days = (expected_end - expected_start).days
-
     dated_qs = _with_event_date(qs)
+    window_start, window_end = _time_window(time_range, today)
+
+    if window_start is None:
+        extrema = dated_qs.aggregate(mn=Min('event_date'), mx=Max('event_date'))
+        expected_start = _as_date(extrema['mn']) or today
+        expected_end = _as_date(extrema['mx']) or today
+        if expected_start > expected_end:
+            expected_start, expected_end = expected_end, expected_start
+    else:
+        expected_start, expected_end = window_start, window_end
+
+    span_days = (expected_end - expected_start).days
 
     if time_range in ('current_month', 'last_30_days') or span_days <= 31:
         interval = 'day'
@@ -198,14 +232,9 @@ def build_epi_curve_data(qs, time_range='current_month'):
 
     raw_period_keys = []
     for row in rows:
-        if row['period']:
-            dt = row['period']
-            if hasattr(dt, 'date') and callable(dt.date):
-                key = dt.date().isoformat()
-            else:
-                key = dt.isoformat()
-            if key not in raw_period_keys:
-                raw_period_keys.append(key)
+        key = _period_key(row['period'])
+        if key and key not in raw_period_keys:
+            raw_period_keys.append(key)
 
     period_keys = _pad_period_keys(
         raw_period_keys, interval, start_date=expected_start, end_date=expected_end,
@@ -213,23 +242,27 @@ def build_epi_curve_data(qs, time_range='current_month'):
     if not period_keys:
         period_keys = raw_period_keys
 
-    from datetime import date as date_type
-    periods = [_period_label(date_type.fromisoformat(k), interval) for k in period_keys]
+    periods = []
+    valid_keys = []
+    for key in period_keys:
+        try:
+            periods.append(_period_label(date.fromisoformat(key[:10]), interval))
+            valid_keys.append(key[:10])
+        except ValueError:
+            continue
+    period_keys = valid_keys
 
     status_data = {s: [0] * len(period_keys) for s in STATUS_ORDER}
     key_index = {k: i for i, k in enumerate(period_keys)}
 
     for row in rows:
-        if not row['period']:
+        key = _period_key(row['period'])
+        if not key or key not in key_index:
             continue
-        dt = row['period']
-        if hasattr(dt, 'date') and callable(dt.date):
-            key = dt.date().isoformat()
-        else:
-            key = dt.isoformat()
-        status = row['status'] or 'Unclassified'
-        if key in key_index and status in status_data:
-            status_data[status][key_index[key]] += row['count']
+        status = row['status'] or 'Suspected'
+        if status not in status_data:
+            status = 'Suspected'
+        status_data[status][key_index[key]] += row['count']
 
     datasets = [
         {
@@ -243,6 +276,8 @@ def build_epi_curve_data(qs, time_range='current_month'):
 
     if time_range == 'current_month':
         period_title = expected_end.strftime('%B %Y')
+    elif time_range == 'all_active':
+        period_title = 'All open cases'
     else:
         period_title = f'{expected_start.strftime("%b %d")} – {expected_end.strftime("%b %d, %Y")}'
 
@@ -254,9 +289,19 @@ def build_epi_curve_data(qs, time_range='current_month'):
     }
 
 
+def _age_sex_from_remarks(remarks):
+    text = remarks or ''
+    age_match = _REMARKS_AGE_RE.search(text)
+    sex_match = _REMARKS_SEX_RE.search(text)
+    age = int(age_match.group(1)) if age_match else None
+    sex = sex_match.group(1) if sex_match else None
+    return age, sex
+
+
 def build_demographics_data(qs):
     report_ids = list(qs.values_list('id', flat=True))
     bracket_sex = {(b, s): 0 for b in AGE_BRACKETS for s in SEX_ORDER}
+    counted = set()
 
     if report_ids:
         for case in PatientCase.objects.filter(surveillance_report_id__in=report_ids).iterator(chunk_size=500):
@@ -264,6 +309,31 @@ def build_demographics_data(qs):
             sex = case.sex if case.sex in SEX_ORDER else None
             if bracket and sex:
                 bracket_sex[(bracket, sex)] += 1
+                counted.add(case.surveillance_report_id)
+
+        missing = [rid for rid in report_ids if rid not in counted]
+        if missing:
+            for report in (
+                SurveillanceReport.objects.filter(id__in=missing)
+                .select_related('patient')
+                .only('id', 'patient_id', 'date_of_birth', 'remarks', 'patient__birthdate', 'patient__sex')
+                .iterator(chunk_size=300)
+            ):
+                age = None
+                sex = None
+                if report.patient_id:
+                    age = _age_from_birthdate(getattr(report.patient, 'birthdate', None))
+                    patient_sex = getattr(report.patient, 'sex', None)
+                    sex = patient_sex if patient_sex in SEX_ORDER else None
+                if age is None:
+                    age = _age_from_birthdate(report.date_of_birth)
+                if age is None or sex not in SEX_ORDER:
+                    remark_age, remark_sex = _age_sex_from_remarks(report.remarks)
+                    age = age if age is not None else remark_age
+                    sex = sex if sex in SEX_ORDER else remark_sex
+                bracket = _age_bracket(age)
+                if bracket and sex in SEX_ORDER:
+                    bracket_sex[(bracket, sex)] += 1
 
     datasets = [
         {
@@ -278,27 +348,44 @@ def build_demographics_data(qs):
 
 
 def _canonical_analytics_disease(label):
-    text = normalize_disease_label((label or '').strip())
-    if is_inconclusive_disease_label(text):
+    raw = (label or '').strip()
+    if not raw or is_inconclusive_disease_label(raw):
         return None
-    return text or None
+    text = normalize_disease_label(raw)
+    if not text or text.lower() in _SKIP_DISEASE_LABELS or is_inconclusive_disease_label(text):
+        return None
+    return text
+
+
+def _analytics_disease_for_report(report):
+    """Same confirmed / ML-predicted label used on the map and Case Monitoring."""
+    display = predicted_disease_display(report)
+    label = _canonical_analytics_disease(display.get('primary'))
+    if label:
+        return label
+    return _canonical_analytics_disease(ml_top_prediction_for_report(report))
+
+
+def _count_by_analytics_disease(qs):
+    aggregated = {}
+    reports = qs.select_related(None).only(
+        'id', 'syndrome_type', 'suspected_disease', 'status', 'remarks',
+    )
+    for report in reports.iterator(chunk_size=300):
+        label = _analytics_disease_for_report(report)
+        if not label:
+            continue
+        aggregated[label] = aggregated.get(label, 0) + 1
+    return aggregated
 
 
 def build_disease_distribution_data(qs):
-    rows = (
-        qs.exclude(_inconclusive_q())
-        .values('syndrome_type', 'suspected_disease')
-        .annotate(count=Count('id'))
-    )
-    aggregated = {}
-    for row in rows:
-        label = _canonical_analytics_disease(row['syndrome_type'] or row['suspected_disease'])
-        if not label:
-            continue
-        aggregated[label] = aggregated.get(label, 0) + row['count']
-
+    aggregated = _count_by_analytics_disease(qs)
     sorted_items = sorted(aggregated.items(), key=lambda x: x[1], reverse=True)
-    base_colors = ['#0F4C81', '#00A6A6', '#E11D48', '#f59e0b', '#8b5cf6', '#10b981', '#f43f5e']
+    base_colors = [
+        '#0F4C81', '#00A6A6', '#E11D48', '#f59e0b', '#8b5cf6',
+        '#10b981', '#f43f5e', '#6366f1', '#14b8a6', '#eab308',
+    ]
     labels, data, background_colors = [], [], []
     for i, (disease, count) in enumerate(sorted_items):
         labels.append(disease)
@@ -338,18 +425,15 @@ def build_top_hotspots_data(qs):
 
 
 def build_top_disease_breakdown(qs, limit=2):
-    rows = (
-        qs.exclude(_inconclusive_q())
-        .values('syndrome_type')
-        .annotate(count=Count('id'))
-        .order_by('-count')[:limit]
-    )
-    breakdown = []
-    for row in rows:
-        label = _canonical_analytics_disease(row['syndrome_type'])
-        if label:
-            breakdown.append({'label': label, 'count': row['count']})
-    return breakdown
+    aggregated = _count_by_analytics_disease(qs)
+    sorted_items = sorted(aggregated.items(), key=lambda x: x[1], reverse=True)[:limit]
+    return [{'label': label, 'count': count} for label, count in sorted_items]
+
+
+def get_analytics_disease_choices():
+    qs = SurveillanceReport.objects.exclude(status__in=INACTIVE_STATUSES)
+    labels = sorted(_count_by_analytics_disease(qs).keys())
+    return [('', 'All Diseases')] + [(label, label) for label in labels]
 
 
 def build_summary_stats(qs, symptom_category_filter=''):
@@ -399,7 +483,7 @@ def build_live_kpis(qs):
     }
 
 
-def get_analytics_payload(*, symptom_category='', barangay_id='', time_range='current_month'):
+def get_analytics_payload(*, symptom_category='', barangay_id='', time_range='all_active'):
     qs = _base_queryset(
         symptom_category=symptom_category,
         barangay_id=barangay_id,

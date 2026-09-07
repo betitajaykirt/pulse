@@ -109,7 +109,8 @@
           <div class="form-group">
             <label for="filter-time">Time Range</label>
             <select id="filter-time" class="input-soft input-soft--plain" aria-label="Time range">
-              <option value="current_month" selected>This Month (Daily)</option>
+              <option value="all_active" selected>All open cases (same as map)</option>
+              <option value="current_month">This Month (Daily)</option>
               <option value="last_30_days">Last 30 Days (Daily)</option>
               <option value="last_3_months">Last 3 Months (Weekly)</option>
               <option value="last_6_months">Last 6 Months</option>
@@ -191,7 +192,7 @@
           </div>
           <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
         </div>
-        <p>Proportion of monitored diseases.</p>
+        <p>Confirmed and ML-predicted diseases, using the same labels as the map.</p>
         <div class="chart-height-side" style="position: relative; height: 250px;">
           <canvas id="disease-chart"></canvas>
         </div>
@@ -500,7 +501,7 @@ async function loadAnalytics() {
 var appliedAnalyticsFilters = {
   syndrome: '',
   barangay: '',
-  time_range: 'current_month',
+  time_range: 'all_active',
 };
 
 function readAnalyticsFilterControls() {
@@ -521,7 +522,7 @@ function readAnalyticsFilterControls() {
 function hasActiveAnalyticsFilters(filters) {
   var barangayEl = document.getElementById('filter-barangay');
   var barangayActive = barangayEl && !barangayEl.disabled && filters.barangay;
-  return Boolean(filters.syndrome) || filters.time_range !== 'current_month' || Boolean(barangayActive);
+  return Boolean(filters.syndrome) || filters.time_range !== 'all_active' || Boolean(barangayActive);
 }
 
 function updateAnalyticsFilterState() {
@@ -550,14 +551,14 @@ document.getElementById('apply-analytics-filters').addEventListener('click', fun
 
 document.getElementById('clear-analytics-filters').addEventListener('click', function() {
   document.getElementById('filter-syndrome').value = '';
-  document.getElementById('filter-time').value = 'current_month';
+  document.getElementById('filter-time').value = 'all_active';
   var barangay = document.getElementById('filter-barangay');
   if (barangay && !barangay.disabled && barangay.options.length) {
     barangay.selectedIndex = 0;
   }
   appliedAnalyticsFilters = readAnalyticsFilterControls();
   appliedAnalyticsFilters.syndrome = '';
-  appliedAnalyticsFilters.time_range = 'current_month';
+  appliedAnalyticsFilters.time_range = 'all_active';
   if (barangay && !barangay.disabled) {
     appliedAnalyticsFilters.barangay = '';
   }

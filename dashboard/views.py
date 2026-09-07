@@ -18,7 +18,7 @@ from myapp.barangay_scope import (
 from .bhw_activity import barangay_filter_choices, build_bhw_activity_entries
 from .analytics_service import (
     VALID_TIME_RANGES, get_analytics_payload, get_barangay_options,
-    build_top_disease_breakdown,
+    build_top_disease_breakdown, get_analytics_disease_choices,
 )
 from reports.weather_service import fetch_bago_city_weather
 from reports.aptas_service import get_aptas_dashboard_context, resolve_aptas_barangay_filter
@@ -267,26 +267,7 @@ def alerts_inbox_view(request):
 
 
 def get_dynamic_disease_choices():
-    from myapp.models import SurveillanceReport
-    from reports.pidsr_schema import normalize_disease_label
-    from reports.ml_display import is_inconclusive_disease_label
-
-    raw_diseases = SurveillanceReport.objects.exclude(
-        status__in=('Closed', 'Discarded'),
-    ).exclude(
-        syndrome_type__isnull=True,
-    ).values_list('syndrome_type', flat=True).distinct()
-
-    disease_set = set()
-    for d in raw_diseases:
-        if not d:
-            continue
-        norm = normalize_disease_label(d)
-        if is_inconclusive_disease_label(norm):
-            continue
-        disease_set.add(norm)
-
-    return [('', 'All Diseases')] + [(d, d) for d in sorted(disease_set)]
+    return get_analytics_disease_choices()
 
 
 @role_required('surveillance_officer', 'admin', 'super_admin', 'health_officer')
@@ -342,10 +323,10 @@ def api_analytics_data(request):
         else:
             barangay_id = '-1'
 
-    time_range = request.GET.get('time_range', 'current_month').strip()
+    time_range = request.GET.get('time_range', 'all_active').strip()
 
     if time_range not in VALID_TIME_RANGES:
-        time_range = 'current_month'
+        time_range = 'all_active'
 
     if len(symptom_category) > 150:
         return JsonResponse({'ok': False, 'error': 'Invalid disease filter.'}, status=400)
