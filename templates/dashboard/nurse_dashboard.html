@@ -28,7 +28,11 @@
       <div class="dash-metric-card__value">{{ active_cases_total|default:0 }}</div>
       <div class="dash-metric-card__label">Barangay Active Cases</div>
       <div class="dash-metric-card__footer text-muted" style="font-size: 0.85rem; margin-top: 5px;">
-        {{ active_cases_dengue|default:0 }} Dengue • {{ active_cases_lepto|default:0 }} Lepto
+        {% if top_disease_breakdown %}
+          {% for row in top_disease_breakdown %}{{ row.count }} {{ row.label }}{% if not forloop.last %} • {% endif %}{% endfor %}
+        {% else %}
+          Live from surveillance reports
+        {% endif %}
       </div>
     </article>
     <article class="dash-metric-card">

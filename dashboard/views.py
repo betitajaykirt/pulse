@@ -17,7 +17,8 @@ from myapp.barangay_scope import (
 )
 from .bhw_activity import barangay_filter_choices, build_bhw_activity_entries
 from .analytics_service import (
-    SYNDROME_CATEGORY_OPTIONS, VALID_TIME_RANGES, get_analytics_payload, get_barangay_options,
+    VALID_TIME_RANGES, get_analytics_payload, get_barangay_options,
+    build_top_disease_breakdown,
 )
 from reports.weather_service import fetch_bago_city_weather
 from reports.aptas_service import get_aptas_dashboard_context, resolve_aptas_barangay_filter
@@ -83,17 +84,19 @@ def _local_barangay_stats(user):
             'active_cases_total': 0,
             'active_cases_dengue': 0,
             'active_cases_lepto': 0,
+            'top_disease_breakdown': [],
             'total_confirmed': 0,
             'aptas_alerts': [],
         }
 
-    base_qs = SurveillanceReport.objects.filter(barangay_id=barangay.id).exclude(status='Closed')
+    base_qs = SurveillanceReport.objects.filter(barangay_id=barangay.id).exclude(
+        status__in=('Closed', 'Discarded')
+    )
     
     active_cases_total = base_qs.count()
-    active_cases_dengue = base_qs.filter(syndrome_type__icontains='dengue').count()
-    active_cases_lepto = base_qs.filter(syndrome_type__icontains='lepto').count()
+    top_diseases = build_top_disease_breakdown(base_qs, limit=2)
     total_confirmed = base_qs.filter(status='Confirmed').count()
-    pending_reports = base_qs.filter(validation_status='pending').count()
+    pending_reports = base_qs.filter(validation_status='pending').exclude(status='Confirmed').count()
     
     # Retrieve active alerts related to this barangay
     notifications = NotificationLog.objects.select_related('alert').filter(
@@ -115,8 +118,9 @@ def _local_barangay_stats(user):
         
         # Admin-style synced KPIs
         'active_cases_total': active_cases_total,
-        'active_cases_dengue': active_cases_dengue,
-        'active_cases_lepto': active_cases_lepto,
+        'active_cases_dengue': next((row['count'] for row in top_diseases if 'dengue' in row['label'].lower()), 0),
+        'active_cases_lepto': next((row['count'] for row in top_diseases if 'lepto' in row['label'].lower()), 0),
+        'top_disease_breakdown': top_diseases,
         'total_confirmed': total_confirmed,
         'aptas_alerts': aptas_alerts,
     }
@@ -125,12 +129,14 @@ def _local_barangay_stats(user):
 def _get_stats(role, user_id=None):
     ctx = {}
     if role in ('admin', 'super_admin', 'health_officer'):
-        active_qs = SurveillanceReport.objects.exclude(status='Closed')
+        active_qs = SurveillanceReport.objects.exclude(status__in=('Closed', 'Discarded'))
         ctx['active_cases_total'] = active_qs.count()
-        ctx['active_cases_dengue'] = active_qs.filter(syndrome_type__icontains='dengue').count()
-        ctx['active_cases_lepto'] = active_qs.filter(syndrome_type__icontains='lepto').count()
+        top_diseases = build_top_disease_breakdown(active_qs, limit=2)
+        ctx['top_disease_breakdown'] = top_diseases
+        ctx['active_cases_dengue'] = next((row['count'] for row in top_diseases if 'dengue' in row['label'].lower()), 0)
+        ctx['active_cases_lepto'] = next((row['count'] for row in top_diseases if 'lepto' in row['label'].lower()), 0)
         ctx['total_confirmed'] = SurveillanceReport.objects.filter(status='Confirmed').count()
-        ctx['pending_reports'] = active_qs.filter(validation_status='pending').count()
+        ctx['pending_reports'] = active_qs.filter(validation_status='pending').exclude(status='Confirmed').count()
 
     if role in ('admin', 'super_admin'):
         ctx['total_users'] = User.objects.count()
@@ -140,10 +146,14 @@ def _get_stats(role, user_id=None):
         ctx['total_admins'] = Admin.objects.count()
         ctx['total_reports'] = SurveillanceReport.objects.exclude(status='Closed').count()
     if role == 'surveillance_officer':
+        active_qs = SurveillanceReport.objects.exclude(status__in=('Closed', 'Discarded'))
         ctx['active_alerts'] = Alert.objects.filter(status='active').count()
-        ctx['pending_reports'] = SurveillanceReport.objects.filter(validation_status='pending').exclude(status='Closed').count()
-        ctx['suspected_count'] = SurveillanceReport.objects.filter(status='Suspected').count()
+        ctx['pending_reports'] = active_qs.filter(validation_status='pending').exclude(status='Confirmed').count()
+        ctx['suspected_count'] = active_qs.filter(status='Suspected').count()
         ctx['confirmed_count'] = SurveillanceReport.objects.filter(status='Confirmed').count()
+        ctx['total_confirmed'] = ctx['confirmed_count']
+        ctx['active_cases_total'] = active_qs.count()
+        ctx['top_disease_breakdown'] = build_top_disease_breakdown(active_qs, limit=2)
     if role in BARANGAY_SCOPED_ROLES and user_id:
         user = User.objects.filter(id=user_id).first()
         if user:
@@ -259,19 +269,23 @@ def alerts_inbox_view(request):
 def get_dynamic_disease_choices():
     from myapp.models import SurveillanceReport
     from reports.pidsr_schema import normalize_disease_label
-    
+    from reports.ml_display import is_inconclusive_disease_label
+
     raw_diseases = SurveillanceReport.objects.exclude(
-        syndrome_type__in=['', 'Inconclusive', 'Unclassified']
+        status__in=('Closed', 'Discarded'),
+    ).exclude(
+        syndrome_type__isnull=True,
     ).values_list('syndrome_type', flat=True).distinct()
-    
+
     disease_set = set()
     for d in raw_diseases:
-        if d:
-            norm = normalize_disease_label(d)
-            lower_norm = norm.lower()
-            if 'insufficient data' not in lower_norm and 'pending' not in lower_norm and 'inconclusive' not in lower_norm and 'unclassified' not in lower_norm:
-                disease_set.add(norm)
-                
+        if not d:
+            continue
+        norm = normalize_disease_label(d)
+        if is_inconclusive_disease_label(norm):
+            continue
+        disease_set.add(norm)
+
     return [('', 'All Diseases')] + [(d, d) for d in sorted(disease_set)]
 
 
@@ -333,16 +347,18 @@ def api_analytics_data(request):
     if time_range not in VALID_TIME_RANGES:
         time_range = 'current_month'
 
-    valid_categories = {value for value, _ in SYNDROME_CATEGORY_OPTIONS if value}
-    if symptom_category and symptom_category not in valid_categories:
-        return JsonResponse({'ok': False, 'error': 'Invalid syndrome category filter.'}, status=400)
+    if len(symptom_category) > 150:
+        return JsonResponse({'ok': False, 'error': 'Invalid disease filter.'}, status=400)
 
     payload = get_analytics_payload(
         symptom_category=symptom_category,
         barangay_id=barangay_id,
         time_range=time_range,
     )
-    return JsonResponse({'ok': True, **payload})
+    response = JsonResponse({'ok': True, **payload})
+    response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response['Pragma'] = 'no-cache'
+    return response
 
 
 @require_GET

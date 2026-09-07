@@ -8,11 +8,14 @@
     <div class="dash-hero__text">
       <span class="pulse-eyebrow">Analysis</span>
       <h2>Surveillance Analytics{% if is_barangay_scoped and barangays.0 %} — {{ barangays.0.barangay_name }}{% endif %}</h2>
-      <p>Epidemic curves and demographic breakdowns from batch-reported patient cases</p>
+      <p>Live epidemic curves and demographic breakdowns from current surveillance reports</p>
     </div>
     <span class="dash-hero__date pill-badge badge-info" id="total-cases-badge">
       <i data-lucide="activity" class="lucide-icon lucide-icon--xs"></i>
       Total cases: —
+    </span>
+    <span class="dash-hero__date pill-badge badge-muted" id="analytics-live-stamp" style="margin-left:.4rem;">
+      Live from database
     </span>
   </header>
 
@@ -24,10 +27,14 @@
         </div>
         <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
       </div>
-      <div class="dash-metric-card__value">{{ active_cases_total|default:0 }}</div>
+      <div class="dash-metric-card__value" id="kpi-active-total">{{ active_cases_total|default:0 }}</div>
       <div class="dash-metric-card__label">Total Active Cases</div>
-      <div class="dash-metric-card__footer text-muted" style="font-size: 0.85rem; margin-top: 5px;">
-        {{ active_cases_dengue|default:0 }} Dengue • {{ active_cases_lepto|default:0 }} Lepto
+      <div class="dash-metric-card__footer text-muted" id="kpi-active-breakdown" style="font-size: 0.85rem; margin-top: 5px;">
+        {% if top_disease_breakdown %}
+          {% for row in top_disease_breakdown %}{{ row.count }} {{ row.label }}{% if not forloop.last %} • {% endif %}{% endfor %}
+        {% else %}
+          Live from surveillance reports
+        {% endif %}
       </div>
     </article>
     <article class="dash-metric-card">
@@ -37,7 +44,7 @@
         </div>
         <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
       </div>
-      <div class="dash-metric-card__value">{{ total_confirmed|default:0 }}</div>
+      <div class="dash-metric-card__value" id="kpi-confirmed">{{ total_confirmed|default:0 }}</div>
       <div class="dash-metric-card__label">Confirmed Cases</div>
       <div class="dash-metric-card__footer text-muted" style="font-size: 0.85rem; margin-top: 5px;">
         Lab-Verified
@@ -50,7 +57,7 @@
         </div>
         <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
       </div>
-      <div class="dash-metric-card__value">{{ aptas_alerts|length }}</div>
+      <div class="dash-metric-card__value" id="kpi-hotspots">{{ aptas_alerts|length }}</div>
       <div class="dash-metric-card__label">High-Risk Hotspots</div>
       <div class="dash-metric-card__footer text-muted" style="font-size: 0.85rem; margin-top: 5px;">
         Local Spatial Clusters
@@ -63,7 +70,7 @@
         </div>
         <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
       </div>
-      <div class="dash-metric-card__value">{{ pending_reports|default:0 }}</div>
+      <div class="dash-metric-card__value" id="kpi-pending">{{ pending_reports|default:0 }}</div>
       <div class="dash-metric-card__label">Pending Lab Confirmations</div>
       <div class="dash-metric-card__footer text-muted" style="font-size: 0.85rem; margin-top: 5px;">
         Awaiting Verification
@@ -95,7 +102,7 @@
               <option value="">All Barangays (City-wide)</option>
               {% endif %}
               {% for b in barangays %}
-              <option value="{{ b.id }}" selected>{{ b.barangay_name }}</option>
+              <option value="{{ b.id }}" {% if is_barangay_scoped %}selected{% endif %}>{{ b.barangay_name }}</option>
               {% endfor %}
             </select>
           </div>
@@ -244,16 +251,13 @@ function hasChartData(payload) {
 
 function emptyChartData() {
   return {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+    labels: ['No cases in this period'],
     datasets: [{
       label: 'No data',
-      data: [0, 0, 0, 0, 0, 0],
+      data: [0],
       backgroundColor: themeChart().emptyBg,
       borderColor: 'rgba(148, 163, 184, 0.5)',
-      borderDash: [5, 5],
       borderWidth: 2,
-      fill: true,
-      tension: 0.3,
       borderRadius: 6,
     }],
   };
@@ -394,6 +398,34 @@ function buildHorizontalBarChart(ctx, payload, emptyMsgId) {
   });
 }
 
+function formatLiveStamp(iso) {
+  if (!iso) return 'Live from database';
+  const dt = new Date(iso);
+  if (Number.isNaN(dt.getTime())) return 'Live from database';
+  return 'Updated ' + dt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+}
+
+function updateKpis(data) {
+  const kpis = data.kpis || {};
+  const activeEl = document.getElementById('kpi-active-total');
+  if (activeEl && kpis.active_total != null) activeEl.textContent = kpis.active_total;
+  const confirmedEl = document.getElementById('kpi-confirmed');
+  if (confirmedEl && kpis.confirmed != null) confirmedEl.textContent = kpis.confirmed;
+  const pendingEl = document.getElementById('kpi-pending');
+  if (pendingEl && kpis.pending_lab != null) pendingEl.textContent = kpis.pending_lab;
+  const hotspotEl = document.getElementById('kpi-hotspots');
+  if (hotspotEl && kpis.hotspot_count != null) hotspotEl.textContent = kpis.hotspot_count;
+  const breakdownEl = document.getElementById('kpi-active-breakdown');
+  if (breakdownEl) {
+    const rows = kpis.top_diseases || [];
+    breakdownEl.textContent = rows.length
+      ? rows.map(function (row) { return row.count + ' ' + row.label; }).join(' • ')
+      : 'No classified diseases in this window';
+  }
+  const stamp = document.getElementById('analytics-live-stamp');
+  if (stamp) stamp.textContent = formatLiveStamp(data.generated_at);
+}
+
 function updateSummary(data) {
   document.getElementById('stat-total').textContent = data.total_cases ?? '—';
   document.getElementById('total-cases-badge').innerHTML =
@@ -402,6 +434,7 @@ function updateSummary(data) {
   document.getElementById('stat-syndrome').textContent = s.dominant_syndrome_category || '—';
   document.getElementById('stat-demo').textContent = s.top_demographic || '—';
   document.getElementById('stat-status').textContent = s.top_status || '—';
+  updateKpis(data);
   if (window.lucide) lucide.createIcons();
 }
 
@@ -410,10 +443,11 @@ async function loadAnalytics() {
     symptom_category: appliedAnalyticsFilters.syndrome,
     barangay: appliedAnalyticsFilters.barangay,
     time_range: appliedAnalyticsFilters.time_range,
+    _ts: String(Date.now()),
   });
 
   try {
-    const res = await fetch(API_URL + '?' + params.toString());
+    const res = await fetch(API_URL + '?' + params.toString(), { cache: 'no-store' });
     const data = await res.json();
     if (!data.ok) {
       updateSummary({ total_cases: 'Error' });
@@ -535,6 +569,7 @@ document.addEventListener('DOMContentLoaded', function() {
   appliedAnalyticsFilters = readAnalyticsFilterControls();
   updateAnalyticsFilterState();
   loadAnalytics();
+  setInterval(loadAnalytics, 60000);
 });
 document.addEventListener('pulse-theme-change', function() {
   if (typeof loadAnalytics === 'function') loadAnalytics();
