@@ -1,6 +1,7 @@
 """UI and API helpers for database-driven syndromic symptoms."""
 
 from myapp.symptom_data import SYNDROMIC_GROUP_TITLES
+from reports.pidsr_schema import PIDSR_SYMPTOM_LOCAL_LABELS
 
 
 def build_symptom_groups_for_ui():
@@ -8,6 +9,7 @@ def build_symptom_groups_for_ui():
     Build grouped symptom payload for ``submit_report.html``.
 
     Symptoms are sorted alphabetically by ``name`` within each syndromic group.
+    ``local_label`` is Hiligaynon/Taglish for display only; ``key`` stays snake_case.
     """
     from myapp.models import Symptom
 
@@ -16,6 +18,7 @@ def build_symptom_groups_for_ui():
         grouped.setdefault(symptom.syndromic_group, []).append({
             'key': symptom.code,
             'label': symptom.name,
+            'local_label': PIDSR_SYMPTOM_LOCAL_LABELS.get(symptom.code, ''),
             'description': symptom.description or '',
         })
 

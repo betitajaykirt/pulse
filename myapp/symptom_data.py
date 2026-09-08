@@ -2,6 +2,7 @@
 
 from reports.pidsr_schema import (
     PIDSR_SYMPTOM_LABELS,
+    PIDSR_SYMPTOM_LOCAL_LABELS,
     SYMPTOM_CODE_TO_GROUP,
     SYNDROMIC_GROUP_TITLES,
 )
@@ -23,7 +24,7 @@ def seed_all_symptoms(verbose=True):
             defaults={
                 'name': name,
                 'syndromic_group': group,
-                'description': '',
+                'description': PIDSR_SYMPTOM_LOCAL_LABELS.get(code, ''),
             },
         )
         if was_created:
