@@ -9,6 +9,8 @@ import json
 import csv
 from django.shortcuts import render, redirect
 from django.http import JsonResponse, HttpResponse
+from django.urls import reverse
+from django.templatetags.static import static
 from django.views.decorators.http import require_POST, require_GET
 from django.contrib import messages
 from django.utils import timezone
@@ -92,11 +94,18 @@ def submit_report(request):
 
     return render(request, 'reports/submit_report.html', {
         'barangays': barangays,
-        'barangay_options_json': json.dumps(barangay_options),
-        'symptom_groups_json': json.dumps(build_symptom_groups_for_ui()),
         'assigned_barangay': assigned_barangay,
         'barangay_locked': locked_barangay is not None,
         'default_barangay_id': locked_barangay.id if locked_barangay else '',
+        'submit_report_boot': {
+            'barangayOptions': barangay_options,
+            'barangayLocked': locked_barangay is not None,
+            'defaultBarangayId': str(locked_barangay.id) if locked_barangay else '',
+            'assignedBarangayName': assigned_barangay or '',
+            'symptomGroups': build_symptom_groups_for_ui(),
+            'submitUrl': reverse('submit_report'),
+            'geojsonUrl': static('ph-json/bago_barangay_boundaries.geojson'),
+        },
     })
 
 

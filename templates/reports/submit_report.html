@@ -81,16 +81,18 @@
 {% block extra_js %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+{{ submit_report_boot|json_script:"submit-report-boot" }}
 <script>
-const BARANGAY_OPTIONS = {{ barangay_options_json|safe }};
-const BARANGAY_LOCKED = {{ barangay_locked|yesno:"true,false" }};
-const DEFAULT_BARANGAY_ID = '{{ default_barangay_id }}';
-const SUBMIT_URL = '{% url "submit_report" %}';
-const ASSIGNED_BARANGAY_NAME = '{{ assigned_barangay|default:""|escapejs }}';
-const BARANGAY_GEOFENCE_ENABLED = {{ barangay_locked|yesno:"true,false" }} && !!ASSIGNED_BARANGAY_NAME;
-const BARANGAY_GEOJSON_URL = '{% static "ph-json/bago_barangay_boundaries.geojson" %}';
+const __boot = JSON.parse(document.getElementById('submit-report-boot').textContent);
+const BARANGAY_OPTIONS = __boot.barangayOptions || [];
+const BARANGAY_LOCKED = !!__boot.barangayLocked;
+const DEFAULT_BARANGAY_ID = __boot.defaultBarangayId || '';
+const SUBMIT_URL = __boot.submitUrl;
+const ASSIGNED_BARANGAY_NAME = __boot.assignedBarangayName || '';
+const BARANGAY_GEOFENCE_ENABLED = BARANGAY_LOCKED && !!ASSIGNED_BARANGAY_NAME;
+const BARANGAY_GEOJSON_URL = __boot.geojsonUrl;
 
-const SYMPTOM_GROUPS = {{ symptom_groups_json|safe }};
+const SYMPTOM_GROUPS = __boot.symptomGroups || [];
 
 const ALL_SYMPTOM_KEYS = SYMPTOM_GROUPS.flatMap(g => g.items.map(i => i.key));
 const CIVIL_STATUS_OPTIONS = ['Single', 'Married', 'Widowed', 'Separated', 'Divorced', 'Annulled'];
@@ -427,7 +429,7 @@ function renderPatientList() {
       <div class="patient-card-body">
         ${demographicsSectionHtml(p)}
         <div class="form-section-title" style="margin-top:.25rem;">B. Syndromic Indicators</div>
-        <p style="font-size:.8rem;color:var(--muted);margin:0 0 .75rem;">Check all signs, symptoms, and exposures present. English is the clinical term; Hiligaynon/Taglish underneath is a guide only. The form still submits standard English IDs.</p>
+        <p style="font-size:.8rem;color:var(--muted);margin:0 0 .75rem;">Check all signs, symptoms, and exposures present. No disease name is recorded at entry — only raw indicators for objective ML classification.</p>
         ${symptomGroupsHtml(p)}
         ${otherSymptomsSectionHtml(p)}
         <div class="form-section-title" style="margin-top:1rem;">C. Location Details</div>
