@@ -204,10 +204,12 @@
           <select name="resolution_outcome" class="input-soft" required>
             <option value="">Select outcome...</option>
             <option value="Recovered (Confirmed Case)">Recovered (Confirmed Case)</option>
-            <option value="Discarded (Not a Case / False Alarm)">Discarded (Not a Case / False Alarm)</option>
             <option value="Deceased">Deceased</option>
             <option value="Lost to Follow-up">Lost to Follow-up</option>
           </select>
+          <p class="um-muted" style="font-size:.78rem;margin:.4rem 0 0;">
+            Laboratory-negative discard is done on Case Confirmation after a matching lab scan. It is not available here.
+          </p>
         </div>
         <div class="form-group">
           <label>Resolution Date</label>
@@ -234,6 +236,8 @@
 document.addEventListener('DOMContentLoaded', function () { if (window.lucide) lucide.createIcons(); });
 
 const CLOSE_URL_TEMPLATE = "{% url 'close_case' 0 %}";
+const CAN_CLOSE_CASES = {{ can_close_cases|yesno:"true,false" }};
+const CAN_CLOSE_UNCONFIRMED = {{ can_close_unconfirmed|yesno:"true,false" }};
 
 function viewRecord(id, barangay, disease, classif, cases, onset, caseStatus, validationStatus, reporter, date, confirmedAt, lat, lng, remarks, resolutionOutcome, closedAt) {
   document.getElementById('modal-title').textContent = 'Case Report #' + id;
@@ -307,7 +311,10 @@ function viewRecord(id, barangay, disease, classif, cases, onset, caseStatus, va
   document.getElementById('modal-body').innerHTML = html;
   
   const closeContainer = document.getElementById('close-case-container');
-  if (caseStatus === 'Confirmed' || caseStatus === 'Probable' || caseStatus === 'Suspected') {
+  const unconfirmed = caseStatus === 'Probable' || caseStatus === 'Suspected';
+  const canCloseThis = (caseStatus === 'Confirmed' && CAN_CLOSE_CASES) ||
+    (unconfirmed && CAN_CLOSE_UNCONFIRMED);
+  if (canCloseThis) {
     closeContainer.style.display = 'block';
     document.getElementById('close-case-form').action = CLOSE_URL_TEMPLATE.replace('/0/', '/' + id + '/');
   } else {

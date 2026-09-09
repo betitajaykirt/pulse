@@ -10,7 +10,40 @@ from reports.views import (
     _evaluate_lab_confirmation,
     _get_valid_lab_ocr_scan,
     _store_lab_ocr_scan,
+    close_case_rejection,
 )
+
+class CloseCasePolicyTests(SimpleTestCase):
+    def test_encoder_cannot_close_probable(self):
+        msg = close_case_rejection(
+            'encoder', 'Probable', 'Lost to Follow-up',
+        )
+        self.assertIsNotNone(msg)
+        self.assertIn('cannot close probable or suspected', msg.lower())
+
+    def test_bhw_cannot_close_suspected(self):
+        msg = close_case_rejection(
+            'barangay_health_worker', 'Suspected', 'Deceased',
+        )
+        self.assertIsNotNone(msg)
+
+    def test_encoder_can_close_confirmed_recovered(self):
+        self.assertIsNone(close_case_rejection(
+            'encoder', 'Confirmed', 'Recovered (Confirmed Case)',
+        ))
+
+    def test_discard_not_a_case_blocked_for_cho(self):
+        msg = close_case_rejection(
+            'health_officer', 'Probable',
+            'Discarded (Not a Case / False Alarm)',
+        )
+        self.assertIsNotNone(msg)
+        self.assertIn('Case Confirmation', msg)
+
+    def test_cho_can_close_probable_lost_to_follow_up(self):
+        self.assertIsNone(close_case_rejection(
+            'health_officer', 'Probable', 'Lost to Follow-up',
+        ))
 
 
 class _Session(dict):

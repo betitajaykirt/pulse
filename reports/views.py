@@ -432,6 +432,8 @@ def case_records(request):
         'disease_category': disease_category,
         'city_wide': city_wide,
         'can_validate': False,
+        'can_close_cases': role in CHO_CLOSE_ROLES or role in FIELD_ROLES_CONFIRMED_CLOSE_ONLY,
+        'can_close_unconfirmed': role in CHO_CLOSE_ROLES,
     })
 
 
@@ -1027,6 +1029,55 @@ def _confirm_redirect_target(request):
     return 'case_records'
 
 
+FIELD_ROLES_CONFIRMED_CLOSE_ONLY = frozenset({
+    'barangay_health_worker',
+    'encoder',
+})
+UNCONFIRMED_CLOSE_STATUSES = frozenset({'Probable', 'Suspected'})
+LAB_NEGATIVE_CLOSE_OUTCOME = 'Discarded (Not a Case / False Alarm)'
+ALLOWED_CLOSE_OUTCOMES = frozenset({
+    'Recovered (Confirmed Case)',
+    'Deceased',
+    'Lost to Follow-up',
+})
+CHO_CLOSE_ROLES = frozenset({
+    'admin',
+    'super_admin',
+    'health_officer',
+    'surveillance_officer',
+})
+
+
+def close_case_rejection(role, status, outcome=''):
+    """Return an error message if this close is not allowed, else None."""
+    role = (role or '').strip()
+    status = (status or '').strip()
+    outcome = (outcome or '').strip()
+
+    if status not in ('Confirmed', 'Probable', 'Suspected'):
+        return f'Only active cases can be closed (current status: {status}).'
+
+    if role in FIELD_ROLES_CONFIRMED_CLOSE_ONLY and status in UNCONFIRMED_CLOSE_STATUSES:
+        return (
+            'Barangay encoders and health workers cannot close probable or suspected cases. '
+            'Laboratory-negative discard is done by CHO on the Case Confirmation panel.'
+        )
+
+    if not outcome:
+        return 'Resolution Outcome is required.'
+
+    if outcome == LAB_NEGATIVE_CLOSE_OUTCOME:
+        return (
+            'Laboratory-negative discard is only available on the Case Confirmation panel '
+            'after a matching lab scan.'
+        )
+
+    if outcome not in ALLOWED_CLOSE_OUTCOMES:
+        return 'Select a valid resolution outcome.'
+
+    return None
+
+
 @require_POST
 @role_required('admin', 'super_admin', 'surveillance_officer')
 def validate_report(request, report_id):
@@ -1042,32 +1093,29 @@ def validate_report(request, report_id):
 @require_POST
 @role_required('admin', 'super_admin', 'health_officer', 'surveillance_officer', 'barangay_health_worker', 'encoder')
 def close_case(request, report_id):
-    """Close an active Confirmed case."""
+    """Close an active case. Unconfirmed discard is CHO lab-confirmation only."""
     report = SurveillanceReport.objects.filter(id=report_id)
     report = barangay_queryset_filter(request, report).first()
     if not report:
         messages.error(request, 'Report not found.')
         return redirect('case_records')
 
-    if report.status not in ('Confirmed', 'Probable', 'Suspected'):
-        messages.error(request, f'Only active cases can be closed (current status: {report.status}).')
+    role = request.session.get('role', '')
+    outcome = request.POST.get('resolution_outcome', '').strip()
+    rejection = close_case_rejection(role, report.status, outcome)
+    if rejection:
+        messages.error(request, rejection)
         return redirect('case_records')
 
-    outcome = request.POST.get('resolution_outcome', '').strip()
     closed_at_str = request.POST.get('closed_at', '').strip()
     notes = request.POST.get('closing_notes', '').strip()
 
-    if not outcome:
-        messages.error(request, 'Resolution Outcome is required.')
-        return redirect('case_records')
-
-    # Parse closed_at or use now
     closed_at = timezone.now()
     if closed_at_str:
         try:
             closed_at = datetime.fromisoformat(closed_at_str)
         except ValueError:
-            pass # fallback to now
+            pass
 
     update_fields = {
         'status': 'Closed',
@@ -1093,7 +1141,7 @@ def close_case(request, report_id):
         trigger_report_id=report.id,
         actor_id=actor_id,
     )
-    
+
     log_audit(
         actor_id=actor_id,
         actor_type=actor_type,
