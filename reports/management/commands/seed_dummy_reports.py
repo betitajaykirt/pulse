@@ -8,6 +8,8 @@ from datetime import date, timedelta
 from django.core.management.base import BaseCommand
 from django.db.models.signals import pre_delete
 
+from mysite.command_safety import assert_safe_for_destructive_commands
+
 from myapp.models import (
     Barangay,
     PatientCase,
@@ -159,6 +161,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         from reports.batch_service import save_batch_submission
 
+        assert_safe_for_destructive_commands('seed_dummy_reports')
         self.stdout.write('Starting dummy report seed...')
         self.stdout.flush()
 

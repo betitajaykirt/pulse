@@ -3,8 +3,18 @@ Seed Bago City barangays into legacy pulse_db.barangays table.
 Usage: python seed_barangays.py
 """
 import os
-import django
+import sys
 
+ROOT = os.path.dirname(os.path.abspath(__file__))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
+from mysite.command_safety import assert_safe_for_destructive_commands, load_project_env
+
+load_project_env()
+assert_safe_for_destructive_commands('seed_barangays.py')
+
+import django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mysite.settings')
 django.setup()
 

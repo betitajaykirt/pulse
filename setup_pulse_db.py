@@ -3,6 +3,17 @@ Create any missing PulseCapstone tables and seed default accounts.
 Usage: python setup_pulse_db.py
 """
 import os
+import sys
+
+ROOT = os.path.dirname(os.path.abspath(__file__))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
+from mysite.command_safety import assert_safe_for_destructive_commands, load_project_env
+
+load_project_env()
+assert_safe_for_destructive_commands('setup_pulse_db.py')
+
 import django
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mysite.settings')

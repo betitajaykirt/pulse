@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 from pathlib import Path
 import environ
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -26,24 +27,38 @@ if os.path.exists(env_file):
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-i9irjbc2s#&1^@zlnl^f@yhq^6jkzjx&co7kz!*1go%zcwopnd'
+DEBUG = env.bool('DEBUG', default=False)
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+SECRET_KEY = env('SECRET_KEY', default=None)
+if not SECRET_KEY:
+    raise ImproperlyConfigured(
+        'SECRET_KEY must be set in the environment or a local .env file.'
+    )
+if not DEBUG and SECRET_KEY.startswith('django-insecure-'):
+    raise ImproperlyConfigured(
+        'Production SECRET_KEY must not use the django-insecure- prefix.'
+    )
+SECRET_KEY_FALLBACKS = env.list('SECRET_KEY_FALLBACKS', default=[])
 
-ALLOWED_HOSTS = [
-    'localhost',
-    '127.0.0.1',
-    'pulse.bccbsis.com',
-    'bccbsis.com',
-    '.vercel.app',
-]
+ALLOWED_HOSTS = env.list(
+    'ALLOWED_HOSTS',
+    default=[
+        'localhost',
+        '127.0.0.1',
+        'pulse.bccbsis.com',
+        'bccbsis.com',
+        '.vercel.app',
+    ],
+)
 
-CSRF_TRUSTED_ORIGINS = [
-    'https://pulse.bccbsis.com',
-    'https://*.vercel.app',
-]
+CSRF_TRUSTED_ORIGINS = env.list(
+    'CSRF_TRUSTED_ORIGINS',
+    default=[
+        'https://pulse.bccbsis.com',
+        'https://pulse-ten-pied.vercel.app',
+        'https://*.vercel.app',
+    ],
+)
 
 
 # Application definition
@@ -178,6 +193,21 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Sessions
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 SESSION_COOKIE_AGE = int(os.getenv('SESSION_COOKIE_AGE', 7200))
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = False  # JS reads csrftoken from document.cookie for AJAX
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = 'same-origin'
+
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=True)
+    SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', default=31536000)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
 
 # Lockout (set LOCKOUT_ENABLED=false in .env to disable temporarily)
 LOCKOUT_ENABLED = os.getenv('LOCKOUT_ENABLED', 'true').lower() in ('1', 'true', 'yes')

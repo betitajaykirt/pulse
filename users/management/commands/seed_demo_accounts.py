@@ -8,6 +8,8 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
+from mysite.command_safety import assert_safe_for_destructive_commands
+
 from accounts.auth_utils import hash_password
 from myapp.models import Barangay, User
 
@@ -163,6 +165,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        assert_safe_for_destructive_commands('seed_demo_accounts')
         reset = bool(options.get('reset_passwords'))
         purge = bool(options.get('purge_unmapped'))
         now = timezone.now()

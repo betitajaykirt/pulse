@@ -12,6 +12,9 @@ import django
 
 if __name__ == '__main__':
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from mysite.command_safety import assert_safe_for_destructive_commands, load_project_env
+    load_project_env()
+    assert_safe_for_destructive_commands('seed_reference_data.py')
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mysite.settings')
     django.setup()
 
