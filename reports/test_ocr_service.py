@@ -4,9 +4,84 @@ from reports.ocr_service import (
     parse_lab_fields,
     cross_validate_patient,
     match_test_type,
+    match_disease,
     split_person_name,
     apply_record_name_correction,
+    infer_lab_outcome,
+    resolve_confirm_lab_outcome,
 )
+
+
+SAMPLE_REPORT = """
+DENGUE NS1 Ag & IgG/IgM TEST REPORT & CERTIFICATION
+Name: AUJERO, JELYN S.
+Birthday: 07/18/2005
+Age: 21
+Nationality: PHILIPPINES
+Civil Status: SINGLE
+Gender: FEMALE
+Passport/ID No: NA
+Address: PURUK KAPAYAS, BARANGAY POBLACION
+Barangay: POBLACION
+City: BAGO CITY
+Result (List):
+DENGUE VIRUS NS1 ANTIGEN: DETECTED
+DENGUE IgM ANTIBODY: DETECTED
+DENGUE IgG ANTIBODY: NOT DETECTED
+Interpretation: POSITIVE FOR ACUTE DENGUE FEVER INFECTION
+Remarks: NS1 and IgM positivity confirms an acute primary infection.
+Lab Number: PORT202608-3882
+Control Number: LC-2026-004B21
+Certificate Issued: 08/17/2026 14:30
+"""
+
+NEGATIVE_DENGUE_REPORT = """
+DENGUE NS1 Ag & IgG/IgM TEST REPORT & CERTIFICATION
+Name: AUJERO, JELYN S.
+Birthday: 07/18/2005
+Age: 21
+Gender: FEMALE
+Address: PUROK KAPAYAS, BARANGAY POBLACION
+Barangay: POBLACION
+City: BAGO CITY
+Result (List):
+DENGUE VIRUS NS1 ANTIGEN: NOT DETECTED
+DENGUE IgM ANTIBODY: NOT DETECTED
+DENGUE IgG ANTIBODY: NOT DETECTED
+Interpretation: NEGATIVE FOR DENGUE FEVER INFECTION
+Lab Number: PORT202608-4001
+Control Number: LC-2026-N004B21
+Certificate Issued: 08/17/2026 14:30
+"""
+
+NEGATIVE_COVID_REPORT = """
+SARS-CoV-2 RT-PCR LABORATORY REPORT
+Name: SANTOS, MARIA L.
+Age: 28
+Gender: FEMALE
+Address: PUROK MABUHAY, BARANGAY POBLACION
+Barangay: POBLACION
+City: BAGO CITY
+Result (List):
+SARS-CoV-2 RNA (N gene): NOT DETECTED
+SARS-CoV-2 RNA (ORF1ab): NOT DETECTED
+Interpretation: NEGATIVE FOR SARS-CoV-2 (COVID-19) INFECTION
+Lab Number: PORT202608-4102
+Control Number: LC-2026-N00C19
+Certificate Issued: 08/18/2026 09:15
+"""
+
+NEGATIVE_CULTURE_REPORT = """
+BLOOD CULTURE LABORATORY REPORT
+Name: SANTOS, MARIA L.
+Age: 28
+Gender: FEMALE
+Result (List):
+BLOOD CULTURE: NO GROWTH / SALMONELLA NOT ISOLATED
+Interpretation: NEGATIVE FOR TYPHOID AND PARATYPHOID FEVER
+Control Number: LC-2026-N00TYP
+Certificate Issued: 08/19/2026 11:00
+"""
 
 
 SAMPLE_REPORT = """
@@ -115,3 +190,57 @@ class ParseLabFieldsTests(SimpleTestCase):
         self.assertEqual(fixed['first_name'], 'Jelyn')
         self.assertEqual(fixed['last_name'], 'Aujero')
         self.assertIn('JELVN', fixed['raw_patient_name'].upper())
+
+    def test_negative_dengue_report(self):
+        fields = parse_lab_fields(NEGATIVE_DENGUE_REPORT)
+        self.assertEqual(fields['overview']['verdict'], 'NEGATIVE')
+        self.assertEqual(fields['lab_outcome'], 'negative')
+        self.assertIn('NEGATIVE FOR DENGUE', fields['interpretation'])
+        self.assertIn('NS1 ANTIGEN: NOT DETECTED', fields['lab_results'])
+        self.assertIn('IgM ANTIBODY: NOT DETECTED', fields['lab_results'])
+        self.assertIn('IgG ANTIBODY: NOT DETECTED', fields['lab_results'])
+        self.assertEqual(fields['overview']['marker_summary'], 'NS1(-) / IgM(-) / IgG(-)')
+        self.assertFalse(any(m['positive'] for m in fields['markers']))
+        self.assertEqual(match_disease(NEGATIVE_DENGUE_REPORT), 'Dengue Fever')
+        self.assertEqual(infer_lab_outcome(fields['interpretation'], fields['markers']), 'negative')
+
+    def test_negative_covid_pcr_report(self):
+        fields = parse_lab_fields(NEGATIVE_COVID_REPORT)
+        self.assertEqual(fields['lab_outcome'], 'negative')
+        self.assertEqual(fields['overview']['verdict'], 'NEGATIVE')
+        self.assertIn('NEGATIVE FOR SARS-COV-2', fields['interpretation'].upper())
+        self.assertTrue(any('NOT DETECTED' in m['status'] for m in fields['markers']))
+        self.assertFalse(any(m['positive'] for m in fields['markers']))
+        self.assertEqual(match_disease(NEGATIVE_COVID_REPORT), 'COVID-19')
+        self.assertEqual(match_test_type(NEGATIVE_COVID_REPORT), 'PCR')
+
+    def test_negative_culture_no_growth(self):
+        fields = parse_lab_fields(NEGATIVE_CULTURE_REPORT)
+        self.assertEqual(fields['lab_outcome'], 'negative')
+        self.assertIn('NEGATIVE FOR TYPHOID', fields['interpretation'])
+        statuses = ' '.join(m['status'] for m in fields['markers'])
+        self.assertTrue('NO GROWTH' in statuses or 'NOT ISOLATED' in statuses)
+        self.assertEqual(match_disease(NEGATIVE_CULTURE_REPORT), 'Typhoid and Paratyphoid Fever')
+        self.assertEqual(match_test_type(NEGATIVE_CULTURE_REPORT), 'Culture')
+
+    def test_unclear_lab_stays_blocked(self):
+        self.assertEqual(resolve_confirm_lab_outcome('', ''), '')
+        self.assertEqual(resolve_confirm_lab_outcome('Pending culture', 'See remarks'), '')
+        self.assertEqual(
+            resolve_confirm_lab_outcome('Inconclusive', '',),
+            '',
+        )
+
+    def test_confirm_outcome_reads_interpretation_not_posted_positive(self):
+        self.assertEqual(
+            resolve_confirm_lab_outcome('NEGATIVE FOR DENGUE FEVER INFECTION', ''),
+            'negative',
+        )
+        self.assertEqual(
+            resolve_confirm_lab_outcome('POSITIVE FOR ACUTE DENGUE FEVER INFECTION', ''),
+            'positive',
+        )
+        self.assertEqual(
+            resolve_confirm_lab_outcome('', 'DENGUE VIRUS NS1 ANTIGEN: NOT DETECTED'),
+            'negative',
+        )

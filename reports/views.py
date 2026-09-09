@@ -584,10 +584,9 @@ def _patient_profile_for_report(report) -> dict:
     }
 
 
-def _perform_case_confirmation(
+def _lab_detail_update_fields(
     report,
     *,
-    actor_id,
     lab_control_number='',
     test_type='',
     confirmed_disease='',
@@ -595,22 +594,13 @@ def _perform_case_confirmation(
     lab_issue_date='',
     lab_findings='',
     lab_interpretation='',
-    actor_type='admin',
-    request=None,
 ):
-    """Confirm a probable/suspected report and run threshold evaluation."""
+    """Shared lab-document fields persisted on confirm or lab-negative discard."""
     now = timezone.now()
-    update_fields = {
-        'status': 'Confirmed',
-        'case_classification': 'confirmed',
-        'confirmed_at': now,
-        'updated_at': now,
-    }
+    update_fields = {'updated_at': now}
 
     if confirmed_disease:
         update_fields['syndrome_type'] = confirmed_disease
-
-    # Persist new lab detail fields
     if lab_specimen_number:
         update_fields['lab_specimen_number'] = lab_specimen_number
     if lab_issue_date:
@@ -629,6 +619,41 @@ def _perform_case_confirmation(
         existing = (report.remarks or '').strip()
         lab_line = ' | '.join(lab_notes)
         update_fields['remarks'] = f'{existing} | {lab_line}'.strip(' |') if existing else lab_line
+    return update_fields
+
+
+def _perform_case_confirmation(
+    report,
+    *,
+    actor_id,
+    lab_control_number='',
+    test_type='',
+    confirmed_disease='',
+    lab_specimen_number='',
+    lab_issue_date='',
+    lab_findings='',
+    lab_interpretation='',
+    actor_type='admin',
+    request=None,
+):
+    """Confirm a probable/suspected report and run threshold evaluation."""
+    now = timezone.now()
+    update_fields = _lab_detail_update_fields(
+        report,
+        lab_control_number=lab_control_number,
+        test_type=test_type,
+        confirmed_disease=confirmed_disease,
+        lab_specimen_number=lab_specimen_number,
+        lab_issue_date=lab_issue_date,
+        lab_findings=lab_findings,
+        lab_interpretation=lab_interpretation,
+    )
+    update_fields.update({
+        'status': 'Confirmed',
+        'case_classification': 'confirmed',
+        'confirmed_at': now,
+        'updated_at': now,
+    })
 
     SurveillanceReport.objects.filter(id=report.id).update(**update_fields)
     report.refresh_from_db()
@@ -649,6 +674,64 @@ def _perform_case_confirmation(
         request=request,
     )
     return threshold_result
+
+
+def _perform_case_lab_negative(
+    report,
+    *,
+    actor_id,
+    lab_control_number='',
+    test_type='',
+    confirmed_disease='',
+    lab_specimen_number='',
+    lab_issue_date='',
+    lab_findings='',
+    lab_interpretation='',
+    actor_type='admin',
+    request=None,
+):
+    """Discard a probable/suspected case after a confirmed negative laboratory result."""
+    now = timezone.now()
+    update_fields = _lab_detail_update_fields(
+        report,
+        lab_control_number=lab_control_number,
+        test_type=test_type,
+        confirmed_disease=confirmed_disease,
+        lab_specimen_number=lab_specimen_number,
+        lab_issue_date=lab_issue_date,
+        lab_findings=lab_findings,
+        lab_interpretation=lab_interpretation,
+    )
+    update_fields.update({
+        'status': 'Discarded',
+        'resolution_outcome': 'Discarded (Not a Case / False Alarm)',
+        'closed_at': now,
+        'updated_at': now,
+    })
+    existing_remarks = (update_fields.get('remarks') or report.remarks or '').strip()
+    outcome_note = 'Lab Outcome: NEGATIVE (not a case)'
+    update_fields['remarks'] = (
+        f'{existing_remarks} | {outcome_note}'.strip(' |') if existing_remarks else outcome_note
+    )
+
+    SurveillanceReport.objects.filter(id=report.id).update(**update_fields)
+    report.refresh_from_db()
+
+    from reports.case_state_service import handle_case_state_change
+    handle_case_state_change(
+        report=report,
+        trigger_report_id=report.id,
+        actor_id=actor_id,
+    )
+
+    log_audit(
+        actor_id=actor_id,
+        actor_type=actor_type,
+        action='case_lab_negative',
+        target_id=report.id,
+        request=request,
+    )
+    return {'status': 'DISCARDED', 'outcome': 'negative'}
 
 
 @role_required('admin', 'super_admin', 'health_officer')
@@ -701,57 +784,166 @@ def admin_confirmation_panel(request):
     })
 
 
+LAB_OCR_SESSION_KEY = 'pulse_lab_ocr_scan'
+LAB_OCR_SCAN_MAX_AGE_SECONDS = 30 * 60
+
+
+def _store_lab_ocr_scan(request, *, report_id, ocr_patient_name, identity_match, lab_outcome=''):
+    request.session[LAB_OCR_SESSION_KEY] = {
+        'report_id': int(report_id),
+        'ocr_patient_name': (ocr_patient_name or '').strip(),
+        'identity_match': bool(identity_match),
+        'lab_outcome': (lab_outcome or '').strip().lower(),
+        'scanned_at': timezone.now().timestamp(),
+    }
+    request.session.modified = True
+
+
+def _get_valid_lab_ocr_scan(request, report_id):
+    data = request.session.get(LAB_OCR_SESSION_KEY) or {}
+    try:
+        scanned_id = int(data.get('report_id') or 0)
+        scanned_at = float(data.get('scanned_at') or 0)
+    except (TypeError, ValueError):
+        return None
+    if scanned_id != int(report_id):
+        return None
+    if timezone.now().timestamp() - scanned_at > LAB_OCR_SCAN_MAX_AGE_SECONDS:
+        return None
+    return data
+
+
+def _clear_lab_ocr_scan(request):
+    if LAB_OCR_SESSION_KEY in request.session:
+        del request.session[LAB_OCR_SESSION_KEY]
+        request.session.modified = True
+
+
+def _evaluate_lab_confirmation(request, report):
+    """Server-side gates: matching OCR scan required; unclear labs stay blocked."""
+    from reports.ocr_service import cross_validate_patient, resolve_confirm_lab_outcome
+
+    scan = _get_valid_lab_ocr_scan(request, report.id)
+    if not scan:
+        return {
+            'ok': False,
+            'error': (
+                'Upload a laboratory document first. Confirmation requires a '
+                'scanned result that matches this patient.'
+            ),
+        }
+
+    ocr_name = (scan.get('ocr_patient_name') or '').strip()
+    if not ocr_name:
+        return {
+            'ok': False,
+            'error': (
+                'The scanned laboratory document did not contain a readable patient name. '
+                'Upload a clearer copy of this patient’s lab result.'
+            ),
+        }
+
+    record_name = _patient_display_for_report(report).get('name') or ''
+    identity = cross_validate_patient(ocr_name, record_name)
+    if not identity.get('match') or not scan.get('identity_match'):
+        return {
+            'ok': False,
+            'error': (
+                'Cannot process this laboratory result: the document does not match '
+                'the patient on record. Upload the correct lab result for this patient.'
+            ),
+        }
+
+    interpretation = request.POST.get('lab_interpretation', '').strip()
+    findings = request.POST.get('lab_findings', '').strip()
+    outcome = resolve_confirm_lab_outcome(interpretation, findings)
+    if outcome not in ('positive', 'negative'):
+        return {
+            'ok': False,
+            'error': (
+                'Laboratory result is unclear. Confirmation is blocked until the '
+                'findings or interpretation clearly read POSITIVE or NEGATIVE.'
+            ),
+        }
+
+    return {'ok': True, 'lab_outcome': outcome}
+
+
 @require_POST
 @login_required
 @role_required('admin', 'super_admin', 'health_officer')
 def ocr_parse_lab_document(request):
-    import traceback
     try:
         from .ocr_service import (
             call_ocr_api, parse_lab_fields, match_test_type,
             match_disease, cross_validate_patient, apply_record_name_correction,
         )
-        
+
         file_obj = request.FILES.get('lab_document')
         if not file_obj:
             return JsonResponse({'success': False, 'error': 'No document uploaded.'}, status=400)
-        
-        case_patient_name = request.POST.get('case_patient_name', '')
-        
-        # 1. Call OCR API
+
+        report_id = (request.POST.get('report_id') or '').strip()
+        if not report_id.isdigit():
+            return JsonResponse(
+                {'success': False, 'error': 'Case is required for laboratory scanning.'},
+                status=400,
+            )
+
+        report = SurveillanceReport.objects.filter(id=int(report_id))
+        report = barangay_queryset_filter(request, report).first()
+        if not report:
+            return JsonResponse({'success': False, 'error': 'Report not found.'}, status=404)
+        if report.status not in ('Suspected', 'Probable'):
+            return JsonResponse(
+                {'success': False, 'error': f'Only suspected or probable cases can be scanned (current status: {report.status}).'},
+                status=400,
+            )
+
+        record_name = _patient_display_for_report(report).get('name') or ''
+
         ocr_res = call_ocr_api(file_obj)
         if not ocr_res.get('success'):
+            _clear_lab_ocr_scan(request)
             return JsonResponse({'success': False, 'error': ocr_res.get('error', 'OCR failed')})
-        
+
         raw_text = ocr_res.get('raw_text', '')
-        
-        # 2. Extract fields
         fields = parse_lab_fields(raw_text)
-        name_fix = apply_record_name_correction(
-            fields.get('raw_patient_name') or fields.get('patient_name') or '',
-            case_patient_name,
-        )
+        ocr_name = fields.get('raw_patient_name') or fields.get('patient_name') or ''
+        name_fix = apply_record_name_correction(ocr_name, record_name)
         fields.update(name_fix)
         if fields.get('overview'):
             fields['overview']['patient'] = fields.get('patient_name') or fields['overview'].get('patient')
-        
-        # 3. Match dropdowns
+
         test_type = match_test_type(raw_text)
         confirmed_disease = match_disease(raw_text)
-        
-        # 4. Cross-validate patient
         validation = cross_validate_patient(
             fields.get('raw_patient_name') or fields.get('patient_name') or '',
-            case_patient_name,
+            record_name,
         )
-        
+        lab_outcome = (
+            (fields.get('overview') or {}).get('lab_outcome')
+            or fields.get('lab_outcome')
+            or ''
+        )
+
+        _store_lab_ocr_scan(
+            request,
+            report_id=report.id,
+            ocr_patient_name=fields.get('raw_patient_name') or fields.get('patient_name') or '',
+            identity_match=bool(validation.get('match')),
+            lab_outcome=lab_outcome,
+        )
+
         return JsonResponse({
             'success': True,
             'fields': fields,
             'overview': fields.get('overview') or {},
             'test_type': test_type,
             'confirmed_disease': confirmed_disease,
+            'lab_outcome': lab_outcome,
             'validation': validation,
+            'record_patient_name': record_name,
         })
     except Exception as exc:
         return JsonResponse({
@@ -770,23 +962,12 @@ def confirm_case(request, report_id):
         return redirect(_confirm_redirect_target(request))
 
     if report.status not in ('Suspected', 'Probable'):
-        messages.error(request, f'Only suspected or probable cases can be confirmed (current status: {report.status}).')
+        messages.error(request, f'Only suspected or probable cases can be processed (current status: {report.status}).')
         return redirect(_confirm_redirect_target(request))
 
-    from reports.ocr_service import cross_validate_patient
-
-    ocr_patient_name = request.POST.get('ocr_patient_name', '').strip()
-    ocr_identity_match = request.POST.get('ocr_identity_match', '').strip()
-    record_name = request.POST.get('case_patient_name', '').strip() or (
-        _patient_display_for_report(report).get('name') or ''
-    )
-    identity = cross_validate_patient(ocr_patient_name, record_name) if ocr_patient_name else {}
-    if ocr_identity_match == '0' or identity.get('mismatch'):
-        messages.error(
-            request,
-            'Cannot confirm this case: the laboratory document does not match the patient on record. '
-            'Upload the correct lab result for this patient.',
-        )
+    gate = _evaluate_lab_confirmation(request, report)
+    if not gate.get('ok'):
+        messages.error(request, gate.get('error') or 'Laboratory confirmation is blocked.')
         return redirect(_confirm_redirect_target(request))
 
     lab_control_number = request.POST.get('lab_control_number', '').strip()
@@ -796,9 +977,9 @@ def confirm_case(request, report_id):
     lab_issue_date = request.POST.get('lab_issue_date', '').strip()
     lab_findings = request.POST.get('lab_findings', '').strip()
     lab_interpretation = request.POST.get('lab_interpretation', '').strip()
+    lab_outcome = gate['lab_outcome']
 
-    threshold_result = _perform_case_confirmation(
-        report,
+    lab_kwargs = dict(
         actor_id=request.session.get('user_id'),
         lab_control_number=lab_control_number,
         test_type=test_type,
@@ -810,6 +991,19 @@ def confirm_case(request, report_id):
         actor_type=request.session.get('user_type', 'admin'),
         request=request,
     )
+
+    if lab_outcome == 'negative':
+        _perform_case_lab_negative(report, **lab_kwargs)
+        _clear_lab_ocr_scan(request)
+        messages.success(
+            request,
+            f'Case #{report_id} confirmed laboratory-negative and discarded. '
+            'It has been removed from the geospatial map.',
+        )
+        return redirect(_confirm_redirect_target(request))
+
+    threshold_result = _perform_case_confirmation(report, **lab_kwargs)
+    _clear_lab_ocr_scan(request)
 
     status_msg = threshold_result.get('status', 'NORMAL')
     if status_msg in ('PROBABLE_OUTBREAK', 'OUTBREAK_CONFIRMED'):

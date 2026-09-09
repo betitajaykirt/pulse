@@ -213,28 +213,76 @@ def _extract_issue_date(text: str) -> str:
     return remaining[-1] if remaining else ''
 
 
+_NEGATIVE_STATUS_RE = re.compile(
+    r'NOT\s*DETECTED|NOT\s+ISOLATED|NO\s+GROWTH|NON[\s\-]?REACTIVE|'
+    r'NO\s+MALARIA\s+PARASITE|NEGATIVE|\bNEG\b',
+    re.IGNORECASE,
+)
+_POSITIVE_STATUS_RE = re.compile(
+    r'\bDETECTED\b|\bISOLATED\b|\bREACTIVE\b|\bPOSITIVE\b|\bPOS\b',
+    re.IGNORECASE,
+)
+_STATUS_CAPTURE = (
+    r'(NOT\s+ISOLATED(?:\s*/\s*NOT\s+DETECTED)?|'
+    r'NOT\s*DETECTED|'
+    r'NO\s+GROWTH(?:\s*/\s*[A-Z][A-Z0-9\s]+NOT\s+ISOLATED)?|'
+    r'NON[\s\-]?REACTIVE(?:\s*/\s*NOT\s+DETECTED)?|'
+    r'NO\s+MALARIA\s+PARASITE[S]?(?:\s+(?:SEEN|FOUND))?|'
+    r'DETECTED|ISOLATED|REACTIVE|POSITIVE|NEGATIVE)'
+)
+_SKIP_ANALYTE_LABELS = frozenset({
+    'interpretation', 'diagnostic impression', 'impression', 'remarks',
+    'name', 'result', 'results', 'findings', 'lab number', 'control number',
+    'certificate issued', 'methodology', 'recommendation', 'note',
+})
+_DENGUE_MARKER_LABELS = {
+    'NS1': 'DENGUE VIRUS NS1 ANTIGEN',
+    'IgM': 'DENGUE IgM ANTIBODY',
+    'IgG': 'DENGUE IgG ANTIBODY',
+}
+
+
 def _marker_status(raw: str) -> str:
-    val = (raw or '').upper()
+    val = re.sub(r'\s+', ' ', (raw or '').upper()).strip()
     val = val.replace('NOTDETECTED', 'NOT DETECTED')
-    if 'NOT DETECTED' in val or val in {'NEGATIVE', 'NEG', 'NONREACTIVE', 'NON-REACTIVE'}:
+    if _NEGATIVE_STATUS_RE.search(val):
+        if 'NO GROWTH' in val:
+            return 'NO GROWTH'
+        if 'NOT ISOLATED' in val:
+            return 'NOT ISOLATED'
+        if 'NON-REACTIVE' in val or 'NON REACTIVE' in val or 'NONREACTIVE' in val:
+            return 'NON-REACTIVE'
+        if 'NO MALARIA' in val:
+            return 'NOT DETECTED'
         return 'NOT DETECTED'
-    if 'DETECTED' in val or val in {'POSITIVE', 'POS', 'REACTIVE'}:
+    if _POSITIVE_STATUS_RE.search(val):
+        if 'ISOLATED' in val:
+            return 'ISOLATED'
+        if 'REACTIVE' in val:
+            return 'REACTIVE'
         return 'DETECTED'
     return _clean(raw).upper()
 
 
-def _extract_markers(text: str) -> list[dict]:
+def _marker_is_positive(status: str) -> bool:
+    return bool(status) and not _NEGATIVE_STATUS_RE.search(status) and bool(
+        _POSITIVE_STATUS_RE.search(status)
+    )
+
+
+def _extract_dengue_markers(text: str) -> list[dict]:
+    if not re.search(r'\b(?:dengue|ns[\s\-]?1)\b', text, re.IGNORECASE):
+        return []
     specs = [
         ('NS1', r'(?:DENGUE\s+(?:VIRUS\s+)?)?NS[\s\-]?1(?:\s+ANTIGEN)?'),
         ('IgM', r'(?:DENGUE\s+)?Ig[\s\-]?M(?:\s+ANTIBODY)?'),
         ('IgG', r'(?:DENGUE\s+)?Ig[\s\-]?G(?:\s+ANTIBODY)?'),
     ]
     markers = []
-    seen = set()
     for name, label_re in specs:
         pattern = (
             rf'{label_re}\s*[:\-]?\s*'
-            r'(DETECTED|NOT\s*DETECTED|POSITIVE|NEGATIVE|REACTIVE|NON[\s\-]?REACTIVE)'
+            rf'{_STATUS_CAPTURE}'
         )
         m = re.search(pattern, text, re.IGNORECASE)
         if not m:
@@ -243,20 +291,50 @@ def _extract_markers(text: str) -> list[dict]:
         markers.append({
             'name': name,
             'status': status,
-            'positive': status == 'DETECTED',
+            'positive': _marker_is_positive(status),
         })
-        seen.add(name)
     return markers
 
 
+def _extract_generic_markers(text: str, existing: list[dict]) -> list[dict]:
+    dengue_names = {m['name'] for m in existing}
+    extras = []
+    seen_names = {n.upper() for n in dengue_names}
+    pattern = re.compile(
+        rf'^([A-Za-z][A-Za-z0-9][A-Za-z0-9\s,.\-/()+]{{1,80}}?)\s*[:\-]\s*{_STATUS_CAPTURE}\b',
+        re.IGNORECASE | re.MULTILINE,
+    )
+    for m in pattern.finditer(text):
+        raw_name = _clean(m.group(1))
+        label_key = re.sub(r'\s+', ' ', raw_name.lower())
+        if not raw_name or label_key in _SKIP_ANALYTE_LABELS:
+            continue
+        if dengue_names and re.search(r'\b(?:NS[\s\-]?1|Ig[\s\-]?M|Ig[\s\-]?G)\b', raw_name, re.I):
+            continue
+        name_key = raw_name.upper()
+        if name_key in seen_names:
+            continue
+        status = _marker_status(m.group(2))
+        extras.append({
+            'name': raw_name.upper(),
+            'status': status,
+            'positive': _marker_is_positive(status),
+        })
+        seen_names.add(name_key)
+    return extras
+
+
+def _extract_markers(text: str) -> list[dict]:
+    dengue = _extract_dengue_markers(text)
+    return dengue + _extract_generic_markers(text, dengue)
+
+
 def _format_findings(markers: list[dict], fallback_block: str) -> str:
-    labels = {
-        'NS1': 'DENGUE VIRUS NS1 ANTIGEN',
-        'IgM': 'DENGUE IgM ANTIBODY',
-        'IgG': 'DENGUE IgG ANTIBODY',
-    }
     if markers:
-        return '\n'.join(f"{labels[m['name']]}: {m['status']}" for m in markers)
+        return '\n'.join(
+            f"{_DENGUE_MARKER_LABELS.get(m['name'], m['name'])}: {m['status']}"
+            for m in markers
+        )
     return fallback_block
 
 
@@ -288,7 +366,7 @@ def _extract_interpretation(text: str, markers: list[dict]) -> str:
             return value
 
     m = re.search(
-        r'((?:POSITIVE|NEGATIVE)\s+FOR\s+[A-Z][A-Z\s,]{8,80})',
+        r'((?:POSITIVE|NEGATIVE)\s+FOR\s+[A-Z][A-Z0-9\s,()\-]{8,100})',
         text,
         re.IGNORECASE,
     )
@@ -296,10 +374,13 @@ def _extract_interpretation(text: str, markers: list[dict]) -> str:
         return _clean(m.group(1)).upper()
 
     positives = [m['name'] for m in markers if m['positive']]
-    if 'NS1' in positives or 'IgM' in positives:
+    dengue_present = any(m['name'] in _DENGUE_MARKER_LABELS for m in markers)
+    if dengue_present and ('NS1' in positives or 'IgM' in positives):
         return 'POSITIVE FOR ACUTE DENGUE FEVER INFECTION'
-    if markers and not positives:
+    if dengue_present and not positives:
         return 'NEGATIVE FOR DENGUE FEVER INFECTION'
+    if markers and not positives:
+        return 'NEGATIVE'
     return ''
 
 
@@ -311,20 +392,49 @@ def _marker_summary(markers: list[dict]) -> str:
     )
 
 
-def _primary_result(interpretation: str, markers: list[dict]) -> str:
+def infer_lab_outcome(interpretation: str, markers: list[dict] | None = None) -> str:
+    """Return 'positive', 'negative', or '' from interpretation and marker pills."""
     interp = (interpretation or '').upper()
-    if 'POSITIVE' in interp:
-        detail = interpretation
-        if 'ACUTE' in interp:
-            return detail
-        return f'POSITIVE — {interpretation}' if interpretation else 'POSITIVE'
+    markers = markers or []
+    if re.search(r'\bNEGATIVE\s+FOR\b', interp) or interp.strip() in {'NEGATIVE', 'NOT DETECTED'}:
+        return 'negative'
+    if re.search(r'\bPOSITIVE\s+FOR\b', interp) or interp.strip() in {'POSITIVE', 'DETECTED'}:
+        return 'positive'
+    if any(m.get('positive') for m in markers):
+        return 'positive'
+    if markers and not any(m.get('positive') for m in markers):
+        return 'negative'
+    if _NEGATIVE_STATUS_RE.search(interp) and not re.search(r'\bPOSITIVE\s+FOR\b', interp):
+        return 'negative'
+    if re.search(r'\bPOSITIVE\b', interp) and 'NEGATIVE' not in interp:
+        return 'positive'
     if 'NEGATIVE' in interp:
-        return interpretation or 'NEGATIVE'
-    if any(m['positive'] for m in markers):
-        return 'POSITIVE'
-    if markers:
-        return 'NEGATIVE'
+        return 'negative'
     return ''
+
+
+def resolve_confirm_lab_outcome(interpretation='', findings=''):
+    """Decide confirm/discard only from lab text. Unclear results stay blocked.
+
+    Client-posted ``lab_outcome`` is not used. If neither interpretation nor
+    findings independently read as positive or negative, return ''.
+    """
+    inferred = infer_lab_outcome(interpretation) or infer_lab_outcome(findings)
+    if inferred in ('positive', 'negative'):
+        return inferred
+    return ''
+
+
+def _primary_result(interpretation: str, markers: list[dict]) -> str:
+    outcome = infer_lab_outcome(interpretation, markers)
+    if outcome == 'positive':
+        interp = (interpretation or '').upper()
+        if interpretation and ('ACUTE' in interp or 'POSITIVE FOR' in interp):
+            return interpretation
+        return f'POSITIVE — {interpretation}' if interpretation else 'POSITIVE'
+    if outcome == 'negative':
+        return interpretation or 'NEGATIVE'
+    return interpretation or ''
 
 
 def _extract_patient_name(text: str) -> str:
@@ -524,17 +634,16 @@ def apply_record_name_correction(ocr_name: str, case_name: str) -> dict:
 def build_lab_overview(fields: dict) -> dict:
     markers = fields.get('markers') or []
     interpretation = fields.get('interpretation') or ''
+    outcome = infer_lab_outcome(interpretation, markers)
+    verdict = outcome.upper() if outcome else ''
     return {
         'patient': fields.get('patient_name') or '',
         'test_date': fields.get('result_date') or '',
         'primary_result': _primary_result(interpretation, markers),
         'markers': markers,
         'marker_summary': _marker_summary(markers),
-        'verdict': (
-            'POSITIVE' if 'POSITIVE' in (interpretation or '').upper()
-            or any(m.get('positive') for m in markers)
-            else ('NEGATIVE' if markers or 'NEGATIVE' in (interpretation or '').upper() else '')
-        ),
+        'verdict': verdict,
+        'lab_outcome': outcome,
     }
 
 
@@ -593,6 +702,7 @@ def parse_lab_fields(raw_text: str) -> dict:
         'marker_summary': _marker_summary(markers),
     }
     fields['overview'] = build_lab_overview(fields)
+    fields['lab_outcome'] = fields['overview'].get('lab_outcome') or ''
     return fields
 
 

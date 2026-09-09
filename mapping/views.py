@@ -254,7 +254,7 @@ def api_barangay_data(request):
         barangay_id=OuterRef('id'),
         validation_status='validated',
         report_date__gte=cutoff
-    ).values('syndrome_type').annotate(
+    ).exclude(status__in=['Closed', 'Discarded']).values('syndrome_type').annotate(
         total_cases=Sum('case_count')
     ).order_by('-total_cases')
 
@@ -265,15 +265,15 @@ def api_barangay_data(request):
             'surveillancereport',
             filter=Q(
                 surveillancereport__validation_status='validated',
-                surveillancereport__report_date__gte=cutoff
-            )
+                surveillancereport__report_date__gte=cutoff,
+            ) & ~Q(surveillancereport__status__in=['Closed', 'Discarded']),
         ),
         total_cases_sum=Sum(
             'surveillancereport__case_count',
             filter=Q(
                 surveillancereport__validation_status='validated',
-                surveillancereport__report_date__gte=cutoff
-            )
+                surveillancereport__report_date__gte=cutoff,
+            ) & ~Q(surveillancereport__status__in=['Closed', 'Discarded']),
         ),
         top_syndrome=top_syndrome_subquery
     )
