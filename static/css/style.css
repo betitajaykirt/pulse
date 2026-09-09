@@ -2836,6 +2836,26 @@ html[data-theme="dark"] .map-layer-btn:hover {
 #submit-status { margin-top: .85rem; font-size: .85rem; font-weight: 500; }
 #submit-status.error { color: var(--danger); }
 #submit-status.success { color: var(--accent); }
+.duplicate-override-panel {
+  margin-top: .85rem;
+  padding: .9rem 1rem;
+  border: 1px solid #f0c4a8;
+  background: #fff7f0;
+  border-radius: 10px;
+}
+.duplicate-override-panel__message {
+  margin: 0;
+  font-size: .85rem;
+  color: #8a3b12;
+  font-weight: 600;
+}
+.duplicate-override-panel__list {
+  margin: .55rem 0 .8rem 1.1rem;
+  padding: 0;
+  font-size: .84rem;
+  color: #5c3a24;
+}
+.duplicate-override-panel__list li { margin: .2rem 0; }
 .report-form-actions {
   display: flex; justify-content: flex-end; gap: .75rem;
   margin-top: 1.25rem; align-items: center; flex-wrap: wrap;

@@ -6,6 +6,7 @@ from decimal import Decimal
 
 
 
+from django.db import transaction
 from django.utils import timezone
 
 from myapp.models import (
@@ -22,6 +23,7 @@ from myapp.date_utils import parse_user_date
 from .ml_service import analyze_batch_cases
 
 from .risk_service import trigger_aptas_for_report
+from .patient_registry import link_or_create_patient
 from .ml_display import stored_disease_identity_from_ml
 
 
@@ -192,6 +194,7 @@ def _extract_demographics(case):
 
 
 
+@transaction.atomic
 def save_batch_submission(*, payload, submitted_by_id, locked_barangay=None):
 
     """
@@ -257,6 +260,8 @@ def save_batch_submission(*, payload, submitted_by_id, locked_barangay=None):
 
 
     created_reports = []
+    seen_patient_keys = set()
+    allow_all_duplicates = bool(payload.get('allow_duplicate_patients'))
 
     for idx, case in enumerate(cases, start=1):
 
@@ -306,6 +311,8 @@ def save_batch_submission(*, payload, submitted_by_id, locked_barangay=None):
         demographics = _extract_demographics(case)
 
         demographics['detailed_address'] = purok
+        if not demographics['date_of_birth']:
+            raise ValueError(f'Patient #{idx}: date of birth is required.')
 
         first_name = (case.get('first_name') or '').strip()
         last_name = (case.get('last_name') or '').strip()
@@ -354,7 +361,16 @@ def save_batch_submission(*, payload, submitted_by_id, locked_barangay=None):
 
             raise ValueError(f'Patient #{idx}: {exc}') from exc
 
-
+        patient = link_or_create_patient(
+            full_name=demographics['patient_name'],
+            birthdate=demographics['date_of_birth'],
+            barangay_id=barangay_id,
+            sex=sex,
+            address=purok,
+            allow_duplicate=allow_all_duplicates or bool(case.get('duplicate_override')),
+            case_index=idx,
+            seen_keys=seen_patient_keys,
+        )
 
         lat = case.get('latitude')
 
@@ -381,6 +397,8 @@ def save_batch_submission(*, payload, submitted_by_id, locked_barangay=None):
         report = SurveillanceReport.objects.create(
 
             barangay_id=barangay_id,
+
+            patient=patient,
 
             submitted_by_id=submitted_by_id,
 

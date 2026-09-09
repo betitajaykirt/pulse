@@ -34,6 +34,7 @@ from reports.ml_display import (
 from reports.pidsr_schema import DISEASE_LABELS, normalize_disease_label
 from .risk_service import evaluate_report_risk
 from .batch_service import save_batch_submission
+from .patient_registry import DuplicatePatientCaseError, link_or_create_patient
 from .threshold_service import process_confirmation_threshold_check
 from myapp.symptom_utils import build_symptom_groups_for_ui
 
@@ -133,6 +134,13 @@ def _process_batch_submission(request, locked_barangay=None):
             submitted_by_id=uid,
             locked_barangay=locked_barangay,
         )
+    except DuplicatePatientCaseError as exc:
+        return JsonResponse({
+            'ok': False,
+            'code': exc.code,
+            'error': str(exc),
+            'duplicates': exc.as_list(),
+        }, status=409)
     except ValueError as exc:
         return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
     except Exception as exc:
@@ -148,6 +156,11 @@ def _process_batch_submission(request, locked_barangay=None):
         (
             f'Session #{session.id} with {len(reports)} patient case(s) submitted'
             + (f' in {barangay_label}' if barangay_label else '')
+            + (
+                ' (staff override for duplicate resident)'
+                if payload.get('allow_duplicate_patients')
+                else ''
+            )
             + '.'
         ),
         user_role=request.session.get('role'),
@@ -256,13 +269,46 @@ def _process_report_submission(request, barangays, locked_barangay=None):
         })
 
     birthdate = _parse_patient_birthdate(request.POST.get('patient_dob', '').strip())
-    patient = _get_or_create_patient(
-        barangay_id=int(barangay_id),
-        full_name=patient_name,
-        sex=patient_sex,
-        birthdate=birthdate,
-        address=patient_addr,
-    )
+    if not patient_name:
+        messages.error(request, 'Patient first and last name are required.')
+        return render(request, 'reports/submit_report.html', {
+            'barangays': barangays,
+            'syndrome_types': SYNDROME_TYPES,
+            'disease_categories': DISEASE_CATEGORIES,
+            'assigned_barangay': locked_barangay.barangay_name if locked_barangay else request.POST.get('assigned_barangay', ''),
+            'barangay_locked': locked_barangay is not None,
+            'old': request.POST,
+        })
+    if not birthdate:
+        messages.error(request, 'Date of birth is required.')
+        return render(request, 'reports/submit_report.html', {
+            'barangays': barangays,
+            'syndrome_types': SYNDROME_TYPES,
+            'disease_categories': DISEASE_CATEGORIES,
+            'assigned_barangay': locked_barangay.barangay_name if locked_barangay else request.POST.get('assigned_barangay', ''),
+            'barangay_locked': locked_barangay is not None,
+            'old': request.POST,
+        })
+
+    try:
+        patient = link_or_create_patient(
+            barangay_id=int(barangay_id),
+            full_name=patient_name,
+            sex=patient_sex,
+            birthdate=birthdate,
+            address=patient_addr,
+            allow_duplicate=bool(request.POST.get('duplicate_override')),
+        )
+    except DuplicatePatientCaseError as exc:
+        messages.error(request, str(exc))
+        return render(request, 'reports/submit_report.html', {
+            'barangays': barangays,
+            'syndrome_types': SYNDROME_TYPES,
+            'disease_categories': DISEASE_CATEGORIES,
+            'assigned_barangay': locked_barangay.barangay_name if locked_barangay else request.POST.get('assigned_barangay', ''),
+            'barangay_locked': locked_barangay is not None,
+            'old': request.POST,
+        })
 
     report = SurveillanceReport.objects.create(
         barangay_id=barangay_id,
@@ -312,24 +358,15 @@ def _parse_patient_birthdate(raw):
     return parse_user_date(raw)
 
 
-def _get_or_create_patient(barangay_id, full_name, sex, birthdate, address):
-    """Find an existing patient by exact name + birthdate, or create a new record."""
-    if not full_name or not birthdate:
-        return None
-
-    patient = Patient.objects.filter(
+def _get_or_create_patient(barangay_id, full_name, sex, birthdate, address, allow_duplicate=False):
+    """Compatibility wrapper around the shared patient registry."""
+    return link_or_create_patient(
+        barangay_id=int(barangay_id),
         full_name=full_name,
+        sex=sex,
         birthdate=birthdate,
-    ).first()
-    if patient:
-        return patient
-
-    return Patient.objects.create(
-        full_name=full_name,
-        sex=sex or '',
-        address=address or '',
-        birthdate=birthdate,
-        barangay_id=barangay_id,
+        address=address,
+        allow_duplicate=allow_duplicate,
     )
 
 

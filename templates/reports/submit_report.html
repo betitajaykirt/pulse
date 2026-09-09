@@ -71,6 +71,13 @@
       <button type="button" id="btn-submit-batch" class="nc-btn nc-btn--primary">Submit Batch Report</button>
     </div>
     <div id="submit-status"></div>
+    <div id="duplicate-override-panel" class="duplicate-override-panel" hidden>
+      <p id="duplicate-override-message" class="duplicate-override-panel__message"></p>
+      <ul id="duplicate-override-list" class="duplicate-override-panel__list"></ul>
+      <button type="button" id="btn-submit-duplicate-override" class="nc-btn nc-btn--primary">
+        Submit as additional case for this resident
+      </button>
+    </div>
   </div>
 
 </div>
@@ -101,6 +108,29 @@ const NAME_SUFFIX_OPTIONS = ['Jr.', 'Sr.', 'II', 'III'];
 let patientSeq = 0;
 let activePatientId = null;
 let patients = [];
+let allowDuplicatePatients = false;
+
+function hideDuplicateOverridePanel() {
+  const panel = document.getElementById('duplicate-override-panel');
+  if (panel) panel.hidden = true;
+}
+
+function showDuplicateOverridePanel(data) {
+  const panel = document.getElementById('duplicate-override-panel');
+  const messageEl = document.getElementById('duplicate-override-message');
+  const listEl = document.getElementById('duplicate-override-list');
+  if (!panel || !messageEl || !listEl) return;
+  messageEl.textContent = data.error || 'This resident already has an open case in this barangay.';
+  const rows = Array.isArray(data.duplicates) ? data.duplicates : [];
+  listEl.innerHTML = rows.map((row) => {
+    const name = escapeHtml(row.patient_name || 'This resident');
+    const status = escapeHtml(row.status || 'Open');
+    const reportId = row.report_id ? '#' + row.report_id : 'this batch';
+    const onset = row.date_of_onset ? ' · onset ' + escapeHtml(row.date_of_onset) : '';
+    return `<li>${name} — open case ${reportId} (${status})${onset}</li>`;
+  }).join('');
+  panel.hidden = false;
+}
 
 function createPatient() {
   patientSeq += 1;
@@ -929,6 +959,7 @@ function validatePatients() {
 
 function buildPayload() {
   return {
+    allow_duplicate_patients: allowDuplicatePatients,
     cases: patients.map(p => {
       const address = p.purok_street.trim();
       return {
@@ -960,6 +991,17 @@ function buildPayload() {
 }
 
 document.getElementById('btn-submit-batch').addEventListener('click', async () => {
+  allowDuplicatePatients = false;
+  hideDuplicateOverridePanel();
+  await submitBatch();
+});
+
+document.getElementById('btn-submit-duplicate-override').addEventListener('click', async () => {
+  allowDuplicatePatients = true;
+  await submitBatch();
+});
+
+async function submitBatch() {
   const statusEl = document.getElementById('submit-status');
   statusEl.className = '';
   statusEl.textContent = 'Submitting...';
@@ -974,7 +1016,9 @@ document.getElementById('btn-submit-batch').addEventListener('click', async () =
   syncPatientsFromDom();
   const payload = buildPayload();
   const btn = document.getElementById('btn-submit-batch');
+  const overrideBtn = document.getElementById('btn-submit-duplicate-override');
   btn.disabled = true;
+  if (overrideBtn) overrideBtn.disabled = true;
 
   try {
     const res = await fetch(SUBMIT_URL, {
@@ -995,14 +1039,25 @@ document.getElementById('btn-submit-batch').addEventListener('click', async () =
       statusEl.className = 'error';
       statusEl.textContent = 'Server returned an invalid response (HTTP ' + res.status + ').';
       btn.disabled = false;
+      if (overrideBtn) overrideBtn.disabled = false;
+      return;
+    }
+    if (res.status === 409 && data.code === 'duplicate_patient') {
+      statusEl.className = 'error';
+      statusEl.textContent = data.error || 'A matching open case already exists.';
+      showDuplicateOverridePanel(data);
+      btn.disabled = false;
+      if (overrideBtn) overrideBtn.disabled = false;
       return;
     }
     if (!res.ok || !data.ok) {
       statusEl.className = 'error';
       statusEl.textContent = data.error || 'Submission failed.';
       btn.disabled = false;
+      if (overrideBtn) overrideBtn.disabled = false;
       return;
     }
+    hideDuplicateOverridePanel();
     statusEl.className = 'success';
     statusEl.textContent = data.message;
     setTimeout(() => { window.location.href = data.redirect || '/reports/my/'; }, 800);
@@ -1010,9 +1065,10 @@ document.getElementById('btn-submit-batch').addEventListener('click', async () =
     statusEl.className = 'error';
     statusEl.textContent = 'Network error. Please try again.';
     btn.disabled = false;
+    if (overrideBtn) overrideBtn.disabled = false;
     console.error('Batch submit failed:', err);
   }
-});
+}
 
 /* ── Automatic age calculation from native date of birth ── */
 function parseIsoDate(str) {

@@ -111,6 +111,19 @@ def _age_for(disease: str, rng: random.Random) -> int:
     return rng.randint(8, 72)
 
 
+def _birthdate_for(age: int, rng: random.Random) -> date:
+    today = date.today()
+    if age <= 0:
+        return today - timedelta(days=rng.randint(0, 27))
+    year = today.year - age
+    month = rng.randint(1, 12)
+    day = rng.randint(1, 28)
+    born = date(year, month, day)
+    if born > today:
+        born = date(year - 1, month, day)
+    return born
+
+
 def _jitter(lat: float, lng: float, rng: random.Random) -> tuple[float, float]:
     return (
         round(lat + rng.uniform(-0.004, 0.004), 7),
@@ -211,6 +224,7 @@ class Command(BaseCommand):
                     first = rng.choice(FIRST_NAMES)
                     last = rng.choice(LAST_NAMES)
                     purok = f'Purok {rng.randint(1, 8)}, {barangay_name}'
+                    age = _age_for(disease, rng)
                     cases.append({
                         'first_name': first,
                         'last_name': last,
@@ -221,7 +235,8 @@ class Command(BaseCommand):
                         'latitude': pin_lat,
                         'longitude': pin_lng,
                         'date_of_onset': onset.isoformat(),
-                        'age': _age_for(disease, rng),
+                        'date_of_birth': _birthdate_for(age, rng).isoformat(),
+                        'age': age,
                         'sex': rng.choice(['Male', 'Female']),
                         'symptoms': _symptoms_for(disease),
                     })
@@ -230,7 +245,7 @@ class Command(BaseCommand):
             )
             self.stdout.flush()
             session, reports = save_batch_submission(
-                payload={'cases': cases},
+                payload={'cases': cases, 'allow_duplicate_patients': True},
                 submitted_by_id=submitter.id,
                 locked_barangay=barangay,
             )
