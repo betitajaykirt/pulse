@@ -18,7 +18,7 @@ from myapp.barangay_scope import (
 )
 from myapp.threshold_data import pidsr_category_display
 from reports.ml_display import (
-    ml_top_prediction_for_report,
+    official_disease_label,
     parse_ml_confidence,
     predicted_disease_display,
 )
@@ -56,17 +56,11 @@ def _is_inconclusive_disease_label(label):
 
 
 def _ml_predicted_disease(report):
-    for candidate in (report.suspected_disease, report.syndrome_type):
-        if candidate and not _is_inconclusive_disease_label(candidate):
-            return candidate.strip()
-    return ''
+    return official_disease_label(report)
 
 
 def _confirmed_disease_name(report):
-    for candidate in (report.syndrome_type, report.suspected_disease):
-        if candidate and not _is_inconclusive_disease_label(candidate):
-            return candidate.strip()
-    return ''
+    return official_disease_label(report)
 
 
 def _ml_confidence_high(report, ml_predicted):
@@ -129,13 +123,22 @@ def _map_pin_aptas(report, assessment, risk_logs):
     barangay = ''
     if getattr(report, 'barangay', None):
         barangay = report.barangay.barangay_name or ''
-    syndrome = (
-        ml_top_prediction_for_report(report)
-        or report.syndrome_type
-        or report.suspected_disease
-        or ''
-    ).strip()
-    log = risk_logs.get((barangay.casefold(), syndrome.casefold()))
+    syndrome = official_disease_label(report)
+    stored = (getattr(report, 'syndrome_type', None) or '').strip()
+    suspected = (getattr(report, 'suspected_disease', None) or '').strip()
+    log = None
+    seen = set()
+    for label in (syndrome, stored, suspected):
+        key_label = (label or '').strip()
+        if not key_label:
+            continue
+        folded = key_label.casefold()
+        if folded in seen:
+            continue
+        seen.add(folded)
+        log = risk_logs.get((barangay.casefold(), folded))
+        if log:
+            break
     if log:
         final_raw = float(log.final_risk_score or 0.0)
         final_norm = final_raw / 100.0 if final_raw > 1.5 else final_raw
@@ -463,10 +466,10 @@ def api_cases(request):
         )
         confirmed_date = format_display_date(r.confirmed_at) if r.confirmed_at else ''
         onset = format_display_date(r.date_of_onset)
-        ml_predicted = ml_top_prediction_for_report(r) or _ml_predicted_disease(r)
+        ml_predicted = official_disease_label(r)
         ml_confidence = parse_ml_confidence(r.remarks or '')
         ml_display = predicted_disease_display(r)
-        confirmed_disease = _confirmed_disease_name(r) if status_norm == 'Confirmed' else ''
+        confirmed_disease = official_disease_label(r) if status_norm == 'Confirmed' else ''
         ml_high = _ml_confidence_high(r, ml_predicted)
         action_disease = _canonical_disease_for_actions(
             r, status_norm, ml_predicted, confirmed_disease,
@@ -479,13 +482,13 @@ def api_cases(request):
             'patient_name':        (r.patient_name or '').strip() or 'Unknown Resident',
             'latitude':            float(r.latitude),
             'longitude':           float(r.longitude),
-            'syndrome_type':       r.syndrome_type,
+            'syndrome_type':       official_disease_label(r),
             'purok':               purok,
             'suspected_disease':   (r.suspected_disease or '').strip(),
             'confirmed_disease':   confirmed_disease,
             'ml_predicted_disease': ml_predicted,
             'pidsr_category': pidsr_category_display(action_disease or ml_predicted or confirmed_disease),
-            'ml_top_predicted_disease': ml_top_prediction_for_report(r) or ml_predicted,
+            'ml_top_predicted_disease': ml_predicted,
             'ml_classification_confidence': ml_confidence,
             'ml_confidence_pct':   ml_display.get('confidence_pct'),
             'ml_secondary_predicted_disease': ml_display.get('secondary') or '',
@@ -561,5 +564,5 @@ def api_case_scores(request, report_id):
         'ml_confidence_pct': ml_display.get('confidence_pct'),
         'ml_secondary_predicted_disease': ml_display.get('secondary') or '',
         'ml_secondary_confidence_pct': ml_display.get('secondary_confidence_pct'),
-        'ml_top_predicted_disease': ml_top_prediction_for_report(report) or '',
+        'ml_top_predicted_disease': official_disease_label(report) or '',
     })

@@ -7,7 +7,7 @@ from reports.aptas_service import (
     compute_aptas_breakdown,
     normalize_anomaly_score,
 )
-from reports.ml_display import ml_top_prediction_for_report
+from reports.ml_display import official_disease_label
 
 
 def _raw_anomaly_for_report(report, assessment=None) -> float | None:
@@ -23,12 +23,7 @@ def aptas_breakdown_for_report(report, assessment=None, cache=None) -> dict:
     if cache is None:
         cache = {}
     barangay = report.barangay.barangay_name if report.barangay else ''
-    syndrome = (
-        ml_top_prediction_for_report(report)
-        or report.syndrome_type
-        or report.suspected_disease
-        or 'Undetermined'
-    ).strip()
+    syndrome = official_disease_label(report) or 'Undetermined'
     raw_anomaly = _raw_anomaly_for_report(report, assessment)
     cache_key = (barangay.lower(), syndrome.lower(), report.id, round(raw_anomaly or 0.0, 4))
     if cache_key not in cache:

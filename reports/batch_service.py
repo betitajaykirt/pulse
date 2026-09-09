@@ -22,6 +22,7 @@ from myapp.date_utils import parse_user_date
 from .ml_service import analyze_batch_cases
 
 from .risk_service import trigger_aptas_for_report
+from .ml_display import stored_disease_identity_from_ml
 
 
 
@@ -262,6 +263,7 @@ def save_batch_submission(*, payload, submitted_by_id, locked_barangay=None):
         ml = ml_results[idx - 1]
 
         disease_label = ml['disease_label']
+        official_disease = stored_disease_identity_from_ml(ml)
 
         case_classif = ml['case_classification']
 
@@ -386,9 +388,9 @@ def save_batch_submission(*, payload, submitted_by_id, locked_barangay=None):
 
             source_type='BHW',
 
-            syndrome_type=disease_label,
+            syndrome_type=official_disease,
 
-            suspected_disease=disease_label,
+            suspected_disease=official_disease,
 
             case_count=1,
 

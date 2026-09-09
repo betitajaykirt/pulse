@@ -27,7 +27,8 @@ def _barangay_name(report) -> str:
 
 
 def _disease_label(report) -> str:
-    return (report.syndrome_type or report.suspected_disease or 'Unclassified').strip() or 'Unclassified'
+    from reports.ml_display import official_disease_label
+    return official_disease_label(report) or 'Unclassified'
 
 
 def bhw_user_ids(*, barangay_name: Optional[str] = None) -> list[int]:

@@ -149,7 +149,7 @@
                   onclick="viewRecord(
                     '{{ r.id }}',
                     '{{ r.barangay_name|default:"—" }}',
-                    '{{ r.syndrome_type }}',
+                    '{{ r.ml_prediction.primary|default:r.syndrome_type|escapejs }}',
                     '{{ r.case_classification }}',
                     '{{ r.case_count }}',
                     '{{ r.date_of_onset|md_date }}',

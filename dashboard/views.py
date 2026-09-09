@@ -679,7 +679,10 @@ def nurse_dashboard_view(request):
         base_qs = SurveillanceReport.objects.select_related('submitted_by').filter(
             barangay_id=barangay.id
         ).exclude(status='Closed')
-        ctx['recent_reports'] = base_qs.order_by('-report_date')[:10]
+        ctx['recent_reports'] = list(base_qs.order_by('-report_date')[:10])
+        from reports.ml_display import official_disease_label
+        for report in ctx['recent_reports']:
+            report.display_disease = official_disease_label(report)
 
     return render(request, 'dashboard/nurse_dashboard.html', ctx)
 

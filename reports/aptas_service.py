@@ -812,6 +812,10 @@ def compute_and_log_barangay_risk(
     is_active = should_activate_aptas_alert(final_score, anomaly, force_activate=force_activate)
     if not _is_trackable_syndrome(syndrome):
         is_active = False
+    if report is not None and not force_activate:
+        from reports.ml_display import report_has_alertable_disease
+        if not report_has_alertable_disease(report):
+            is_active = False
 
     if deactivate_previous:
         BarangayRiskLog.objects.filter(
@@ -952,6 +956,7 @@ def recalculate_aptas_for_barangay(
     Called after batch submission and case confirmation so neighbor records refresh.
     """
     from myapp.models import Barangay
+    from reports.ml_display import official_disease_label
 
     if isinstance(barangay, int):
         barangay = Barangay.objects.filter(id=barangay).first()
@@ -982,7 +987,7 @@ def recalculate_aptas_for_barangay(
             barangay_id=barangay.id,
         ).select_related('barangay').first()
         if trigger:
-            syndrome = (trigger.syndrome_type or trigger.suspected_disease or '').strip()
+            syndrome = official_disease_label(trigger)
             _register_syndrome(syndrome)
             key = syndrome.casefold()
             if _is_trackable_syndrome(syndrome) and key not in processed_syndromes:
@@ -1020,7 +1025,7 @@ def recalculate_aptas_for_barangay(
         .order_by('-report_date')[:40]
     )
     for sibling in siblings:
-        syndrome = (sibling.syndrome_type or sibling.suspected_disease or '').strip()
+        syndrome = official_disease_label(sibling)
         key = syndrome.casefold()
         if not _is_trackable_syndrome(syndrome) or key in processed_syndromes:
             continue

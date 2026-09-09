@@ -328,8 +328,9 @@ def handle_case_state_change(
     Called from ``close_case`` and the ``pre_delete`` signal on ``SurveillanceReport``.
     """
     if report is not None:
+        from reports.ml_display import official_disease_label
         barangay_id = report.barangay_id
-        syndrome = (report.syndrome_type or report.suspected_disease or '').strip()
+        syndrome = official_disease_label(report)
         trigger_report_id = trigger_report_id or report.id
 
     if not barangay_id:

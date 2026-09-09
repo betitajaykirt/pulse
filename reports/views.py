@@ -26,11 +26,14 @@ from myapp.barangay_scope import (
 from myapp.audit_utils import log_audit, log_system
 from myapp.date_utils import format_display_date, format_display_datetime, parse_user_date
 from reports.disease_category_data import filter_surveillance_reports_by_disease_label
-from reports.ml_display import is_inconclusive_disease_label
+from reports.ml_display import (
+    is_inconclusive_disease_label,
+    official_disease_label,
+    predicted_disease_display,
+)
 from reports.pidsr_schema import DISEASE_LABELS, normalize_disease_label
 from .risk_service import evaluate_report_risk
 from .batch_service import save_batch_submission
-from .ml_display import predicted_disease_display
 from .threshold_service import process_confirmation_threshold_check
 from myapp.symptom_utils import build_symptom_groups_for_ui
 
@@ -49,9 +52,13 @@ DISEASE_CATEGORIES = [
 ]
 
 
-def _incident_summary_disease_label(syndrome_type: str) -> str:
-    """Normalize legacy syndrome labels for incident report summaries."""
-    label = normalize_disease_label((syndrome_type or '').strip())
+def _incident_summary_disease_label(report_or_label) -> str:
+    """Normalize the official disease identity for incident report summaries."""
+    if hasattr(report_or_label, 'syndrome_type'):
+        label = official_disease_label(report_or_label)
+    else:
+        label = (report_or_label or '').strip()
+    label = normalize_disease_label(label)
     if is_inconclusive_disease_label(label):
         return ''
     return label
@@ -574,9 +581,9 @@ def _patient_profile_for_report(report) -> dict:
         'city': city or '—',
         'onset_date': format_display_date(display.get('onset_date') or report.date_of_onset),
         'reported_at': format_display_datetime(report.report_date),
-        'disease': report.syndrome_type or report.suspected_disease or '—',
+        'disease': official_disease_label(report) or '—',
         'pidsr_category': pidsr_category_display(
-            report.syndrome_type or report.suspected_disease or ''
+            official_disease_label(report) or ''
         ),
         'status': report.status or '—',
         'classification': (report.case_classification or '').title() or '—',
@@ -774,7 +781,7 @@ def admin_confirmation_panel(request):
             'patient_name': patient['name'],
             'patient_id_display': patient['id_display'],
             'onset_date': patient.get('onset_date'),
-            'ml_disease': report.syndrome_type or report.suspected_disease or '—',
+            'ml_disease': official_disease_label(report) or '—',
             'patient_payload': json.dumps(profile),
         })
 
@@ -1137,7 +1144,7 @@ def close_case(request, report_id):
     from reports.case_state_service import handle_case_state_change
     handle_case_state_change(
         barangay_id=report.barangay_id,
-        syndrome=(report.syndrome_type or report.suspected_disease or '').strip(),
+        syndrome=official_disease_label(report),
         trigger_report_id=report.id,
         actor_id=actor_id,
     )
@@ -1262,7 +1269,7 @@ def incident_reports(request):
 
     aptas_cache = {}
     for report in reports:
-        report.display_disease = _incident_summary_disease_label(report.syndrome_type) or (report.syndrome_type or '—')
+        report.display_disease = _incident_summary_disease_label(report) or (official_disease_label(report) or '—')
         report.incident_risk_level = risk_level_for_report(
             report,
             assessments.get(report.id),
@@ -1294,7 +1301,7 @@ def incident_reports(request):
     by_classif  = {'Suspected': 0, 'Probable': 0, 'Confirmed': 0}
 
     for r in reports:
-        disease_label = _incident_summary_disease_label(r.syndrome_type)
+        disease_label = _incident_summary_disease_label(r)
         if disease_label:
             by_disease[disease_label] = by_disease.get(disease_label, 0) + r.case_count
         by_barangay[r.barangay_name] = by_barangay.get(r.barangay_name, 0) + r.case_count

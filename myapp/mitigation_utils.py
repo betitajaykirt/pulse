@@ -100,14 +100,16 @@ def mitigation_suggestions_for_report(report) -> Optional[Dict[str, Any]]:
     """
     Build map-popup mitigation payload for PROBABLE (ML) or CONFIRMED (admin) cases.
     """
+    from reports.ml_display import is_inconclusive_disease_label, official_disease_label
+
     status = (report.status or '').strip()
     classification = (report.case_classification or '').strip().lower()
     threshold_status = (getattr(report, 'epidemic_threshold_status', '') or '').strip()
+    disease_label = official_disease_label(report)
+    if not disease_label or is_inconclusive_disease_label(disease_label):
+        return None
 
     if status == 'Confirmed' or classification == 'confirmed':
-        disease_label = (report.syndrome_type or report.suspected_disease or '').strip()
-        if not disease_label:
-            return None
         alert_levels = list(CONFIRMED_ALERT_LEVELS)
         banner_type = 'outbreak_critical'
         tier = 'confirmed'
@@ -124,9 +126,6 @@ def mitigation_suggestions_for_report(report) -> Optional[Dict[str, Any]]:
         }
 
     if status == 'Probable' or classification == 'probable':
-        disease_label = (report.syndrome_type or report.suspected_disease or '').strip()
-        if not disease_label:
-            return None
         steps = protocols_for_alert_tier(disease_label, PROBABLE_ALERT_LEVELS)
         return {
             'tier': 'probable',

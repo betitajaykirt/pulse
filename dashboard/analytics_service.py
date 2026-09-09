@@ -9,8 +9,7 @@ from django.utils import timezone
 from myapp.models import Barangay, PatientCase, SurveillanceReport, SYMPTOM_CATEGORY_CHOICES
 from reports.ml_display import (
     is_inconclusive_disease_label,
-    ml_top_prediction_for_report,
-    predicted_disease_display,
+    official_disease_label,
 )
 from reports.pidsr_schema import normalize_disease_label
 
@@ -358,12 +357,8 @@ def _canonical_analytics_disease(label):
 
 
 def _analytics_disease_for_report(report):
-    """Same confirmed / ML-predicted label used on the map and Case Monitoring."""
-    display = predicted_disease_display(report)
-    label = _canonical_analytics_disease(display.get('primary'))
-    if label:
-        return label
-    return _canonical_analytics_disease(ml_top_prediction_for_report(report))
+    """Same official disease identity used on the map, APTAS, and Case Monitoring."""
+    return _canonical_analytics_disease(official_disease_label(report))
 
 
 def _count_by_analytics_disease(qs):

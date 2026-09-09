@@ -7,6 +7,7 @@ Risk assessment and APTAS alert pipeline — adapted for pulse_db legacy alerts 
 import logging
 from decimal import Decimal
 
+from django.db.models import Q
 from django.utils import timezone
 
 from myapp.models import (
@@ -15,7 +16,11 @@ from myapp.models import (
 )
 from myapp.barangay_scope import CITY_WIDE_ROLES, BARANGAY_SCOPED_ROLES
 from reports.aptas_service import compute_and_log_barangay_risk
-from reports.ml_display import is_alertable_disease_label, report_has_alertable_disease
+from reports.ml_display import (
+    is_alertable_disease_label,
+    official_disease_label,
+    report_has_alertable_disease,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +39,7 @@ def _persist_aptas_risk_log(report, raw_anomaly_score, force_activate=False):
     try:
         return compute_and_log_barangay_risk(
             report.barangay.barangay_name,
-            report.syndrome_type or report.suspected_disease,
+            official_disease_label(report),
             raw_anomaly_score,
             force_activate=force_activate,
             report=report,
@@ -79,7 +84,7 @@ def trigger_aptas_for_report(report_id, *, is_anomaly=False):
         model_version='aptas-engine-v1' if aptas_log else ('isolation-forest-v1' if is_anomaly else 'random-forest-v1'),
         evaluation_status='completed',
         evaluated_at=timezone.now(),
-        recommended_action=_recommended_action(risk_level, report.syndrome_type),
+        recommended_action=_recommended_action(risk_level, official_disease_label(report)),
         created_at=timezone.now(),
     )
 
@@ -145,11 +150,7 @@ def _create_risk_analysis_bridge(
     ``alerts.analysis_id`` FK (must reference ``risk_analysis.analysis_id``).
     """
     now_ts = timezone.now()
-    disease_type = (
-        report.syndrome_type
-        or getattr(report, 'suspected_disease', None)
-        or 'Unknown'
-    )
+    disease_type = official_disease_label(report) or 'Unknown'
     prediction = MlAiPrediction.objects.create(
         disease_type=disease_type,
         risk_score=float(risk_score),
@@ -188,27 +189,31 @@ def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level
         return None
     if not alert_level:
         alert_level = 'critical' if is_anomaly else 'high'
-        
+
+    disease = official_disease_label(report)
     purok = _get_purok_for_report(report)
-    
+
     summary = (
-        f'APTAS RISK: {report.syndrome_type} at {alert_level.title()} level in {barangay.barangay_name}'
+        f'APTAS RISK: {disease} at {alert_level.title()} level in {barangay.barangay_name}'
         if alert_level in ('high', 'critical') else
-        f'{report.syndrome_type} alert in {barangay.barangay_name}'
+        f'{disease} alert in {barangay.barangay_name}'
     )
 
     from dashboard.models import AppNotification
     from django.utils import timezone
     today = timezone.now().date()
-    
+
     active_cases = SurveillanceReport.objects.filter(
         barangay_id=report.barangay_id,
-        syndrome_type=report.syndrome_type,
-        status__in=['Pending ML Analysis', 'Suspected', 'Probable', 'Confirmed']
+        status__in=['Pending ML Analysis', 'Suspected', 'Probable', 'Confirmed'],
+    ).filter(
+        Q(syndrome_type=disease)
+        | Q(suspected_disease=disease)
+        | Q(remarks__icontains=f'ML Top Prediction: {disease}')
     ).count()
     
     existing_notif = AppNotification.objects.filter(
-        disease=report.syndrome_type,
+        disease=disease,
         barangay_name=barangay.barangay_name,
         purok=purok,
         created_at__date=today
@@ -247,7 +252,7 @@ def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level
         alert_level=alert_level,
         alert_date=timezone.now(),
         status='active',
-        alert_type=report.syndrome_type,
+        alert_type=disease,
         analysis_id=analysis.id,
     )
 
@@ -264,7 +269,7 @@ def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level
 
     AppNotification.objects.create(
         alert_id=alert.id,
-        disease=report.syndrome_type,
+        disease=disease,
         barangay_name=barangay.barangay_name,
         purok=purok,
         severity_level=alert_level.title(),

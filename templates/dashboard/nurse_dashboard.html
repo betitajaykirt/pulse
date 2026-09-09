@@ -186,7 +186,7 @@
           <tbody>
             {% for r in recent_reports %}
             <tr class="pulse-table__row">
-              <td data-label="Syndrome">{{ r.syndrome_type }}</td>
+              <td data-label="Syndrome">{{ r.display_disease|default:r.syndrome_type }}</td>
               <td data-label="Cases">{{ r.case_count }}</td>
               <td data-label="Submitted By">
                 {% if r.submitted_by %}
