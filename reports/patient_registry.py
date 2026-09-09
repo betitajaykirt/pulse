@@ -3,9 +3,8 @@ from __future__ import annotations
 
 from datetime import date
 
+from reports.case_scope import INACTIVE_CASE_STATUSES as CLOSED_CASE_STATUSES
 from myapp.models import Patient, SurveillanceReport
-
-CLOSED_CASE_STATUSES = frozenset({'Closed', 'Discarded'})
 UNKNOWN_PATIENT_NAME = 'unknown resident'
 
 

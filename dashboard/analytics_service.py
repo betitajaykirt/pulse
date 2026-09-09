@@ -2,11 +2,17 @@
 from datetime import date, timedelta
 import re
 
-from django.db.models import Count, F, Max, Min, Q
+from django.db.models import Count, F, Max, Min
 from django.db.models.functions import Coalesce, TruncDate, TruncMonth, TruncWeek
 from django.utils import timezone
 
 from myapp.models import Barangay, PatientCase, SurveillanceReport, SYMPTOM_CATEGORY_CHOICES
+from reports.case_scope import (
+    INACTIVE_CASE_STATUSES,
+    NAMED_TIME_RANGES,
+    apply_open_case_scope,
+    named_time_window,
+)
 from reports.ml_display import (
     is_inconclusive_disease_label,
     official_disease_label,
@@ -19,7 +25,7 @@ SYNDROME_CATEGORY_OPTIONS = SYMPTOM_CATEGORY_CHOICES
 STATUS_ORDER = ['Suspected', 'Probable', 'Confirmed']
 AGE_BRACKETS = ['0-5', '6-12', '13-19', '20+']
 SEX_ORDER = ['Male', 'Female']
-INACTIVE_STATUSES = ('Closed', 'Discarded')
+INACTIVE_STATUSES = INACTIVE_CASE_STATUSES
 
 STATUS_COLORS = {
     'Suspected': '#f59e0b',
@@ -59,14 +65,7 @@ def _age_from_birthdate(birthdate, today=None):
     return years if years >= 0 else None
 
 
-VALID_TIME_RANGES = (
-    'all_active',
-    'current_month',
-    'last_30_days',
-    'last_3_months',
-    'last_6_months',
-    'current_year',
-)
+VALID_TIME_RANGES = NAMED_TIME_RANGES
 
 _REMARKS_AGE_RE = re.compile(r'Age:\s*(\d+)', re.IGNORECASE)
 _REMARKS_SEX_RE = re.compile(r'Sex:\s*(Male|Female)', re.IGNORECASE)
@@ -74,18 +73,7 @@ _SKIP_DISEASE_LABELS = frozenset({'unknown', '—', '-', 'n/a', 'na', 'none'})
 
 
 def _time_window(time_range, today=None):
-    today = today or timezone.now().date()
-    if time_range == 'all_active':
-        return None, today
-    if time_range == 'current_month':
-        return today.replace(day=1), today
-    if time_range == 'last_30_days':
-        return today - timedelta(days=30), today
-    if time_range == 'last_3_months':
-        return today - timedelta(days=90), today
-    if time_range == 'last_6_months':
-        return today - timedelta(days=183), today
-    return today.replace(month=1, day=1), today
+    return named_time_window(time_range, today=today)
 
 
 def _apply_disease_filter(qs, disease=''):
@@ -105,17 +93,12 @@ def _apply_disease_filter(qs, disease=''):
 
 def _base_queryset(symptom_category='', barangay_id='', time_range='all_active'):
     """All open surveillance reports in the selected window, read live from MySQL."""
-    qs = SurveillanceReport.objects.exclude(status__in=INACTIVE_STATUSES).select_related('barangay')
     start, end = _time_window(time_range)
-    if start is not None:
-        qs = qs.filter(
-            Q(date_of_onset__gte=start, date_of_onset__lte=end)
-            | Q(
-                date_of_onset__isnull=True,
-                report_date__date__gte=start,
-                report_date__date__lte=end,
-            )
-        )
+    qs = apply_open_case_scope(
+        SurveillanceReport.objects.select_related('barangay'),
+        start=start,
+        end=end,
+    )
     qs = _apply_disease_filter(qs, symptom_category)
     if barangay_id:
         qs = qs.filter(barangay_id=barangay_id)

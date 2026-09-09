@@ -1391,8 +1391,10 @@ def api_recent_reports(request):
 def get_barangay_risk_map_data(request):
     """Return latest ``BarangayRiskLog`` score per barangay for Leaflet boundaries."""
     from reports.aptas_service import get_barangay_risk_map_matrix
+    from reports.case_scope import parse_scope_time_range
 
-    matrix = get_barangay_risk_map_matrix()
+    start, end = parse_scope_time_range(request.GET.get('time_range', '30'))
+    matrix = get_barangay_risk_map_matrix(start=start, end=end)
     scoped_barangay = get_request_barangay(request)
 
     if scoped_barangay:

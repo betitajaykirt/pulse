@@ -1052,14 +1052,15 @@ def recalculate_aptas_for_barangay(
     return logs
 
 
-def get_barangay_risk_map_matrix() -> Dict[str, Dict[str, Any]]:
+def get_barangay_risk_map_matrix(start=None, end=None) -> Dict[str, Dict[str, Any]]:
     """
     Latest APTAS score per barangay for choropleth map styling.
 
     Returns ``{barangay_name: {'score': float, 'level': str}}``.
-    Barangays with no open surveillance cases always return zero risk.
+    Barangays with no open surveillance cases in the window always return zero risk.
     """
     from myapp.models import Barangay
+    from reports.case_scope import apply_open_case_scope
 
     matrix: Dict[str, Dict[str, Any]] = {}
     barangay_ids_by_name: Dict[str, int] = {}
@@ -1068,16 +1069,21 @@ def get_barangay_risk_map_matrix() -> Dict[str, Dict[str, Any]]:
         if name:
             barangay_ids_by_name[name.casefold()] = row['id']
 
+    open_barangay_ids = set(
+        apply_open_case_scope(
+            SurveillanceReport.objects.all(),
+            start=start,
+            end=end,
+        ).values_list('barangay_id', flat=True).distinct()
+    )
+
     logs = BarangayRiskLog.objects.order_by('-created_at')
     for log in logs:
         name = canonical_barangay_name(log.barangay)
         if not name or name in matrix:
             continue
         brgy_id = barangay_ids_by_name.get(name.casefold())
-        if brgy_id and not SurveillanceReport.objects.filter(
-            barangay_id=brgy_id,
-            status__in=ACTIVE_SURVEILLANCE_STATUSES,
-        ).exists():
+        if brgy_id not in open_barangay_ids:
             matrix[name] = {'score': 0.0, 'level': 'Low'}
             continue
         matrix[name] = {

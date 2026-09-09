@@ -3,9 +3,7 @@ from django.http import JsonResponse, HttpResponse
 from django.urls import reverse
 from django.views.decorators.http import require_GET
 from django.db.models import OuterRef, Subquery, Sum, Count, Q
-from django.utils import timezone
 from myapp.date_utils import format_display_date, format_display_datetime, parse_user_date
-from datetime import timedelta
 from accounts.auth_utils import login_required
 from myapp.models import (
     Barangay, SurveillanceReport, RiskAssessment,
@@ -17,6 +15,12 @@ from myapp.barangay_scope import (
     catchment_nurse_officer_fields,
 )
 from myapp.threshold_data import pidsr_category_display
+from reports.case_scope import (
+    INACTIVE_CASE_STATUSES,
+    apply_open_case_scope,
+    event_date_window_q,
+    parse_scope_time_range,
+)
 from reports.ml_display import (
     official_disease_label,
     parse_ml_confidence,
@@ -245,19 +249,19 @@ def map_view(request):
 def api_barangay_data(request):
     time_range  = request.GET.get('time_range', '30')
     risk_filter = request.GET.get('risk', '')
-    try:
-        days = int(time_range)
-    except ValueError:
-        days = 30
-
-    cutoff = timezone.now() - timedelta(days=days)
+    start, end = parse_scope_time_range(time_range)
     scoped_barangay = get_request_barangay(request)
+    related_window_q = event_date_window_q(start, end, prefix='surveillancereport')
+    open_related_q = (
+        related_window_q
+        & ~Q(surveillancereport__status__in=INACTIVE_CASE_STATUSES)
+    )
 
-    top_syndrome_qs = SurveillanceReport.objects.filter(
-        barangay_id=OuterRef('id'),
-        validation_status='validated',
-        report_date__gte=cutoff
-    ).exclude(status__in=['Closed', 'Discarded']).values('syndrome_type').annotate(
+    top_syndrome_qs = apply_open_case_scope(
+        SurveillanceReport.objects.filter(barangay_id=OuterRef('id')),
+        start=start,
+        end=end,
+    ).values('syndrome_type').annotate(
         total_cases=Sum('case_count')
     ).order_by('-total_cases')
 
@@ -266,17 +270,11 @@ def api_barangay_data(request):
     barangays_qs = Barangay.objects.annotate(
         report_count=Count(
             'surveillancereport',
-            filter=Q(
-                surveillancereport__validation_status='validated',
-                surveillancereport__report_date__gte=cutoff,
-            ) & ~Q(surveillancereport__status__in=['Closed', 'Discarded']),
+            filter=open_related_q,
         ),
         total_cases_sum=Sum(
             'surveillancereport__case_count',
-            filter=Q(
-                surveillancereport__validation_status='validated',
-                surveillancereport__report_date__gte=cutoff,
-            ) & ~Q(surveillancereport__status__in=['Closed', 'Discarded']),
+            filter=open_related_q,
         ),
         top_syndrome=top_syndrome_subquery
     )
@@ -331,20 +329,18 @@ def api_cases(request):
     barangay_name = request.GET.get('barangay', '').strip()
     case_classif = request.GET.get('case_classification', '').strip()
 
-    try:
-        days = int(time_range)
-    except ValueError:
-        days = 30
-
+    start, end = parse_scope_time_range(time_range)
     role = request.session.get('role')
-    cutoff = timezone.now() - timedelta(days=days)
     scoped_barangay = get_request_barangay(request)
 
-    base_qs = SurveillanceReport.objects.filter(
-        latitude__isnull=False,
-        longitude__isnull=False,
-        report_date__gte=cutoff,
-    ).exclude(status__in=['Closed', 'Discarded'])
+    base_qs = apply_open_case_scope(
+        SurveillanceReport.objects.filter(
+            latitude__isnull=False,
+            longitude__isnull=False,
+        ),
+        start=start,
+        end=end,
+    )
 
     if scoped_barangay:
         base_qs = base_qs.filter(barangay_id=scoped_barangay.id)

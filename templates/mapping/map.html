@@ -125,10 +125,9 @@
       <select id="filter-time" class="input-soft input-soft--plain" onchange="loadMapData(false)">
 
         <option value="7">Last 7 days</option>
-
         <option value="30" selected>Last 30 days</option>
-
         <option value="90">Last 90 days</option>
+        <option value="all_active">All open cases</option>
 
       </select>
 
@@ -997,8 +996,16 @@
 
 
 
-    function loadBarangayBoundaries() {
+    function mapTimeRangeParam() {
+      var el = document.getElementById('filter-time');
+      return el ? el.value : '30';
+    }
 
+    function riskDataUrl() {
+      return MAP_CONFIG.riskUrl + (MAP_CONFIG.riskUrl.indexOf('?') === -1 ? '?' : '&') + 'time_range=' + encodeURIComponent(mapTimeRangeParam());
+    }
+
+    function loadBarangayBoundaries() {
       if (boundaryApi) {
 
         return Promise.resolve(boundaryApi);
@@ -1019,7 +1026,7 @@
 
         cityGeoUrl: MAP_CONFIG.cityGeoUrl,
 
-        riskUrl: MAP_CONFIG.riskUrl,
+        riskUrl: riskDataUrl(),
 
         casePinsLayer: casePinsLayer,
 
@@ -1097,7 +1104,7 @@
 
       }
 
-      return fetch(MAP_CONFIG.riskUrl)
+      return fetch(riskDataUrl())
 
         .then(function (r) { return r.json(); })
 
