@@ -19,6 +19,11 @@ def is_city_wide_role(role):
     return role in CITY_WIDE_ROLES
 
 
+def can_acknowledge_alerts(role) -> bool:
+    """Only City Health Office / city-wide officers may clear a system alert."""
+    return role in CITY_WIDE_ROLES
+
+
 def is_barangay_scoped_role(role):
     return role in BARANGAY_SCOPED_ROLES
 

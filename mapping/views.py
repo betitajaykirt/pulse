@@ -160,7 +160,7 @@ def _map_pin_aptas(report, assessment, risk_logs):
     elif report.ml_anomaly_score is not None:
         raw = float(report.ml_anomaly_score)
     if raw is None:
-        anomaly = 0.22
+        anomaly = 0.0
     elif raw < 0:
         anomaly = max(0.0, min(1.0, 0.5 - raw))
     elif raw <= 1.0:

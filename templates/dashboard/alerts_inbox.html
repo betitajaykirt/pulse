@@ -169,9 +169,11 @@
       </div>
     </div>
     <div class="aptas-modal__footer">
+      {% if can_acknowledge_alerts %}
       <button type="button" id="aptas-modal-ack-btn" class="nc-btn nc-btn--secondary" onclick="acknowledgeAlert()">
         <i data-lucide="check-circle" class="lucide-icon lucide-icon--sm" style="margin-right:6px;"></i>Acknowledge
       </button>
+      {% endif %}
       <a id="aptas-modal-map-btn" href="/map/" class="nc-btn nc-btn--primary" style="text-decoration:none;">
         <i data-lucide="map-pin" class="lucide-icon lucide-icon--sm" style="margin-right:6px;"></i>View on Map
       </a>
@@ -367,15 +369,16 @@
     // Map button
     document.getElementById('aptas-modal-map-btn').href = d.mapUrl || '/map/';
 
-    // Acknowledge button visibility
+    // Acknowledge button visibility (CHO roles only — button is omitted otherwise)
     var ackBtn = document.getElementById('aptas-modal-ack-btn');
-    if (currentAlertId) {
-      ackBtn.style.display = '';
-      ackBtn.disabled = false;
-      ackBtn.textContent = '';
-      ackBtn.innerHTML = '<i data-lucide="check-circle" class="lucide-icon lucide-icon--sm" style="margin-right:6px;"></i>Acknowledge';
-    } else {
-      ackBtn.style.display = 'none';
+    if (ackBtn) {
+      if (currentAlertId) {
+        ackBtn.style.display = '';
+        ackBtn.disabled = false;
+        ackBtn.innerHTML = '<i data-lucide="check-circle" class="lucide-icon lucide-icon--sm" style="margin-right:6px;"></i>Acknowledge';
+      } else {
+        ackBtn.style.display = 'none';
+      }
     }
 
     modal.style.display = 'flex';
@@ -418,12 +421,14 @@
     document.getElementById('aptas-modal-map-btn').href = '/map/?barangay=' + encodeURIComponent(d.barangay || d.syndrome || '');
 
     var ackBtn = document.getElementById('aptas-modal-ack-btn');
-    if (currentAlertId && d.status && d.status.toLowerCase() === 'active') {
-      ackBtn.style.display = '';
-      ackBtn.disabled = false;
-      ackBtn.innerHTML = '<i data-lucide="check-circle" class="lucide-icon lucide-icon--sm" style="margin-right:6px;"></i>Acknowledge';
-    } else {
-      ackBtn.style.display = 'none';
+    if (ackBtn) {
+      if (currentAlertId && d.status && d.status.toLowerCase() === 'active') {
+        ackBtn.style.display = '';
+        ackBtn.disabled = false;
+        ackBtn.innerHTML = '<i data-lucide="check-circle" class="lucide-icon lucide-icon--sm" style="margin-right:6px;"></i>Acknowledge';
+      } else {
+        ackBtn.style.display = 'none';
+      }
     }
 
     modal.style.display = 'flex';
@@ -454,6 +459,7 @@
     if (!currentAlertId) return;
 
     var ackBtn = document.getElementById('aptas-modal-ack-btn');
+    if (!ackBtn) return;
     ackBtn.disabled = true;
     ackBtn.innerHTML = 'Acknowledging…';
 
@@ -464,14 +470,14 @@
       method: 'POST',
       headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
     })
-    .then(function(res) { return res.json(); })
-    .then(function(data) {
+    .then(function(res) { return res.json().then(function(data) { return { status: res.status, data: data }; }); })
+    .then(function(result) {
+      var data = result.data || {};
       if (data.ok) {
         ackBtn.innerHTML = '<i data-lucide="check" class="lucide-icon lucide-icon--sm" style="margin-right:6px;"></i>Acknowledged';
         ackBtn.style.background = '#dcfce7';
         ackBtn.style.color = '#15803d';
 
-        // Update status badges in the table rows if present
         var rows = document.querySelectorAll('tr[data-alert-id="' + currentAlertId + '"]');
         rows.forEach(function(row) {
           row.dataset.status = 'Acknowledged';
@@ -484,8 +490,10 @@
 
         if (window.lucide) window.lucide.createIcons();
       } else {
-        ackBtn.innerHTML = 'Error — try again';
-        ackBtn.disabled = false;
+        ackBtn.innerHTML = result.status === 403
+          ? 'CHO officers only'
+          : (data.error || 'Error — try again');
+        ackBtn.disabled = result.status === 403;
       }
     })
     .catch(function() {

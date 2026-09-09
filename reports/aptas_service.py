@@ -903,12 +903,18 @@ def compute_aptas_breakdown(
     }
 
 
-def _raw_anomaly_for_report(report) -> float:
-    if report.ml_anomaly_score is not None:
-        return float(report.ml_anomaly_score)
-    if report.is_anomaly:
-        return 0.75   # Pre-calibrated: maps to High tier
-    return 0.15       # Pre-calibrated: maps to Low/Baseline tier
+def raw_anomaly_for_report(report) -> float | None:
+    """Return the stored Isolation Forest score, or None. Never invent High."""
+    if report is None:
+        return None
+    score = getattr(report, 'ml_anomaly_score', None)
+    if score is None:
+        return None
+    return float(score)
+
+
+def _raw_anomaly_for_report(report) -> float | None:
+    return raw_anomaly_for_report(report)
 
 
 def reset_aptas_risk_for_barangay_syndrome(barangay_name: str, syndrome_name: str) -> BarangayRiskLog | None:

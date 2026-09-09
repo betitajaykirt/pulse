@@ -15,7 +15,7 @@ from myapp.models import (
     MlAiPrediction, RiskAnalysis,
 )
 from myapp.barangay_scope import CITY_WIDE_ROLES, BARANGAY_SCOPED_ROLES
-from reports.aptas_service import compute_and_log_barangay_risk
+from reports.aptas_service import compute_and_log_barangay_risk, raw_anomaly_for_report
 from reports.ml_display import (
     is_alertable_disease_label,
     official_disease_label,
@@ -25,12 +25,9 @@ from reports.ml_display import (
 logger = logging.getLogger(__name__)
 
 
-def _raw_anomaly_for_report(report, *, is_anomaly=False) -> float:
-    if report.ml_anomaly_score is not None:
-        return float(report.ml_anomaly_score)
-    if is_anomaly or report.is_anomaly:
-        return 0.75   # Pre-calibrated: maps to High tier
-    return 0.15       # Pre-calibrated: maps to Low/Baseline tier
+def _raw_anomaly_for_report(report, *, is_anomaly=False) -> float | None:
+    del is_anomaly  # Boolean flags must not invent a High (0.75) score.
+    return raw_anomaly_for_report(report)
 
 
 def _persist_aptas_risk_log(report, raw_anomaly_score, force_activate=False):
@@ -60,20 +57,19 @@ def trigger_aptas_for_report(report_id, *, is_anomaly=False):
     if not report:
         return None
 
-    aptas_log = _persist_aptas_risk_log(report, _raw_anomaly_for_report(report, is_anomaly=is_anomaly))
+    raw_anomaly = _raw_anomaly_for_report(report)
+    aptas_log = _persist_aptas_risk_log(report, raw_anomaly)
 
     if aptas_log:
         risk_level = aptas_log.risk_level.lower()
         anomaly_score = Decimal(str(aptas_log.anomaly_score))
         risk_score = Decimal(str(aptas_log.final_risk_score)) / Decimal('100.0')
-    elif is_anomaly or report.is_anomaly:
-        risk_level = 'critical'
-        anomaly_score = report.ml_anomaly_score or Decimal('0.9000')
-        risk_score = Decimal('1.0000')
     else:
-        risk_level = 'moderate'
-        anomaly_score = report.ml_anomaly_score or Decimal('0.3500')
-        risk_score = Decimal('0.5000')
+        risk_level = 'low'
+        anomaly_score = (
+            Decimal(str(raw_anomaly)) if raw_anomaly is not None else Decimal('0')
+        )
+        risk_score = Decimal('0')
 
     assessment = RiskAssessment.objects.create(
         report_id=report.id,

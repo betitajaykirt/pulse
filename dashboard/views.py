@@ -4,7 +4,7 @@ from django.views.decorators.http import require_GET
 from django.urls import reverse
 from urllib.parse import urlencode
 from accounts.auth_utils import login_required
-from myapp.audit_utils import display_name_for_audit_log, display_name_for_system_log
+from myapp.audit_utils import display_name_for_audit_log, display_name_for_system_log, log_audit, log_system
 from myapp.models import (
     User, Admin, SuperAdmin, Barangay, SurveillanceReport,
     Alert, SystemLog, AuditLog, NotificationLog, FieldTask, EnvironmentalData
@@ -13,7 +13,7 @@ from accounts.auth_utils import role_required
 from myapp.barangay_scope import (
     is_city_wide_role, resolve_user_barangay, BARANGAY_SCOPED_ROLES,
     get_request_barangay, catchment_nurses_by_barangay,
-    catchment_nurse_officer_fields,
+    catchment_nurse_officer_fields, can_acknowledge_alerts,
 )
 from .bhw_activity import barangay_filter_choices, build_bhw_activity_entries
 from .analytics_service import (
@@ -254,6 +254,7 @@ def alerts_inbox_view(request):
         'alerts': alerts,
         'alert_history': alert_history,
         'notifications': notifications,
+        'can_acknowledge_alerts': can_acknowledge_alerts(role),
     }
 
     barangay_filter = resolve_aptas_barangay_filter(
@@ -638,16 +639,52 @@ def api_notification_read(request, notif_id):
 
 @login_required
 def api_alert_acknowledge(request, alert_id):
-    """Update an alert's status from 'active' to 'acknowledged'."""
+    """CHO-only: mark an alert acknowledged and write an audit trail."""
     if request.method != 'POST':
         return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+
+    role = request.session.get('role')
+    uid = request.session.get('user_id')
+    if not can_acknowledge_alerts(role):
+        return JsonResponse({
+            'ok': False,
+            'error': 'Only CHO officers can acknowledge alerts.',
+        }, status=403)
+
     alert = Alert.objects.filter(id=alert_id).first()
     if not alert:
         return JsonResponse({'ok': False, 'error': 'Alert not found'}, status=404)
+
+    previous = alert.status
     if alert.status == 'active':
         alert.status = 'acknowledged'
         alert.save(update_fields=['status'])
-    return JsonResponse({'ok': True, 'new_status': alert.status})
+        details = (
+            f'Alert #{alert.id} acknowledged '
+            f'(type={alert.alert_type or "—"}, level={alert.alert_level or "—"}).'
+        )
+        log_audit(
+            uid,
+            role,
+            'alert_acknowledged',
+            target_id=alert.id,
+            details=details,
+            request=request,
+        )
+        log_system(
+            'alert_acknowledged',
+            details,
+            user_role=role,
+            user_id=uid,
+            module='alerts',
+            ip_address=request.META.get('REMOTE_ADDR'),
+            request=request,
+        )
+    return JsonResponse({
+        'ok': True,
+        'new_status': alert.status,
+        'already_acknowledged': previous != 'active',
+    })
 
 
 @login_required
