@@ -2640,11 +2640,18 @@ html[data-theme="dark"] .map-layer-btn:hover {
   display: flex; align-items: center; justify-content: space-between;
   padding: .95rem 1.15rem; background: var(--bg); cursor: pointer; user-select: none;
   transition: var(--transition);
+  gap: .75rem;
 }
 .patient-card-header:hover { background: rgba(0, 166, 166, 0.05); }
+.patient-card-header__text { min-width: 0; flex: 1; }
 .patient-card-header h4 {
   margin: 0; font-family: var(--font-display);
   font-size: .92rem; font-weight: 700; color: var(--primary);
+}
+.patient-card-header__summary {
+  margin: .2rem 0 0; font-size: .75rem; font-weight: 500;
+  color: var(--muted); line-height: 1.4;
+  overflow: hidden; text-overflow: ellipsis;
 }
 .patient-card-body {
   display: none; padding: 1.15rem 1.25rem 1.25rem;
@@ -2664,7 +2671,7 @@ html[data-theme="dark"] .map-layer-btn:hover {
 .symptom-grid {
   display: grid; grid-template-columns: 1fr; gap: .55rem .85rem;
 }
-@media (min-width: 560px) { .symptom-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 720px) { .symptom-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (min-width: 960px) { .symptom-grid { grid-template-columns: repeat(3, 1fr); } }
 .symptom-item {
   display: flex; align-items: flex-start; gap: .5rem;
@@ -2832,6 +2839,115 @@ html[data-theme="dark"] .map-layer-btn:hover {
 .report-form-actions {
   display: flex; justify-content: flex-end; gap: .75rem;
   margin-top: 1.25rem; align-items: center; flex-wrap: wrap;
+}
+
+@media (max-width: 900px) {
+  .pulse-page--submit {
+    overflow-x: clip;
+  }
+  .pulse-page--submit .pulse-page-header {
+    margin-bottom: 1rem;
+  }
+  .pulse-page--submit .pulse-page-header__text h2 {
+    font-size: 1.25rem;
+  }
+  .pulse-page--submit .pulse-page-header__text p {
+    font-size: .82rem;
+  }
+  .pulse-panel.report-form-shell {
+    max-width: 100%;
+    padding: 1rem .85rem;
+  }
+  .pulse-page--submit .form-section {
+    padding: .95rem .85rem;
+  }
+  .pulse-page--submit .demographic-grid--two-col,
+  .pulse-page--submit .demographics-row {
+    grid-template-columns: 1fr;
+  }
+  .pulse-page--submit .demographic-grid__full {
+    grid-column: auto;
+  }
+  .pulse-page--submit .form-group,
+  .pulse-page--submit .input-soft,
+  .pulse-page--submit select.input-soft,
+  .pulse-page--submit .other-symptoms-textarea {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .pulse-page--submit .input-soft,
+  .pulse-page--submit select.input-soft,
+  .pulse-page--submit .other-symptoms-textarea {
+    font-size: 16px; /* prevent iOS zoom on focus */
+  }
+  .pulse-page--submit .patient-card-header {
+    align-items: flex-start;
+    padding: .8rem .85rem;
+  }
+  .pulse-page--submit .patient-card-header h4 {
+    font-size: .88rem;
+    white-space: normal;
+  }
+  .pulse-page--submit .patient-card-body {
+    padding: .85rem;
+  }
+  .pulse-page--submit .demographic-section,
+  .pulse-page--submit .location-section,
+  .pulse-page--submit .symptom-group,
+  .pulse-page--submit .other-symptoms-panel {
+    padding: .85rem .8rem;
+  }
+  .pulse-page--submit .symptom-grid {
+    grid-template-columns: 1fr;
+  }
+  .pulse-page--submit .symptom-item {
+    padding: .45rem .15rem;
+    min-height: 44px;
+  }
+  .pulse-page--submit .symptom-item input[type=checkbox] {
+    width: 20px;
+    height: 20px;
+    margin-top: .15rem;
+  }
+  .pulse-page--submit .patient-card-actions {
+    flex-shrink: 0;
+  }
+  .pulse-page--submit #btn-add-patient,
+  .pulse-page--submit .report-form-actions .nc-btn,
+  .pulse-page--submit .pin-map-toolbar .nc-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .pulse-page--submit .report-form-actions {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: stretch;
+  }
+  .pulse-page--submit .pin-map-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .pulse-page--submit .pin-info-row {
+    flex-wrap: wrap;
+  }
+  .pulse-page--submit #pin-map,
+  .pulse-page--submit #pin-map.leaflet-container {
+    height: 240px !important;
+    min-height: 220px;
+  }
+  .pulse-page--submit .session-info-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .pulse-page--submit .session-info-grid {
+    grid-template-columns: 1fr;
+  }
+  .pulse-page--submit .pulse-page-header__text h2 {
+    font-size: 1.15rem;
+  }
 }
 
 .pulse-modal-overlay {

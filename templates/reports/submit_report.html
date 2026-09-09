@@ -6,7 +6,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="pulse-page">
+<div class="pulse-page pulse-page--submit">
 
   <header class="pulse-page-header">
     <div class="pulse-page-header__text">
@@ -392,13 +392,21 @@ function patientSummary(p) {
   if (p.purok_street) parts.push(p.purok_street);
   const symptomCount = getSymptomArray(p).length;
   if (symptomCount) parts.push(symptomCount + ' indicator' + (symptomCount === 1 ? '' : 's'));
-  return parts.length ? ' — ' + parts.join(', ') : '';
+  return parts.join(', ');
 }
 
 function updatePatientHeader(p) {
-  const hdr = document.querySelector(`.patient-card[data-pid="${p.id}"] .patient-card-header h4`);
+  const card = document.querySelector(`.patient-card[data-pid="${p.id}"]`);
+  if (!card) return;
   const idx = patients.findIndex(x => x.id === p.id);
-  if (hdr) hdr.textContent = 'Patient #' + (idx + 1) + patientSummary(p);
+  const title = card.querySelector('.patient-card-header h4');
+  const summaryEl = card.querySelector('.patient-card-header__summary');
+  if (title) title.textContent = 'Patient #' + (idx + 1);
+  if (summaryEl) {
+    const summary = patientSummary(p);
+    summaryEl.textContent = summary;
+    summaryEl.hidden = !summary;
+  }
 }
 
 function formatPatientDate(value) {
@@ -420,7 +428,10 @@ function renderPatientList() {
   list.innerHTML = patients.map((p, idx) => `
     <div class="patient-card ${p.open ? 'open' : ''} ${p.id === activePatientId ? 'active' : ''}" data-pid="${p.id}">
       <div class="patient-card-header" data-action="toggle" data-pid="${p.id}">
-        <h4>Patient #${idx + 1}${patientSummary(p)}</h4>
+        <div class="patient-card-header__text">
+          <h4>Patient #${idx + 1}</h4>
+          ${patientSummary(p) ? `<p class="patient-card-header__summary">${escapeHtml(patientSummary(p))}</p>` : '<p class="patient-card-header__summary" hidden></p>'}
+        </div>
         <div class="patient-card-actions">
           ${patients.length > 1 ? `<button type="button" class="nc-btn nc-btn--danger nc-btn--sm" data-action="remove" data-pid="${p.id}">Remove</button>` : ''}
           <span class="patient-chevron"><i data-lucide="${p.open ? 'chevron-up' : 'chevron-down'}" class="lucide-icon lucide-icon--xs"></i></span>
@@ -1080,5 +1091,11 @@ function toggleStudentFields(pid, show) {
 addPatient();
 loadAssignedBarangayBoundary();
 setTimeout(() => pinMap.invalidateSize(), 400);
+window.addEventListener('resize', function () {
+  clearTimeout(window._pulsePinMapResize);
+  window._pulsePinMapResize = setTimeout(function () {
+    pinMap.invalidateSize();
+  }, 200);
+});
 </script>
 {% endblock %}
