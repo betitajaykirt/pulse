@@ -47,6 +47,7 @@ THRESHOLD_RISK_MAP = {
     'ISOLATED_CASE': 'moderate',
     'NORMAL': 'low',
 }
+MIN_MAP_ML_CONFIDENCE = 0.30
 
 _INCONCLUSIVE_DISEASE_LABELS = frozenset({
     'inconclusive syndromic pattern',
@@ -76,6 +77,18 @@ def _ml_confidence_high(report, ml_predicted):
     if report.suspected_disease and not _is_inconclusive_disease_label(report.suspected_disease):
         return True
     return False
+
+
+def should_show_map_pin(report, ml_confidence=None):
+    """Hide low-confidence ML-only cases while preserving confirmed cases."""
+    is_confirmed = (
+        (report.status or '').strip().casefold() == 'confirmed'
+        or (report.case_classification or '').strip().casefold() == 'confirmed'
+        or bool(report.validated_by)
+    )
+    if is_confirmed:
+        return True
+    return ml_confidence is None or ml_confidence >= MIN_MAP_ML_CONFIDENCE
 
 
 def _canonical_disease_for_actions(report, status_norm, ml_predicted, confirmed_name):
@@ -420,6 +433,10 @@ def api_cases(request):
 
     cases = []
     for r in rows:
+        ml_confidence = parse_ml_confidence(r.remarks or '')
+        if not should_show_map_pin(r, ml_confidence):
+            continue
+
         weight_map = {
             'confirmed': 1.0,
             'probable': 0.6,
@@ -444,7 +461,6 @@ def api_cases(request):
         confirmed_date = format_display_date(r.confirmed_at) if r.confirmed_at else ''
         onset = format_display_date(r.date_of_onset)
         ml_predicted = official_disease_label(r)
-        ml_confidence = parse_ml_confidence(r.remarks or '')
         ml_display = predicted_disease_display(r)
         confirmed_disease = official_disease_label(r) if status_norm == 'Confirmed' else ''
         ml_high = _ml_confidence_high(r, ml_predicted)
