@@ -36,6 +36,7 @@
         data-map-url="{{ alert.map_url }}"
         data-created-at="{{ alert.created_at|date:'M d, Y H:i' }}"
         data-is-pidsr="true"
+        data-recommendations="{{ alert.recommendation_bundle_json|escape }}"
         data-threshold-headline="{{ alert.threshold_headline }}"
         data-threshold-summary="{{ alert.threshold_summary }}"
         onclick="openAptasDetailModal(this)"
@@ -91,6 +92,7 @@
         data-map-url="{{ alert.map_url }}"
         data-created-at="{{ alert.created_at|date:'M d, Y H:i' }}"
         data-is-pidsr="false"
+        data-recommendations="{{ alert.recommendation_bundle_json|escape }}"
         onclick="openAptasDetailModal(this)"
       >
         <header class="aptas-alert-card__head">

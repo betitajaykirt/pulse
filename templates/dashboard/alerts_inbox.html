@@ -1,4 +1,5 @@
 {% extends "dashboard/base_dashboard.html" %}
+{% load static %}
 {% block page_title %}Alerts Inbox{% endblock %}
 {% block content %}
 <div class="pulse-page dash-home">
@@ -167,6 +168,10 @@
         <h4>Alert Details</h4>
         <dl class="aptas-modal__details" id="aptas-modal-details"></dl>
       </div>
+      <div class="aptas-modal__section">
+        <h4>Public Health Recommendations</h4>
+        <div id="aptas-modal-recommendations"></div>
+      </div>
     </div>
     <div class="aptas-modal__footer">
       {% if can_acknowledge_alerts %}
@@ -287,6 +292,7 @@
   .aptas-modal__footer .nc-btn--primary:hover { background: #003a6b; }
 </style>
 
+<script src="{% static 'js/recommendation_engine.js' %}"></script>
 <script>
 (function() {
   var modal = document.getElementById('aptas-detail-modal');
@@ -365,6 +371,17 @@
       detailsHtml += '<div><dt>' + pair[0] + '</dt><dd>' + escHtml(pair[1]) + '</dd></div>';
     });
     document.getElementById('aptas-modal-details').innerHTML = detailsHtml;
+    var recommendationBundle = {};
+    try {
+      recommendationBundle = JSON.parse(d.recommendations || '{}');
+    } catch (error) {
+      recommendationBundle = {};
+    }
+    document.getElementById('aptas-modal-recommendations').innerHTML =
+      window.PulseRecommendationEngine.renderRecommendationCards(
+        recommendationBundle,
+        { showSummary: true }
+      );
 
     // Map button
     document.getElementById('aptas-modal-map-btn').href = d.mapUrl || '/map/';
@@ -417,6 +434,8 @@
       detailsHtml += '<div><dt>' + pair[0] + '</dt><dd>' + escHtml(pair[1]) + '</dd></div>';
     });
     document.getElementById('aptas-modal-details').innerHTML = detailsHtml;
+    document.getElementById('aptas-modal-recommendations').innerHTML =
+      '<div class="rec-empty">Open the linked map alert for structured field actions.</div>';
 
     document.getElementById('aptas-modal-map-btn').href = '/map/?barangay=' + encodeURIComponent(d.barangay || d.syndrome || '');
 

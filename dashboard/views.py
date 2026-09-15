@@ -386,6 +386,7 @@ def api_alerts_aptas(request):
                 'map_url': card.get('map_url'),
                 'is_active_alert': card.get('is_active_alert', False),
                 'created_at': card.get('created_at'),
+                'recommendation_bundle': card.get('recommendation_bundle') or {},
             }
         else:
             existing = merged_map[key]
@@ -504,6 +505,16 @@ def api_notifications(request):
     ).values_list('notification_id', flat=True))
 
     def _notification_recommendations(notif, report=None):
+        from reports.recommendation_service import (
+            resolve_case_recommendation,
+            status_for_case,
+        )
+
+        disease = notif.disease or (report.syndrome_type if report else '')
+        status = status_for_case(report) if report else 'probable'
+        bundle = resolve_case_recommendation(disease, status)
+        if bundle:
+            return ' '.join(action['text_en'] for action in bundle['actions'])
         if report:
             assessment = RiskAssessment.objects.filter(report_id=report.id).order_by('-created_at').first()
             if assessment and assessment.recommended_action:
@@ -572,6 +583,15 @@ def api_notifications(request):
         final_risk = float(notif.final_risk_score) if notif.final_risk_score is not None else None
         anomaly = float(notif.anomaly_score) if notif.anomaly_score is not None else None
 
+        from reports.recommendation_service import (
+            resolve_case_recommendation,
+            status_for_case,
+        )
+        recommendation_bundle = resolve_case_recommendation(
+            notif.disease or (report.syndrome_type if report else ''),
+            status_for_case(report) if report else case_status,
+        )
+
         return {
             'id': notif.id,
             'disease': notif.disease,
@@ -594,6 +614,7 @@ def api_notifications(request):
             'officer_contact': officer_contact,
             'officer_email': officer_email,
             'recommendations': _notification_recommendations(notif, report),
+            'recommendation_bundle': recommendation_bundle or {},
             'latitude': latitude,
             'longitude': longitude,
             'map_url': map_url,

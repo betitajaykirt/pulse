@@ -327,6 +327,7 @@
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 
 <script src="{% static 'js/pulse_map_boundaries.js' %}"></script>
+<script src="{% static 'js/recommendation_engine.js' %}"></script>
 
 <script>
 
@@ -1509,22 +1510,12 @@
 
 
       html += '<div class="map-case-popup__section map-case-popup__section--divider map-case-popup__recommendations">';
-
-      html += '<div class="map-case-popup__rec-head">';
-
-      html += '<svg class="map-case-popup__rec-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26A7 7 0 0 0 12 2z"/></svg>';
-
-      html += '<strong>Recommendations</strong>';
-
+      html += '<div class="map-case-popup__rec-head"><strong>Public Health Recommendations</strong></div>';
+      html += window.PulseRecommendationEngine.renderRecommendationCards(
+        c.recommendation_bundle,
+        { showSummary: false }
+      );
       html += '</div>';
-
-      html += '<p class="map-case-popup__rec-text">' + escapeMapPopupHtml(c.recommendations) + '</p>';
-
-      html += '</div>';
-
-
-
-      html += buildMitigationBanner(c.mitigation_suggestions);
 
       html += '</div>';
 
@@ -1603,6 +1594,13 @@
         html += '</details>'; 
       });
 
+      html += '</div>';
+      var resolved = window.PulseRecommendationEngine.resolveClusterRecommendations(cases);
+      html += '<div class="map-cluster-popup__recommendations">';
+      html += window.PulseRecommendationEngine.renderRecommendationCards(
+        resolved,
+        { showSummary: true }
+      );
       html += '</div></div>';
       return html;
 
@@ -1650,7 +1648,8 @@
 
 
       // Leaflet L.circle uses radius in meters (geographic), not screen pixels.
-      const CLUSTER_RADIUS_M = 25;
+      const CLUSTER_RADIUS_M = 300;
+      const CLUSTER_WINDOW_DAYS = 7;
 
 
 
@@ -1763,7 +1762,17 @@
 
             var dist = L.latLng(latA, lonA).distanceTo(L.latLng(latB, lonB));
 
-            if (dist <= thresholdM) union(i, j);
+            var dateA = cases[i].cluster_date
+              ? new Date(cases[i].cluster_date + 'T00:00:00')
+              : null;
+            var dateB = cases[j].cluster_date
+              ? new Date(cases[j].cluster_date + 'T00:00:00')
+              : null;
+            var daysApart = dateA && dateB
+              ? Math.abs(dateA.getTime() - dateB.getTime()) / 86400000
+              : Number.POSITIVE_INFINITY;
+
+            if (dist <= thresholdM && daysApart <= CLUSTER_WINDOW_DAYS) union(i, j);
 
           }
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 import math
 import statistics
+import json
 from datetime import timedelta
 from typing import Any, Dict, Optional
 
@@ -89,12 +90,16 @@ def _enrich_card_context(card: Dict[str, Any], *, nurses_by_barangay: dict | Non
 
     # Count active cases for this barangay + syndrome
     active_qs = _active_reports_qs(barangay_name, syndrome_name) if barangay_name else None
-    card['active_cases'] = active_qs.count() if active_qs else 0
+    active_reports = list(active_qs) if active_qs is not None else []
+    card['active_cases'] = len(active_reports)
 
     # Find anchor report for purok and coordinates
     anchor = (
-        active_qs.order_by('-report_date').first()
-    ) if active_qs else None
+        max(
+            active_reports,
+            key=lambda report: report.report_date or timezone.now(),
+        )
+    ) if active_reports else None
 
     if nurses_by_barangay is not None:
         nurse = nurses_by_barangay.get((barangay_name or '').strip().casefold())
@@ -135,6 +140,32 @@ def _enrich_card_context(card: Dict[str, Any], *, nurses_by_barangay: dict | Non
             .first()
         )
         card['alert_id'] = alert.id if alert else None
+
+    # The same structured bilingual bundle drives dashboard and map actions.
+    from reports.recommendation_service import (
+        resolve_case_recommendation,
+        resolve_cluster_recommendations,
+        status_for_case,
+    )
+
+    if active_reports and (card.get('is_pidsr_threshold') or len(active_reports) > 1):
+        recommendation_bundle = resolve_cluster_recommendations(active_reports)
+        recommendation_bundle['is_cluster'] = True
+    elif anchor:
+        recommendation_bundle = resolve_case_recommendation(
+            syndrome_name,
+            status_for_case(anchor),
+        )
+    else:
+        recommendation_bundle = resolve_case_recommendation(
+            syndrome_name,
+            'confirmed' if card.get('is_pidsr_threshold') else 'probable',
+        )
+    card['recommendation_bundle'] = recommendation_bundle or {}
+    card['recommendation_bundle_json'] = json.dumps(
+        card['recommendation_bundle'],
+        ensure_ascii=False,
+    )
 
     return card
 

@@ -1,0 +1,546 @@
+{
+  "version": 1,
+  "statuses": ["suspected", "probable", "confirmed", "cluster"],
+  "diseases": [
+    {
+      "label": "Acute Flaccid Paralysis",
+      "code": "AFP",
+      "category": "Category I",
+      "actions": {
+        "suspected": [
+          {"code": "immediate_cho_report", "en": "Notify the CHO surveillance unit immediately and record paralysis onset.", "local": "Ipahibalo dayon sa CHO surveillance kag irekord kon san-o nagsugod ang pagkaluya/paralysis.", "targets": ["BHW Team", "Catchment Nurse", "CHO Surveillance Unit"]}
+        ],
+        "probable": [
+          {"code": "afp_specimen_referral", "en": "Arrange urgent referral and coordinate two stool specimens through the PIDSR pathway.", "local": "Ipa-refer gilayon kag koordinahon ang duha ka stool specimen paagi sa PIDSR pathway.", "targets": ["Catchment Nurse", "CHO Surveillance Unit", "Referral Hospital"]}
+        ],
+        "confirmed": [
+          {"code": "afp_confirmed_response", "en": "Activate the CHO rapid response team, complete contact assessment, and support immunization review.", "local": "I-activate ang CHO rapid response team, usisaon ang contacts, kag repasuhon ang immunization status.", "targets": ["CHO Surveillance Unit", "City Health Officer", "Immunization Team"]}
+        ],
+        "cluster": [
+          {"code": "active_case_finding", "en": "Conduct house-to-house active case finding for new weakness or paralysis.", "local": "Mag-house-to-house pangita sang bag-o nga kaso sang pagkaluya ukon paralysis.", "targets": ["BHW Team", "Catchment Nurse"]},
+          {"code": "cluster_line_list", "en": "Create one cluster line list and escalate it to the CHO incident team.", "local": "Maghimo sang isa ka cluster line list kag i-escalate sa CHO incident team.", "targets": ["Catchment Nurse", "CHO Surveillance Unit"]}
+        ]
+      }
+    },
+    {
+      "label": "Adverse Event Following Immunization",
+      "code": "AEFI",
+      "category": "Category I",
+      "actions": {
+        "suspected": [
+          {"code": "aefi_immediate_assessment", "en": "Assess severity, record vaccine details, and notify the immunization coordinator immediately.", "local": "Usisaon ang kabug-aton, irekord ang detalye sang bakuna, kag ipahibalo dayon sa immunization coordinator.", "targets": ["Catchment Nurse", "Immunization Team"]}
+        ],
+        "probable": [
+          {"code": "aefi_referral_investigation", "en": "Arrange clinical referral and preserve the vaccine, lot, and administration records for investigation.", "local": "Ipa-refer ang pasyente kag tipigan ang vaccine, lot, kag administration records para sa imbestigasyon.", "targets": ["Catchment Nurse", "CHO Surveillance Unit", "Immunization Team"]}
+        ],
+        "confirmed": [
+          {"code": "aefi_committee_review", "en": "Submit the complete case packet for AEFI committee review and implement the official risk communication plan.", "local": "Isumiter ang kompleto nga case packet sa AEFI committee kag sundon ang opisyal nga risk communication plan.", "targets": ["City Health Officer", "Immunization Team", "CHO Surveillance Unit"]}
+        ],
+        "cluster": [
+          {"code": "aefi_lot_cluster_review", "en": "Compare vaccine lot, site, vaccinator, and timing across all clustered reports.", "local": "Ikompara ang vaccine lot, site, vaccinator, kag timing sang tanan nga clustered reports.", "targets": ["Immunization Team", "CHO Surveillance Unit"]},
+          {"code": "cluster_line_list", "en": "Maintain one cluster line list and escalate significant patterns to the CHO incident team.", "local": "Magtipig sang isa ka cluster line list kag i-escalate ang importante nga pattern sa CHO incident team.", "targets": ["CHO Surveillance Unit"]}
+        ]
+      }
+    },
+    {
+      "label": "Anthrax",
+      "code": "ANTHRAX",
+      "category": "Category I",
+      "actions": {
+        "suspected": [
+          {"code": "anthrax_exposure_control", "en": "Avoid handling suspect animals or hides, cover lesions, and notify CHO and veterinary authorities immediately.", "local": "Indi pag-uyatan ang suspetsado nga sapat ukon panit; tabunan ang lesion kag ipahibalo dayon sa CHO kag veterinary.", "targets": ["BHW Team", "CHO Surveillance Unit", "City Veterinary Office"]}
+        ],
+        "probable": [
+          {"code": "anthrax_specimen_referral", "en": "Coordinate protected specimen collection and urgent clinical referral under infection-control precautions.", "local": "Koordinahon ang protektado nga specimen collection kag gilayon nga referral suno sa infection-control precautions.", "targets": ["Catchment Nurse", "CHO Surveillance Unit", "Referral Hospital"]}
+        ],
+        "confirmed": [
+          {"code": "anthrax_one_health_response", "en": "Activate joint human-animal exposure tracing and secure the suspected source area.", "local": "I-activate ang joint human-animal exposure tracing kag seguruhon ang suspetsado nga source area.", "targets": ["City Health Officer", "City Veterinary Office", "CHO Surveillance Unit"]}
+        ],
+        "cluster": [
+          {"code": "one_health_source_investigation", "en": "Map shared animal, meat, wool, and hide exposures and stop further distribution.", "local": "I-map ang pareho nga animal, karne, wool, kag hide exposure kag untaton ang dugang nga pagpanagtag.", "targets": ["CHO Surveillance Unit", "City Veterinary Office", "Barangay Officials"]},
+          {"code": "cluster_line_list", "en": "Create a joint One Health cluster line list.", "local": "Maghimo sang joint One Health cluster line list.", "targets": ["CHO Surveillance Unit", "City Veterinary Office"]}
+        ]
+      }
+    },
+    {
+      "label": "COVID-19",
+      "code": "COVID19",
+      "category": "Category I",
+      "actions": {
+        "suspected": [
+          {"code": "respiratory_precautions", "en": "Provide a mask, separate the patient from crowded areas, and assess testing and referral needs.", "local": "Hatagan mask, ibulag anay sa matawo nga lugar, kag usisaon kon kinahanglan testing ukon referral.", "targets": ["BHW Team", "Catchment Nurse"]}
+        ],
+        "probable": [
+          {"code": "covid_testing_contacts", "en": "Coordinate diagnostic testing, household contact listing, and home infection-control guidance.", "local": "Koordinahon ang diagnostic testing, household contact list, kag home infection-control guidance.", "targets": ["Catchment Nurse", "CHO Surveillance Unit"]}
+        ],
+        "confirmed": [
+          {"code": "covid_confirmed_management", "en": "Apply current DOH isolation, clinical monitoring, and high-risk contact guidance.", "local": "Sundon ang pinakabag-o nga DOH isolation, clinical monitoring, kag high-risk contact guidance.", "targets": ["CHO Surveillance Unit", "Catchment Nurse", "Referral Hospital"]}
+        ],
+        "cluster": [
+          {"code": "respiratory_cluster_control", "en": "Investigate shared indoor exposure, improve ventilation, and expand symptom surveillance.", "local": "Usisaon ang pareho nga indoor exposure, pauswagon ang bentilasyon, kag palaparon ang symptom surveillance.", "targets": ["CHO Surveillance Unit", "BHW Team", "Barangay Officials"]},
+          {"code": "cluster_line_list", "en": "Maintain one onset-based cluster line list.", "local": "Magtipig sang isa ka onset-based cluster line list.", "targets": ["Catchment Nurse", "CHO Surveillance Unit"]}
+        ]
+      }
+    },
+    {
+      "label": "Hand, Foot, and Mouth Disease",
+      "code": "HFMD",
+      "category": "Category I",
+      "actions": {
+        "suspected": [
+          {"code": "hfmd_hygiene_exclusion", "en": "Advise hand hygiene, no sharing of utensils, and temporary exclusion while febrile or acutely ill.", "local": "Pahugasi pirmi ang kamot, indi maghulamay utensils, kag magpabilin anay sa balay samtang may hilanat ukon masakit.", "targets": ["BHW Team", "Catchment Nurse", "School Health Coordinator"]}
+        ],
+        "probable": [
+          {"code": "hfmd_facility_check", "en": "Check household or school contacts and disinfect frequently touched surfaces and shared toys.", "local": "Usisaon ang household ukon school contacts kag disimpektahon ang pirmi ginahikap nga surfaces kag shared toys.", "targets": ["BHW Team", "School Health Coordinator", "Barangay Officials"]}
+        ],
+        "confirmed": [
+          {"code": "hfmd_confirmed_response", "en": "Coordinate facility-wide surveillance and follow CHO guidance on class or daycare control measures.", "local": "Koordinahon ang facility-wide surveillance kag sundon ang CHO guidance sa class ukon daycare control measures.", "targets": ["CHO Surveillance Unit", "School Health Coordinator", "Catchment Nurse"]}
+        ],
+        "cluster": [
+          {"code": "hfmd_cluster_sweep", "en": "Line-list affected children by classroom or daycare group and intensify cleaning and symptom checks.", "local": "I-line-list ang apektado nga kabataan per classroom ukon daycare group kag paigtingon ang cleaning kag symptom checks.", "targets": ["School Health Coordinator", "BHW Team", "CHO Surveillance Unit"]},
+          {"code": "cluster_line_list", "en": "Submit a single HFMD cluster line list to CHO.", "local": "Isumiter ang isa ka HFMD cluster line list sa CHO.", "targets": ["Catchment Nurse", "CHO Surveillance Unit"]}
+        ]
+      }
+    },
+    {
+      "label": "Human Avian Influenza",
+      "code": "HAI",
+      "category": "Category I",
+      "actions": {
+        "suspected": [
+          {"code": "avian_flu_isolation_report", "en": "Mask and separate the patient, document poultry exposure, and notify CHO and veterinary authorities immediately.", "local": "I-mask kag ibulag ang pasyente, irekord ang poultry exposure, kag ipahibalo dayon sa CHO kag veterinary.", "targets": ["Catchment Nurse", "CHO Surveillance Unit", "City Veterinary Office"]}
+        ],
+        "probable": [
+          {"code": "avian_flu_specimen_referral", "en": "Coordinate urgent respiratory specimen referral and protected transport to the designated facility.", "local": "Koordinahon ang gilayon nga respiratory specimen referral kag protektado nga transport sa designated facility.", "targets": ["CHO Surveillance Unit", "Referral Hospital", "City Veterinary Office"]}
+        ],
+        "confirmed": [
+          {"code": "avian_flu_one_health_response", "en": "Activate One Health contact tracing, poultry-source investigation, and monitored exposure follow-up.", "local": "I-activate ang One Health contact tracing, poultry-source investigation, kag monitored exposure follow-up.", "targets": ["City Health Officer", "CHO Surveillance Unit", "City Veterinary Office"]}
+        ],
+        "cluster": [
+          {"code": "one_health_source_investigation", "en": "Identify shared poultry, market, farm, or bird exposures and coordinate source control.", "local": "Pangitaon ang pareho nga poultry, market, farm, ukon bird exposure kag koordinahon ang source control.", "targets": ["CHO Surveillance Unit", "City Veterinary Office"]},
+          {"code": "cluster_line_list", "en": "Maintain a joint human-animal cluster line list.", "local": "Magtipig sang joint human-animal cluster line list.", "targets": ["CHO Surveillance Unit", "City Veterinary Office"]}
+        ]
+      }
+    },
+    {
+      "label": "Measles",
+      "code": "MEASLES",
+      "category": "Category I",
+      "actions": {
+        "suspected": [
+          {"code": "measles_isolate_report", "en": "Apply airborne precautions, keep the patient away from shared waiting areas, and report immediately.", "local": "Sundon ang airborne precautions, ibulag sa shared waiting area, kag ireport dayon.", "targets": ["BHW Team", "Catchment Nurse", "CHO Surveillance Unit"]}
+        ],
+        "probable": [
+          {"code": "measles_specimen_contacts", "en": "Coordinate specimen collection, list close contacts, and verify vaccination history.", "local": "Koordinahon ang specimen collection, ilista ang close contacts, kag beripikahon ang vaccination history.", "targets": ["Catchment Nurse", "CHO Surveillance Unit", "Immunization Team"]}
+        ],
+        "confirmed": [
+          {"code": "measles_outbreak_response", "en": "Activate rapid coverage assessment and targeted vaccination response under CHO guidance.", "local": "I-activate ang rapid coverage assessment kag targeted vaccination response suno sa CHO guidance.", "targets": ["City Health Officer", "Immunization Team", "CHO Surveillance Unit"]}
+        ],
+        "cluster": [
+          {"code": "measles_cluster_sweep", "en": "Conduct active rash-and-fever case finding and map unvaccinated contacts.", "local": "Mag-active case finding sang rash kag hilanat kag i-map ang wala nabakunahan nga contacts.", "targets": ["BHW Team", "Immunization Team", "CHO Surveillance Unit"]},
+          {"code": "cluster_line_list", "en": "Maintain an onset and vaccination-status cluster line list.", "local": "Magtipig sang cluster line list nga may onset kag vaccination status.", "targets": ["Catchment Nurse", "CHO Surveillance Unit"]}
+        ]
+      }
+    },
+    {
+      "label": "Meningococcal Disease",
+      "code": "MENINGOCOCCAL",
+      "category": "Category I",
+      "actions": {
+        "suspected": [
+          {"code": "meningococcal_emergency_referral", "en": "Use droplet precautions and arrange emergency referral without delaying CHO notification.", "local": "Sundon ang droplet precautions kag ipa-emergency referral nga wala ginapalangan ang CHO notification.", "targets": ["Catchment Nurse", "CHO Surveillance Unit", "Referral Hospital"]}
+        ],
+        "probable": [
+          {"code": "meningococcal_contacts", "en": "List close contacts urgently and refer prophylaxis decisions to the authorized clinician.", "local": "Ilista gilayon ang close contacts kag ipa-desisyon ang prophylaxis sa awtorisado nga clinician.", "targets": ["CHO Surveillance Unit", "Referral Hospital", "Catchment Nurse"]}
+        ],
+        "confirmed": [
+          {"code": "meningococcal_confirmed_response", "en": "Complete contact follow-up, exposure risk classification, and official risk communication.", "local": "Kompletuhon ang contact follow-up, exposure risk classification, kag opisyal nga risk communication.", "targets": ["City Health Officer", "CHO Surveillance Unit", "Referral Hospital"]}
+        ],
+        "cluster": [
+          {"code": "meningitis_cluster_investigation", "en": "Investigate shared school, household, transport, or gathering exposure immediately.", "local": "Usisaon dayon ang pareho nga school, household, transport, ukon gathering exposure.", "targets": ["CHO Surveillance Unit", "BHW Team", "School Health Coordinator"]},
+          {"code": "cluster_line_list", "en": "Maintain one contact-linked cluster line list.", "local": "Magtipig sang isa ka contact-linked cluster line list.", "targets": ["CHO Surveillance Unit"]}
+        ]
+      }
+    },
+    {
+      "label": "Middle East Respiratory Syndrome",
+      "code": "MERS",
+      "category": "Category I",
+      "actions": {
+        "suspected": [
+          {"code": "severe_resp_isolate_report", "en": "Apply respiratory isolation, document travel and camel exposure, and notify CHO immediately.", "local": "Sundon ang respiratory isolation, irekord ang travel kag camel exposure, kag ipahibalo dayon sa CHO.", "targets": ["Catchment Nurse", "CHO Surveillance Unit", "Referral Hospital"]}
+        ],
+        "probable": [
+          {"code": "severe_resp_specimen_referral", "en": "Coordinate protected respiratory specimen collection and designated-facility referral.", "local": "Koordinahon ang protektado nga respiratory specimen collection kag referral sa designated facility.", "targets": ["CHO Surveillance Unit", "Referral Hospital"]}
+        ],
+        "confirmed": [
+          {"code": "severe_resp_confirmed_response", "en": "Activate high-risk contact monitoring and healthcare exposure investigation.", "local": "I-activate ang high-risk contact monitoring kag healthcare exposure investigation.", "targets": ["City Health Officer", "CHO Surveillance Unit", "Referral Hospital"]}
+        ],
+        "cluster": [
+          {"code": "respiratory_cluster_control", "en": "Investigate shared travel, household, and healthcare exposure and reinforce ventilation controls.", "local": "Usisaon ang pareho nga travel, household, kag healthcare exposure kag paigtingon ang ventilation controls.", "targets": ["CHO Surveillance Unit", "Referral Hospital"]},
+          {"code": "cluster_line_list", "en": "Maintain one exposure-linked respiratory cluster line list.", "local": "Magtipig sang isa ka exposure-linked respiratory cluster line list.", "targets": ["CHO Surveillance Unit"]}
+        ]
+      }
+    },
+    {
+      "label": "Neonatal Tetanus",
+      "code": "NT",
+      "category": "Category I",
+      "actions": {
+        "suspected": [
+          {"code": "neonatal_tetanus_referral", "en": "Arrange immediate neonatal referral and document delivery, cord care, and maternal vaccination history.", "local": "Ipa-refer dayon ang newborn kag irekord ang delivery, cord care, kag maternal vaccination history.", "targets": ["Catchment Nurse", "CHO Surveillance Unit", "Referral Hospital"]}
+        ],
+        "probable": [
+          {"code": "neonatal_tetanus_investigation", "en": "Investigate the birth setting and unsafe cord-care practices while referral proceeds.", "local": "Usisaon ang birth setting kag unsafe cord-care practices samtang naga-proseso ang referral.", "targets": ["CHO Surveillance Unit", "Maternal and Child Health Team"]}
+        ],
+        "confirmed": [
+          {"code": "neonatal_tetanus_confirmed_response", "en": "Complete maternal immunization follow-up and corrective action with the delivery provider or community.", "local": "Kompletuhon ang maternal immunization follow-up kag corrective action upod sa delivery provider ukon komunidad.", "targets": ["City Health Officer", "Immunization Team", "Maternal and Child Health Team"]}
+        ],
+        "cluster": [
+          {"code": "neonatal_tetanus_cluster_review", "en": "Review shared birth attendants, delivery sites, cord products, and maternal vaccination gaps.", "local": "Repasuhon ang pareho nga birth attendants, delivery sites, cord products, kag maternal vaccination gaps.", "targets": ["CHO Surveillance Unit", "Maternal and Child Health Team"]},
+          {"code": "cluster_line_list", "en": "Maintain one maternal-newborn cluster line list.", "local": "Magtipig sang isa ka maternal-newborn cluster line list.", "targets": ["CHO Surveillance Unit"]}
+        ]
+      }
+    },
+    {
+      "label": "Paralytic Shellfish Poisoning",
+      "code": "PSP",
+      "category": "Category I",
+      "actions": {
+        "suspected": [
+          {"code": "psp_stop_consumption_referral", "en": "Arrange urgent referral and advise the household to stop eating shellfish from the suspected source.", "local": "Ipa-refer gilayon kag pahalinon ang panimalay sa pagkaon sang shellfish halin sa suspetsado nga source.", "targets": ["BHW Team", "Catchment Nurse", "Referral Hospital"]}
+        ],
+        "probable": [
+          {"code": "psp_source_trace", "en": "Secure food-source details and notify CHO, BFAR, and food-safety authorities.", "local": "Kuhaon ang detalye sang food source kag ipahibalo sa CHO, BFAR, kag food-safety authorities.", "targets": ["CHO Surveillance Unit", "Sanitary Inspector", "BFAR"]}
+        ],
+        "confirmed": [
+          {"code": "psp_confirmed_control", "en": "Support official shellfish advisories, source closure, and exposed-person follow-up.", "local": "Suportahan ang opisyal nga shellfish advisory, source closure, kag follow-up sang exposed persons.", "targets": ["City Health Officer", "BFAR", "Sanitary Inspector"]}
+        ],
+        "cluster": [
+          {"code": "food_source_cluster_trace", "en": "Trace all cases to vendor, harvest area, product, and meal time; stop further sale.", "local": "I-trace ang tanan nga kaso sa vendor, harvest area, produkto, kag oras sang pagkaon; untaton ang pagbaligya.", "targets": ["Sanitary Inspector", "BFAR", "CHO Surveillance Unit"]},
+          {"code": "cluster_line_list", "en": "Maintain one food-exposure cluster line list.", "local": "Magtipig sang isa ka food-exposure cluster line list.", "targets": ["CHO Surveillance Unit"]}
+        ]
+      }
+    },
+    {
+      "label": "Rabies",
+      "code": "RABIES",
+      "category": "Category I",
+      "actions": {
+        "suspected": [
+          {"code": "rabies_wound_referral", "en": "Ensure immediate wound washing and urgent referral to an Animal Bite Treatment Center.", "local": "Siguruhon ang gilayon nga paghugas sang pilas kag ipa-refer sa Animal Bite Treatment Center.", "targets": ["BHW Team", "Catchment Nurse", "Animal Bite Treatment Center"]}
+        ],
+        "probable": [
+          {"code": "rabies_exposure_investigation", "en": "Coordinate exposure assessment, animal tracing, and clinician-directed post-exposure management.", "local": "Koordinahon ang exposure assessment, animal tracing, kag clinician-directed post-exposure management.", "targets": ["Animal Bite Treatment Center", "City Veterinary Office", "CHO Surveillance Unit"]}
+        ],
+        "confirmed": [
+          {"code": "rabies_confirmed_response", "en": "Activate joint contact and animal-source investigation with immediate community risk communication.", "local": "I-activate ang joint contact kag animal-source investigation upod ang gilayon nga community risk communication.", "targets": ["City Health Officer", "City Veterinary Office", "CHO Surveillance Unit"]}
+        ],
+        "cluster": [
+          {"code": "one_health_source_investigation", "en": "Map linked bite victims and suspect animals and coordinate focused animal control.", "local": "I-map ang linked bite victims kag suspetsado nga sapat kag koordinahon ang focused animal control.", "targets": ["City Veterinary Office", "CHO Surveillance Unit", "Barangay Officials"]},
+          {"code": "cluster_line_list", "en": "Maintain one bite-exposure cluster line list.", "local": "Magtipig sang isa ka bite-exposure cluster line list.", "targets": ["Animal Bite Treatment Center", "CHO Surveillance Unit"]}
+        ]
+      }
+    },
+    {
+      "label": "Severe Acute Respiratory Syndrome",
+      "code": "SARS",
+      "category": "Category I",
+      "actions": {
+        "suspected": [
+          {"code": "severe_resp_isolate_report", "en": "Apply respiratory isolation, document travel and healthcare exposure, and notify CHO immediately.", "local": "Sundon ang respiratory isolation, irekord ang travel kag healthcare exposure, kag ipahibalo dayon sa CHO.", "targets": ["Catchment Nurse", "CHO Surveillance Unit", "Referral Hospital"]}
+        ],
+        "probable": [
+          {"code": "severe_resp_specimen_referral", "en": "Coordinate protected specimen collection and designated-facility referral.", "local": "Koordinahon ang protektado nga specimen collection kag referral sa designated facility.", "targets": ["CHO Surveillance Unit", "Referral Hospital"]}
+        ],
+        "confirmed": [
+          {"code": "severe_resp_confirmed_response", "en": "Activate high-risk contact monitoring and healthcare exposure investigation.", "local": "I-activate ang high-risk contact monitoring kag healthcare exposure investigation.", "targets": ["City Health Officer", "CHO Surveillance Unit", "Referral Hospital"]}
+        ],
+        "cluster": [
+          {"code": "respiratory_cluster_control", "en": "Investigate shared household, travel, and healthcare exposure and reinforce ventilation controls.", "local": "Usisaon ang pareho nga household, travel, kag healthcare exposure kag paigtingon ang ventilation controls.", "targets": ["CHO Surveillance Unit", "Referral Hospital"]},
+          {"code": "cluster_line_list", "en": "Maintain one exposure-linked respiratory cluster line list.", "local": "Magtipig sang isa ka exposure-linked respiratory cluster line list.", "targets": ["CHO Surveillance Unit"]}
+        ]
+      }
+    },
+    {
+      "label": "Acute Bloody Diarrhea",
+      "code": "ABD",
+      "category": "Category II",
+      "actions": {
+        "suspected": [
+          {"code": "diarrhea_assess_hydration", "en": "Assess dehydration and danger signs, reinforce hand hygiene, and arrange referral when needed.", "local": "Usisaon ang dehydration kag danger signs, paigtingon ang hand hygiene, kag ipa-refer kon kinahanglan.", "targets": ["BHW Team", "Catchment Nurse"]}
+        ],
+        "probable": [
+          {"code": "abd_specimen_water_check", "en": "Coordinate stool specimen referral and check household food and water exposures.", "local": "Koordinahon ang stool specimen referral kag usisaon ang household food kag water exposures.", "targets": ["Catchment Nurse", "Sanitary Inspector", "CHO Surveillance Unit"]}
+        ],
+        "confirmed": [
+          {"code": "enteric_confirmed_control", "en": "Implement source-specific food and water control and follow up household contacts.", "local": "Ipatuman ang source-specific food kag water control kag i-follow up ang household contacts.", "targets": ["Sanitary Inspector", "CHO Surveillance Unit", "BHW Team"]}
+        ],
+        "cluster": [
+          {"code": "water_food_cluster_investigation", "en": "Map shared meals and water sources and collect environmental samples as directed.", "local": "I-map ang pareho nga pagkaon kag water sources kag magkuha environmental samples suno sa instruction.", "targets": ["Sanitary Inspector", "CHO Surveillance Unit"]},
+          {"code": "cluster_line_list", "en": "Maintain one food-and-water cluster line list.", "local": "Magtipig sang isa ka food-and-water cluster line list.", "targets": ["Catchment Nurse", "CHO Surveillance Unit"]}
+        ]
+      }
+    },
+    {
+      "label": "Acute Encephalitis Syndrome",
+      "code": "AES",
+      "category": "Category II",
+      "actions": {
+        "suspected": [
+          {"code": "aes_urgent_referral", "en": "Arrange urgent referral for altered consciousness or seizures and record onset precisely.", "local": "Ipa-refer gilayon kon may altered consciousness ukon seizures kag irekord sing ensakto ang onset.", "targets": ["Catchment Nurse", "Referral Hospital"]}
+        ],
+        "probable": [
+          {"code": "aes_exposure_specimen", "en": "Coordinate diagnostic specimen referral and document mosquito, animal, travel, and vaccination exposures.", "local": "Koordinahon ang diagnostic specimen referral kag irekord ang mosquito, animal, travel, kag vaccination exposures.", "targets": ["CHO Surveillance Unit", "Referral Hospital", "Catchment Nurse"]}
+        ],
+        "confirmed": [
+          {"code": "aes_confirmed_response", "en": "Apply pathogen-specific vector, vaccination, or contact measures directed by CHO.", "local": "Ipatuman ang pathogen-specific vector, vaccination, ukon contact measures nga ginmando sang CHO.", "targets": ["City Health Officer", "CHO Surveillance Unit", "Referral Hospital"]}
+        ],
+        "cluster": [
+          {"code": "aes_cluster_investigation", "en": "Map onset, travel, vector exposure, and vaccination status across neurologic cases.", "local": "I-map ang onset, travel, vector exposure, kag vaccination status sang neurologic cases.", "targets": ["CHO Surveillance Unit", "BHW Team"]},
+          {"code": "cluster_line_list", "en": "Maintain one neurologic syndrome cluster line list.", "local": "Magtipig sang isa ka neurologic syndrome cluster line list.", "targets": ["CHO Surveillance Unit"]}
+        ]
+      }
+    },
+    {
+      "label": "Acute Hemorrhagic Fever Syndrome",
+      "code": "AHFS",
+      "category": "Category II",
+      "actions": {
+        "suspected": [
+          {"code": "ahfs_precaution_referral", "en": "Use appropriate infection precautions, avoid unnecessary exposure to body fluids, and arrange urgent referral.", "local": "Sundon ang infection precautions, likawan ang wala kinahanglan nga exposure sa body fluids, kag ipa-refer gilayon.", "targets": ["Catchment Nurse", "Referral Hospital", "CHO Surveillance Unit"]}
+        ],
+        "probable": [
+          {"code": "ahfs_exposure_trace", "en": "Coordinate protected specimen referral and document travel, animal, vector, and contact exposures.", "local": "Koordinahon ang protektado nga specimen referral kag irekord ang travel, animal, vector, kag contact exposures.", "targets": ["CHO Surveillance Unit", "Referral Hospital"]}
+        ],
+        "confirmed": [
+          {"code": "ahfs_confirmed_response", "en": "Activate pathogen-specific isolation, contact monitoring, and vector or source control.", "local": "I-activate ang pathogen-specific isolation, contact monitoring, kag vector ukon source control.", "targets": ["City Health Officer", "CHO Surveillance Unit", "Referral Hospital"]}
+        ],
+        "cluster": [
+          {"code": "hemorrhagic_cluster_control", "en": "Establish exposure links immediately and deploy the CHO rapid response team.", "local": "Pangitaon dayon ang exposure links kag ipadala ang CHO rapid response team.", "targets": ["City Health Officer", "CHO Surveillance Unit"]},
+          {"code": "cluster_line_list", "en": "Maintain one exposure-linked hemorrhagic syndrome line list.", "local": "Magtipig sang isa ka exposure-linked hemorrhagic syndrome line list.", "targets": ["CHO Surveillance Unit"]}
+        ]
+      }
+    },
+    {
+      "label": "Acute Viral Hepatitis",
+      "code": "AVH",
+      "category": "Category II",
+      "actions": {
+        "suspected": [
+          {"code": "hepatitis_hygiene_assessment", "en": "Assess jaundice danger signs and reinforce safe food, water, and hand hygiene.", "local": "Usisaon ang jaundice danger signs kag paigtingon ang safe food, water, kag hand hygiene.", "targets": ["BHW Team", "Catchment Nurse"]}
+        ],
+        "probable": [
+          {"code": "hepatitis_exposure_testing", "en": "Coordinate clinical testing and document household, food, water, and blood exposures.", "local": "Koordinahon ang clinical testing kag irekord ang household, food, water, kag blood exposures.", "targets": ["Catchment Nurse", "CHO Surveillance Unit", "Sanitary Inspector"]}
+        ],
+        "confirmed": [
+          {"code": "hepatitis_confirmed_control", "en": "Apply hepatitis-type-specific contact, food-handler, water, or blood-safety measures.", "local": "Ipatuman ang hepatitis-type-specific contact, food-handler, water, ukon blood-safety measures.", "targets": ["CHO Surveillance Unit", "Sanitary Inspector", "Referral Hospital"]}
+        ],
+        "cluster": [
+          {"code": "water_food_cluster_investigation", "en": "Investigate shared food and water sources and map linked households.", "local": "Usisaon ang pareho nga food kag water sources kag i-map ang linked households.", "targets": ["Sanitary Inspector", "CHO Surveillance Unit"]},
+          {"code": "cluster_line_list", "en": "Maintain one hepatitis exposure cluster line list.", "local": "Magtipig sang isa ka hepatitis exposure cluster line list.", "targets": ["CHO Surveillance Unit"]}
+        ]
+      }
+    },
+    {
+      "label": "Bacterial Meningitis",
+      "code": "BACT_MENINGITIS",
+      "category": "Category II",
+      "actions": {
+        "suspected": [
+          {"code": "meningitis_urgent_referral", "en": "Apply droplet precautions where indicated and arrange emergency referral.", "local": "Sundon ang droplet precautions kon kinahanglan kag ipa-emergency referral.", "targets": ["Catchment Nurse", "Referral Hospital"]}
+        ],
+        "probable": [
+          {"code": "meningitis_contacts_specimen", "en": "Coordinate diagnostic specimen referral and list close contacts for risk assessment.", "local": "Koordinahon ang diagnostic specimen referral kag ilista ang close contacts para sa risk assessment.", "targets": ["CHO Surveillance Unit", "Referral Hospital", "Catchment Nurse"]}
+        ],
+        "confirmed": [
+          {"code": "meningitis_confirmed_response", "en": "Complete pathogen-specific contact follow-up and clinician-directed prophylaxis assessment.", "local": "Kompletuhon ang pathogen-specific contact follow-up kag clinician-directed prophylaxis assessment.", "targets": ["CHO Surveillance Unit", "Referral Hospital"]}
+        ],
+        "cluster": [
+          {"code": "meningitis_cluster_investigation", "en": "Investigate shared household, school, dormitory, and gathering exposures.", "local": "Usisaon ang pareho nga household, school, dormitory, kag gathering exposures.", "targets": ["CHO Surveillance Unit", "School Health Coordinator", "BHW Team"]},
+          {"code": "cluster_line_list", "en": "Maintain one contact-linked meningitis cluster line list.", "local": "Magtipig sang isa ka contact-linked meningitis cluster line list.", "targets": ["CHO Surveillance Unit"]}
+        ]
+      }
+    },
+    {
+      "label": "Cholera",
+      "code": "CHOLERA",
+      "category": "Category II",
+      "actions": {
+        "suspected": [
+          {"code": "cholera_rehydration_report", "en": "Start rapid dehydration assessment and referral, reinforce hand hygiene, and notify CHO promptly.", "local": "Sugdan dayon ang dehydration assessment kag referral, paigtingon ang hand hygiene, kag ipahibalo sa CHO.", "targets": ["BHW Team", "Catchment Nurse", "CHO Surveillance Unit"]}
+        ],
+        "probable": [
+          {"code": "cholera_specimen_water", "en": "Coordinate stool specimen referral and inspect drinking-water and food sources.", "local": "Koordinahon ang stool specimen referral kag inspeksyunon ang drinking-water kag food sources.", "targets": ["Catchment Nurse", "Sanitary Inspector", "CHO Surveillance Unit"]}
+        ],
+        "confirmed": [
+          {"code": "cholera_confirmed_control", "en": "Activate safe-water measures, targeted chlorination, food-safety controls, and contact surveillance.", "local": "I-activate ang safe-water measures, targeted chlorination, food-safety controls, kag contact surveillance.", "targets": ["City Health Officer", "Sanitary Inspector", "CHO Surveillance Unit"]}
+        ],
+        "cluster": [
+          {"code": "water_food_cluster_investigation", "en": "Map shared water points and food sources and prioritize environmental sampling.", "local": "I-map ang pareho nga water points kag food sources kag unahon ang environmental sampling.", "targets": ["Sanitary Inspector", "CHO Surveillance Unit"]},
+          {"code": "cluster_line_list", "en": "Maintain one acute watery diarrhea cluster line list.", "local": "Magtipig sang isa ka acute watery diarrhea cluster line list.", "targets": ["Catchment Nurse", "CHO Surveillance Unit"]}
+        ]
+      }
+    },
+    {
+      "label": "Dengue Fever",
+      "code": "DENGUE",
+      "category": "Category II",
+      "actions": {
+        "suspected": [
+          {"code": "dengue_warning_signs", "en": "Assess dengue warning signs, advise hydration and daily monitoring, and refer danger signs immediately.", "local": "Usisaon ang dengue warning signs, painumon kag bantayan kada adlaw, kag ipa-refer dayon kon may danger signs.", "targets": ["BHW Team", "Catchment Nurse"]}
+        ],
+        "probable": [
+          {"code": "dengue_focused_4s", "en": "Conduct focused 4S source reduction around the residence and coordinate diagnostic follow-up.", "local": "Mag-focused 4S source reduction palibot sang puluy-an kag koordinahon ang diagnostic follow-up.", "targets": ["Barangay Dengue Task Force", "BHW Team", "Catchment Nurse"]}
+        ],
+        "confirmed": [
+          {"code": "dengue_confirmed_response", "en": "Activate CHO-directed vector control, household fever surveillance, and clinical follow-up.", "local": "I-activate ang CHO-directed vector control, household fever surveillance, kag clinical follow-up.", "targets": ["CHO Surveillance Unit", "Barangay Dengue Task Force", "Catchment Nurse"]}
+        ],
+        "cluster": [
+          {"code": "vector_cluster_sweep", "en": "Conduct a 300 m breeding-site sweep, fever search, and focused vector-control assessment.", "local": "Mag-300 m breeding-site sweep, fever search, kag focused vector-control assessment.", "targets": ["Barangay Dengue Task Force", "BHW Team", "CHO Surveillance Unit"]},
+          {"code": "cluster_line_list", "en": "Maintain one onset-based dengue cluster line list.", "local": "Magtipig sang isa ka onset-based dengue cluster line list.", "targets": ["Catchment Nurse", "CHO Surveillance Unit"]}
+        ]
+      }
+    },
+    {
+      "label": "Diphtheria",
+      "code": "DIPHTHERIA",
+      "category": "Category II",
+      "actions": {
+        "suspected": [
+          {"code": "diphtheria_isolate_referral", "en": "Apply droplet precautions, avoid disturbing throat membranes, and arrange urgent referral.", "local": "Sundon ang droplet precautions, indi paghilabtan ang throat membrane, kag ipa-refer gilayon.", "targets": ["Catchment Nurse", "Referral Hospital", "CHO Surveillance Unit"]}
+        ],
+        "probable": [
+          {"code": "diphtheria_contacts_specimen", "en": "Coordinate specimen referral, list close contacts, and verify vaccination history.", "local": "Koordinahon ang specimen referral, ilista ang close contacts, kag beripikahon ang vaccination history.", "targets": ["CHO Surveillance Unit", "Immunization Team", "Referral Hospital"]}
+        ],
+        "confirmed": [
+          {"code": "diphtheria_confirmed_response", "en": "Complete contact management, vaccination-gap response, and official school or household guidance.", "local": "Kompletuhon ang contact management, vaccination-gap response, kag opisyal nga school ukon household guidance.", "targets": ["City Health Officer", "Immunization Team", "CHO Surveillance Unit"]}
+        ],
+        "cluster": [
+          {"code": "diphtheria_cluster_sweep", "en": "Conduct sore-throat case finding and map vaccination gaps in linked settings.", "local": "Mag-sore-throat case finding kag i-map ang vaccination gaps sa linked settings.", "targets": ["BHW Team", "Immunization Team", "CHO Surveillance Unit"]},
+          {"code": "cluster_line_list", "en": "Maintain one contact-linked diphtheria cluster line list.", "local": "Magtipig sang isa ka contact-linked diphtheria cluster line list.", "targets": ["CHO Surveillance Unit"]}
+        ]
+      }
+    },
+    {
+      "label": "Influenza-Like Illness",
+      "code": "ILI",
+      "category": "Category II",
+      "actions": {
+        "suspected": [
+          {"code": "respiratory_precautions", "en": "Promote masking when symptomatic, cough etiquette, ventilation, and danger-sign assessment.", "local": "Mag-mask kon may sintomas, sundon ang cough etiquette, pauswagon ang bentilasyon, kag usisaon ang danger signs.", "targets": ["BHW Team", "Catchment Nurse"]}
+        ],
+        "probable": [
+          {"code": "ili_facility_surveillance", "en": "Check linked households, schools, or workplaces and coordinate testing for severe or unusual cases.", "local": "Usisaon ang linked households, schools, ukon workplaces kag koordinahon ang testing sa severe ukon unusual cases.", "targets": ["Catchment Nurse", "CHO Surveillance Unit", "School Health Coordinator"]}
+        ],
+        "confirmed": [
+          {"code": "ili_confirmed_response", "en": "Apply identified-pathogen guidance and monitor high-risk contacts and severe illness.", "local": "Sundon ang identified-pathogen guidance kag bantayan ang high-risk contacts kag severe illness.", "targets": ["CHO Surveillance Unit", "Catchment Nurse", "Referral Hospital"]}
+        ],
+        "cluster": [
+          {"code": "respiratory_cluster_control", "en": "Investigate shared indoor exposure, improve ventilation, and expand symptom surveillance.", "local": "Usisaon ang pareho nga indoor exposure, pauswagon ang bentilasyon, kag palaparon ang symptom surveillance.", "targets": ["BHW Team", "CHO Surveillance Unit", "School Health Coordinator"]},
+          {"code": "cluster_line_list", "en": "Maintain one onset-based respiratory cluster line list.", "local": "Magtipig sang isa ka onset-based respiratory cluster line list.", "targets": ["Catchment Nurse", "CHO Surveillance Unit"]}
+        ]
+      }
+    },
+    {
+      "label": "Leptospirosis",
+      "code": "LEPTO",
+      "category": "Category II",
+      "actions": {
+        "suspected": [
+          {"code": "lepto_exposure_referral", "en": "Document flood or animal-urine exposure, assess danger signs, and arrange clinical referral.", "local": "Irekord ang flood ukon animal-urine exposure, usisaon ang danger signs, kag ipa-clinical referral.", "targets": ["BHW Team", "Catchment Nurse"]}
+        ],
+        "probable": [
+          {"code": "lepto_drainage_followup", "en": "Coordinate diagnostic follow-up and inspect drainage, floodwater, and rodent-risk sites.", "local": "Koordinahon ang diagnostic follow-up kag inspeksyunon ang drainage, floodwater, kag rodent-risk sites.", "targets": ["Catchment Nurse", "Sanitary Inspector", "Barangay Officials"]}
+        ],
+        "confirmed": [
+          {"code": "lepto_confirmed_response", "en": "Activate focused flood-exposure surveillance, rodent control, drainage action, and public warnings.", "local": "I-activate ang focused flood-exposure surveillance, rodent control, drainage action, kag public warnings.", "targets": ["CHO Surveillance Unit", "Sanitary Inspector", "Barangay Officials"]}
+        ],
+        "cluster": [
+          {"code": "lepto_cluster_source_control", "en": "Map shared floodwater and occupational exposures and prioritize drainage and rodent-control sites.", "local": "I-map ang pareho nga floodwater kag occupational exposures kag unahon ang drainage kag rodent-control sites.", "targets": ["Sanitary Inspector", "BHW Team", "CHO Surveillance Unit"]},
+          {"code": "cluster_line_list", "en": "Maintain one flood-exposure cluster line list.", "local": "Magtipig sang isa ka flood-exposure cluster line list.", "targets": ["Catchment Nurse", "CHO Surveillance Unit"]}
+        ]
+      }
+    },
+    {
+      "label": "Malaria",
+      "code": "MALARIA",
+      "category": "Category II",
+      "actions": {
+        "suspected": [
+          {"code": "malaria_test_travel", "en": "Document travel and mosquito exposure and coordinate prompt malaria testing and referral.", "local": "Irekord ang travel kag mosquito exposure kag koordinahon ang gilayon nga malaria testing kag referral.", "targets": ["BHW Team", "Catchment Nurse", "CHO Surveillance Unit"]}
+        ],
+        "probable": [
+          {"code": "malaria_vector_assessment", "en": "Follow up diagnostic results and assess household mosquito protection and local exposure sites.", "local": "I-follow up ang diagnostic results kag usisaon ang household mosquito protection kag local exposure sites.", "targets": ["Catchment Nurse", "Vector Control Team", "CHO Surveillance Unit"]}
+        ],
+        "confirmed": [
+          {"code": "malaria_confirmed_response", "en": "Complete case investigation, treatment follow-up through clinicians, and focused vector control.", "local": "Kompletuhon ang case investigation, clinician treatment follow-up, kag focused vector control.", "targets": ["CHO Surveillance Unit", "Referral Hospital", "Vector Control Team"]}
+        ],
+        "cluster": [
+          {"code": "vector_cluster_sweep", "en": "Map travel-linked and local cases and conduct focused mosquito surveillance and source control.", "local": "I-map ang travel-linked kag local cases kag mag-focused mosquito surveillance kag source control.", "targets": ["Vector Control Team", "BHW Team", "CHO Surveillance Unit"]},
+          {"code": "cluster_line_list", "en": "Maintain one malaria exposure cluster line list.", "local": "Magtipig sang isa ka malaria exposure cluster line list.", "targets": ["CHO Surveillance Unit"]}
+        ]
+      }
+    },
+    {
+      "label": "Non-Neonatal Tetanus",
+      "code": "NNT",
+      "category": "Category II",
+      "actions": {
+        "suspected": [
+          {"code": "tetanus_urgent_referral", "en": "Arrange urgent referral and document wound, procedure, and vaccination history.", "local": "Ipa-refer gilayon kag irekord ang wound, procedure, kag vaccination history.", "targets": ["Catchment Nurse", "Referral Hospital"]}
+        ],
+        "probable": [
+          {"code": "tetanus_wound_investigation", "en": "Coordinate clinical follow-up and investigate unsafe wound-care or procedure practices.", "local": "Koordinahon ang clinical follow-up kag usisaon ang unsafe wound-care ukon procedure practices.", "targets": ["CHO Surveillance Unit", "Catchment Nurse", "Referral Hospital"]}
+        ],
+        "confirmed": [
+          {"code": "tetanus_confirmed_response", "en": "Complete vaccination-gap assessment and corrective education for linked providers or households.", "local": "Kompletuhon ang vaccination-gap assessment kag corrective education para sa linked providers ukon households.", "targets": ["Immunization Team", "CHO Surveillance Unit", "Catchment Nurse"]}
+        ],
+        "cluster": [
+          {"code": "tetanus_cluster_review", "en": "Review shared wounds, procedures, providers, products, and vaccination gaps.", "local": "Repasuhon ang pareho nga wounds, procedures, providers, products, kag vaccination gaps.", "targets": ["CHO Surveillance Unit", "Immunization Team"]},
+          {"code": "cluster_line_list", "en": "Maintain one exposure-linked tetanus cluster line list.", "local": "Magtipig sang isa ka exposure-linked tetanus cluster line list.", "targets": ["CHO Surveillance Unit"]}
+        ]
+      }
+    },
+    {
+      "label": "Pertussis",
+      "code": "PERTUSSIS",
+      "category": "Category II",
+      "actions": {
+        "suspected": [
+          {"code": "pertussis_droplet_referral", "en": "Apply droplet precautions, assess infant danger signs, and arrange clinical referral.", "local": "Sundon ang droplet precautions, usisaon ang infant danger signs, kag ipa-clinical referral.", "targets": ["BHW Team", "Catchment Nurse", "Referral Hospital"]}
+        ],
+        "probable": [
+          {"code": "pertussis_contacts_specimen", "en": "Coordinate diagnostic specimen referral, list close contacts, and verify vaccination history.", "local": "Koordinahon ang diagnostic specimen referral, ilista ang close contacts, kag beripikahon ang vaccination history.", "targets": ["CHO Surveillance Unit", "Immunization Team", "Catchment Nurse"]}
+        ],
+        "confirmed": [
+          {"code": "pertussis_confirmed_response", "en": "Complete contact management and targeted vaccination-gap response under CHO guidance.", "local": "Kompletuhon ang contact management kag targeted vaccination-gap response suno sa CHO guidance.", "targets": ["CHO Surveillance Unit", "Immunization Team", "Referral Hospital"]}
+        ],
+        "cluster": [
+          {"code": "pertussis_cluster_sweep", "en": "Conduct prolonged-cough case finding in linked households, schools, and daycare groups.", "local": "Mag-prolonged-cough case finding sa linked households, schools, kag daycare groups.", "targets": ["BHW Team", "School Health Coordinator", "CHO Surveillance Unit"]},
+          {"code": "cluster_line_list", "en": "Maintain one contact-linked pertussis cluster line list.", "local": "Magtipig sang isa ka contact-linked pertussis cluster line list.", "targets": ["CHO Surveillance Unit"]}
+        ]
+      }
+    },
+    {
+      "label": "Typhoid and Paratyphoid Fever",
+      "code": "TYPHOID",
+      "category": "Category II",
+      "actions": {
+        "suspected": [
+          {"code": "typhoid_hygiene_referral", "en": "Assess danger signs, arrange clinical referral, and reinforce safe food, water, and hand hygiene.", "local": "Usisaon ang danger signs, ipa-clinical referral, kag paigtingon ang safe food, water, kag hand hygiene.", "targets": ["BHW Team", "Catchment Nurse"]}
+        ],
+        "probable": [
+          {"code": "typhoid_specimen_source", "en": "Coordinate diagnostic specimen referral and inspect household food and water exposures.", "local": "Koordinahon ang diagnostic specimen referral kag inspeksyunon ang household food kag water exposures.", "targets": ["Catchment Nurse", "Sanitary Inspector", "CHO Surveillance Unit"]}
+        ],
+        "confirmed": [
+          {"code": "enteric_confirmed_control", "en": "Apply source-specific food and water controls and assess food-handler restrictions through CHO.", "local": "Ipatuman ang source-specific food kag water controls kag ipa-assess sa CHO ang food-handler restrictions.", "targets": ["Sanitary Inspector", "CHO Surveillance Unit", "City Health Officer"]}
+        ],
+        "cluster": [
+          {"code": "water_food_cluster_investigation", "en": "Map shared meals, vendors, and water points and prioritize environmental sampling.", "local": "I-map ang pareho nga meals, vendors, kag water points kag unahon ang environmental sampling.", "targets": ["Sanitary Inspector", "CHO Surveillance Unit"]},
+          {"code": "cluster_line_list", "en": "Maintain one enteric-fever cluster line list.", "local": "Magtipig sang isa ka enteric-fever cluster line list.", "targets": ["Catchment Nurse", "CHO Surveillance Unit"]}
+        ]
+      }
+    }
+  ]
+}

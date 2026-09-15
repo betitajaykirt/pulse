@@ -21,6 +21,7 @@ from reports.case_scope import (
     event_date_window_q,
     parse_scope_time_range,
 )
+from reports.recommendation_service import resolve_case_recommendation
 from reports.ml_display import (
     official_disease_label,
     parse_ml_confidence,
@@ -413,25 +414,6 @@ def api_cases(request):
             return f'{score:.2f} — {level} Risk', score, level
         return f'{level} Risk', None, level
 
-    def _recommendations_text(mitigation, recommended_action, disease_name):
-        disease_name = (disease_name or 'the reported illness').strip()
-        intro = f'Initiate {disease_name} vector control protocols.'
-        fallback = (
-            f'{intro} Inspect standing water and conduct localized vector control within the 25m radius.'
-        )
-        if recommended_action:
-            if disease_name.lower() in recommended_action.lower():
-                return recommended_action
-            return f'{intro} {recommended_action}'
-        if mitigation and mitigation.get('steps'):
-            parts = [s.get('action_text', '') for s in mitigation['steps'] if s.get('action_text')]
-            if parts:
-                base = ' '.join(parts[:3])
-                if disease_name.lower() in base.lower():
-                    return base
-                return f'{intro} {base}'
-        return fallback
-
     nurses_by_barangay = catchment_nurses_by_barangay([
         r.barangay.barangay_name for r in rows if r.barangay
     ])
@@ -446,7 +428,6 @@ def api_cases(request):
         }
         weight = weight_map.get(r.case_classification, 0.25)
         heat_intensity = min(1.0, weight * (r.case_count / 3))
-        mitigation = None
         assessment = latest_assessments.get(r.id)
         risk_line, risk_score, risk_level = _risk_display(assessment, r)
         barangay_name = r.barangay.barangay_name if r.barangay else ''
@@ -469,6 +450,10 @@ def api_cases(request):
         ml_high = _ml_confidence_high(r, ml_predicted)
         action_disease = _canonical_disease_for_actions(
             r, status_norm, ml_predicted, confirmed_disease,
+        )
+        recommendation_bundle = resolve_case_recommendation(
+            action_disease,
+            'confirmed' if status_norm.casefold() == 'confirmed' else classif_norm,
         )
         aptas_scores, aptas_risk_level, aptas_stored = _map_pin_aptas(r, assessment, risk_logs)
         purok = r.detailed_address or ''
@@ -496,10 +481,15 @@ def api_cases(request):
             'validation_status':   r.validation_status,
             'report_date':         format_display_date(r.report_date),
             'date_of_onset':       onset,
+            'cluster_date': (
+                r.date_of_onset.isoformat()
+                if r.date_of_onset
+                else r.report_date.date().isoformat()
+            ),
             'barangay_name':       r.barangay.barangay_name if r.barangay else 'Unknown',
             'heat_intensity':      heat_intensity,
             'epidemic_threshold_status': r.epidemic_threshold_status or '',
-            'mitigation_suggestions': mitigation,
+            'mitigation_suggestions': recommendation_bundle,
             'officer_name':        officer_fields['officer_name'],
             'officer_contact':     officer_fields['officer_contact'] or officer_fields['officer_email'],
             'risk_score_line':     risk_line,
@@ -512,10 +502,17 @@ def api_cases(request):
             'spatial_score':       aptas_scores['spatial_score'],
             'environmental_score': aptas_scores['environmental_score'],
             'aptas_stored':        aptas_stored,
-            'recommendations':     _recommendations_text(
-                mitigation,
-                assessment.recommended_action if assessment else None,
-                action_disease,
+            'recommendation_bundle': recommendation_bundle,
+            'recommendations': (
+                ' '.join(
+                    action['text_en']
+                    for action in (recommendation_bundle or {}).get('actions', [])
+                )
+                or (
+                    assessment.recommended_action
+                    if assessment and assessment.recommended_action
+                    else ''
+                )
             ),
             'confirmed_by':          confirmed_by,
             'confirmed_date':      confirmed_date,
