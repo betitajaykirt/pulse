@@ -376,8 +376,9 @@
     map.on('zoom zoomend', applyMapPopupScale);
     applyMapPopupScale();
 
-    var streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    var streetLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      referrerPolicy: 'strict-origin-when-cross-origin',
       maxNativeZoom: TILE_ZOOM.maxNative,
       maxZoom: TILE_ZOOM.max,
     });
