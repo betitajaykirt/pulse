@@ -145,7 +145,7 @@ CHO202609-1001 LC-2026-DF001 09/17/2026 10:00
 PULSE_ENGINE3_OCR = """
 BAGO CITY HEALTH OFFICE - CITY HEALTH LABORATORY
 PULSE Health Surveillance - Negros Occidental, Philippines
-Name: BAÑEZ, HERNANI J.
+Name: BA�EZ, HERNANI J.
 Birthday: 05/21/2004
 Age: 28
 Gender: MALE
@@ -212,6 +212,7 @@ class ParseLabFieldsTests(SimpleTestCase):
     def test_city_lab_header_does_not_contaminate_address_fields(self):
         fields = parse_lab_fields(PULSE_ENGINE3_OCR)
 
+        self.assertEqual(fields['raw_patient_name'], 'BA�EZ, HERNANI J')
         self.assertEqual(fields['age'], '28')
         self.assertEqual(fields['city'], 'Bago City')
         self.assertEqual(fields['province'], 'Negros Occidental')
@@ -220,6 +221,20 @@ class ParseLabFieldsTests(SimpleTestCase):
             'Purok Kapayas, Barangay Poblacion, Bago City, Negros Occidental',
         )
         self.assertNotIn('Health Laboratory', fields['address'])
+
+    def test_replacement_character_name_matches_and_uses_record_spelling(self):
+        fixed = apply_record_name_correction(
+            'BA�EZ, HERNANI J.',
+            'Hernani J. Bañez III',
+        )
+
+        self.assertTrue(
+            cross_validate_patient(
+                fixed['raw_patient_name'],
+                'Hernani J. Bañez III',
+            )['match']
+        )
+        self.assertEqual(fixed['patient_name'], 'Hernani J. Bañez III')
 
     def test_fuzzy_name_match_handles_ocr_typo(self):
         result = cross_validate_patient('AUJERO, JELVN S', 'Jelyn S. Aujero')

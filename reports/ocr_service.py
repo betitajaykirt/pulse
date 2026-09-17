@@ -450,7 +450,9 @@ def _primary_result(interpretation: str, markers: list[dict]) -> str:
 def _extract_patient_name(text: str) -> str:
     m = re.search(
         r'(?:Patient\s*Name|^Name)\s*[:\-]\s*'
-        r'([A-Za-z][A-Za-z\s,.\'-]{1,80}?)'
+        # Capture the line instead of ASCII-only letters. OCR commonly emits
+        # U+FFFD for Ñ (for example, BA�EZ), which must still be matchable.
+        r'([^\n]{2,100}?)'
         r'(?=\s*(?:Birthday|Age|Nationality|Civil\s*Status|Date\s*of\s*Birth|Sex|Gender|Passport|Address|\n|$))',
         text,
         re.IGNORECASE | re.MULTILINE,
@@ -461,7 +463,7 @@ def _extract_patient_name(text: str) -> str:
         if name.lower() not in {'name', 'patient', 'patient name'}:
             return name
     m = re.search(
-        r'\bName\s*[:\-]\s*([A-Z][A-Z\s,.\'-]{2,80}?)(?=\s*(?:Birthday|Age|Nationality|Gender|Sex|\n))',
+        r'\bName\s*[:\-]\s*([^\n]{2,100}?)(?=\s*(?:Birthday|Age|Nationality|Gender|Sex|\n))',
         text,
         re.IGNORECASE,
     )

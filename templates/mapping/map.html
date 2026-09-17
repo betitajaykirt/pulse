@@ -125,9 +125,9 @@
       <select id="filter-time" class="input-soft input-soft--plain" onchange="loadMapData(false)">
 
         <option value="7">Last 7 days</option>
-        <option value="30" selected>Last 30 days</option>
+        <option value="30">Last 30 days</option>
         <option value="90">Last 90 days</option>
-        <option value="all_active">All open cases</option>
+        <option value="all_active" selected>All open cases</option>
 
       </select>
 
@@ -591,7 +591,7 @@
 
       clusterModels.forEach(function (cluster) {
 
-        if (cluster.reportCount < 2) return;
+        if (cluster.reportCount < 1) return;
 
         if (!isValidLatLng(cluster.lat, cluster.lng)) return;
 
@@ -603,7 +603,7 @@
 
         L.circle([lat, lng], {
 
-          radius: CLUSTER_RADIUS_M,
+          radius: cluster.reportCount >= 2 ? CLUSTER_RADIUS_M : 25,
 
           color: radiusStyle.color,
 
