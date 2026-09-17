@@ -3325,16 +3325,16 @@ html[data-theme="dark"] .map-layer-btn:hover {
 /* ── Cluster pin badge ──────────────────────────────────────────── */
 .map-cluster-badge {
   display: flex; align-items: center; justify-content: center;
-  pointer-events: none;
+  pointer-events: auto;
 }
 .map-cluster-badge__label {
   background: var(--primary, #0F4C81); color: #fff;
-  font-size: .65rem; font-weight: 700; line-height: 1;
-  min-width: 18px; height: 18px; padding: 0 4px;
-  border-radius: 999px; border: 2px solid #fff;
+  font-size: .75rem; font-weight: 800; line-height: 1;
+  width: 34px; height: 34px;
+  border-radius: 999px; border: 3px solid #fff;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
-  position: absolute; top: -6px; right: -8px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.35);
+  cursor: pointer;
 }
 
 /* ── Cluster / aggregated popup — accordion layout ──────────────── */

@@ -408,7 +408,7 @@
 
     /* ── Custom panes for correct z-stacking ─────────────────────── */
 
-    /* Stacking order: Tiles → Heatmap (340) → Boundaries (400) → Cluster (620) → Pins (650) → Popup (800) */
+    /* Stacking: Tiles → Heatmap → Boundaries → Radius → Pins → Cluster marker → Popup */
 
     if (!map.getPane('heatmapPane')) {
 
@@ -430,6 +430,12 @@
       map.getPane('pins-pane').style.pointerEvents = 'auto';
     }
 
+    if (!map.getPane('cluster-marker-pane')) {
+      map.createPane('cluster-marker-pane');
+      map.getPane('cluster-marker-pane').style.zIndex = '680';
+      map.getPane('cluster-marker-pane').style.pointerEvents = 'auto';
+    }
+
     if (map.getPane('popupPane')) {
       map.getPane('popupPane').style.zIndex = '800';
     }
@@ -440,6 +446,9 @@
     var clusterSvgRenderer = L.svg({ pane: 'cluster-pane', padding: 0.5 });
 
     var pinsSvgRenderer = L.svg({ pane: 'pins-pane', padding: 0.5 });
+
+    const CLUSTER_RADIUS_M = 300;
+    const CLUSTER_WINDOW_DAYS = 7;
 
     var CLASSIF_RANK = { confirmed: 3, probable: 2, suspected: 1 };
 
@@ -549,7 +558,10 @@
 
         cases: cluster.cases,
 
-        caseCount: cluster.cases.length,
+        reportCount: cluster.cases.length,
+        caseCount: cluster.cases.reduce(function (total, item) {
+          return total + Number(item.case_count || 1);
+        }, 0),
 
       };
 
@@ -579,7 +591,7 @@
 
       clusterModels.forEach(function (cluster) {
 
-        if (cluster.caseCount < 1) return;
+        if (cluster.reportCount < 2) return;
 
         if (!isValidLatLng(cluster.lat, cluster.lng)) return;
 
@@ -589,13 +601,9 @@
 
         var radiusStyle = classificationRadiusStyle(worstCaseClassification(cluster.cases));
 
-        console.log('Rendering 25m circle at:', lat, lng, 'Total clusters:', clusterModels.length);
-
-
-
         L.circle([lat, lng], {
 
-          radius: 25,
+          radius: CLUSTER_RADIUS_M,
 
           color: radiusStyle.color,
 
@@ -1648,11 +1656,6 @@
 
 
       // Leaflet L.circle uses radius in meters (geographic), not screen pixels.
-      const CLUSTER_RADIUS_M = 300;
-      const CLUSTER_WINDOW_DAYS = 7;
-
-
-
       function buildCaseTooltip(c) {
 
         var appearance = casePinAppearance(c);
@@ -1889,28 +1892,34 @@
             caseCount: clusterModel.caseCount
         };
 
-        if (clusterModel.caseCount >= 2 && ll) {
+        if (clusterModel.reportCount >= 2 && ll) {
           window.clusterMap[clusterId].clusterNumber = clusterCounter;
           var popupHtml = buildClusterPopup(group, clusterId);
           clusterCounter++;
           L.marker(ll, {
-            pane: 'pins-pane',
+            pane: 'cluster-marker-pane',
             interactive: true,
             zIndexOffset: 1000,
             icon: L.divIcon({
               className: 'map-cluster-badge',
-              html: '<span class="map-cluster-badge__label">' + group.length + '</span>',
-              iconSize: [24, 24],
-              iconAnchor: [4, 20],
+              html: '<span class="map-cluster-badge__label" aria-label="'
+                + clusterModel.caseCount + ' cases in this cluster">'
+                + clusterModel.caseCount + '</span>',
+              iconSize: [36, 36],
+              iconAnchor: [18, 18],
             }),
           })
+          .bindTooltip(
+            clusterModel.caseCount + ' cases in ' + clusterModel.reportCount + ' reports',
+            { direction: 'top', className: 'hotspot-tip' }
+          )
           .bindPopup(popupHtml, { maxWidth: 440, minWidth: 380, autoPan: true, autoPanPadding: [30, 30], className: 'custom-fixed-popup' })
           .addTo(casePinsLayer);
+        } else {
+          group.forEach(function (c) {
+            addCasePin(c, clusterId);
+          });
         }
-
-        group.forEach(function (c) {
-          addCasePin(c, clusterId);
-        });
       });
 
 
