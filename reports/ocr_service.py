@@ -40,7 +40,9 @@ def call_ocr_api(file_obj) -> dict:
             'detectOrientation': 'true',
             'scale': 'true',
             'isTable': 'true',
-            'OCREngine': '2',
+            # Engine 3 preserves small multi-column footer fields much better
+            # than Engine 2 (notably CHO lab and control numbers).
+            'OCREngine': os.environ.get('OCR_ENGINE', '3'),
         }
         files = {'file': (file_obj.name, file_obj.read(), file_obj.content_type)}
         resp = requests.post(api_url, data=payload, files=files, timeout=60)
@@ -547,8 +549,10 @@ def _fix_address_typos(value: str) -> str:
 
 def _labeled_place(text: str, label: str) -> str:
     return _title_place(_first_group(
-        rf'{label}\s*[:\-]?\s*([A-Za-z0-9\s,.]+?)(?=\s*(?:Barangay|City|Province|Municipality|Region|Email|Phone|Contact|Nationality|Civil\s*Status|Address|\n|$))',
+        rf'(?:^|\n)\s*{label}\s*[:\-]\s*'
+        r'([A-Za-z0-9 ,.]+?)(?=\n|$)',
         text,
+        flags=re.IGNORECASE | re.MULTILINE,
     ))
 
 

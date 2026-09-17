@@ -142,6 +142,24 @@ Lab Number Control Number Certificate Issued
 CHO202609-1001 LC-2026-DF001 09/17/2026 10:00
 """
 
+PULSE_ENGINE3_OCR = """
+BAGO CITY HEALTH OFFICE - CITY HEALTH LABORATORY
+PULSE Health Surveillance - Negros Occidental, Philippines
+Name: BAÑEZ, HERNANI J.
+Birthday: 05/21/2004
+Age: 28
+Gender: MALE
+Address: PUROK KAPAYAS, BARANGAY POBLACION
+Barangay: POBLACION
+City: BAGO CITY
+Province: Negros Occidental
+Region: Negros Island Region
+Lab Number: CHO202609-1001
+Control Number: LC-2026-DF001
+Certificate Issued: 09/17/2026
+10:00
+"""
+
 
 class ParseLabFieldsTests(SimpleTestCase):
     def test_clean_red_cross_report(self):
@@ -190,6 +208,18 @@ class ParseLabFieldsTests(SimpleTestCase):
 
         self.assertEqual(fields['lab_number'], 'CHO202609-1001')
         self.assertEqual(fields['control_number'], 'LC-2026-DF001')
+
+    def test_city_lab_header_does_not_contaminate_address_fields(self):
+        fields = parse_lab_fields(PULSE_ENGINE3_OCR)
+
+        self.assertEqual(fields['age'], '28')
+        self.assertEqual(fields['city'], 'Bago City')
+        self.assertEqual(fields['province'], 'Negros Occidental')
+        self.assertEqual(
+            fields['address'],
+            'Purok Kapayas, Barangay Poblacion, Bago City, Negros Occidental',
+        )
+        self.assertNotIn('Health Laboratory', fields['address'])
 
     def test_fuzzy_name_match_handles_ocr_typo(self):
         result = cross_validate_patient('AUJERO, JELVN S', 'Jelyn S. Aujero')
