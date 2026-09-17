@@ -1918,11 +1918,13 @@
           )
           .bindPopup(popupHtml, { maxWidth: 440, minWidth: 380, autoPan: true, autoPanPadding: [30, 30], className: 'custom-fixed-popup' })
           .addTo(casePinsLayer);
-        } else {
-          group.forEach(function (c) {
-            addCasePin(c, clusterId);
-          });
         }
+
+        // Keep every patient pin visible; the numbered marker supplements
+        // the individual locations instead of replacing them.
+        group.forEach(function (c) {
+          addCasePin(c, clusterId);
+        });
       });
 
 
