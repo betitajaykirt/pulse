@@ -1720,6 +1720,18 @@
 
         var parent = cases.map(function (_, idx) { return idx; });
 
+        function diseaseKey(caseItem) {
+          var bundle = caseItem.recommendation_bundle || {};
+          return String(
+            bundle.disease
+            || caseItem.confirmed_disease
+            || caseItem.ml_top_predicted_disease
+            || caseItem.ml_predicted_disease
+            || caseItem.syndrome_type
+            || ''
+          ).trim().toLowerCase();
+        }
+
 
 
         function find(idx) {
@@ -1759,6 +1771,10 @@
           if (!Number.isFinite(latA) || !Number.isFinite(lonA)) continue;
 
           for (var j = i + 1; j < cases.length; j++) {
+
+            var diseaseA = diseaseKey(cases[i]);
+            var diseaseB = diseaseKey(cases[j]);
+            if (!diseaseA || diseaseA !== diseaseB) continue;
 
             var latB = parseFloat(cases[j].latitude);
 
