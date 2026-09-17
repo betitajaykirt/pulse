@@ -67,7 +67,10 @@ _JUNK_IDENTIFIERS = frozenset({
     'result', 'date', 'name', 'report', 'test', 'id', 'accession', 'na',
 })
 
-_PORT_RE = re.compile(r'\b(PORT[\s\-]?\d{6,8}[\s\-]?\d{3,6})\b', re.IGNORECASE)
+_LAB_NUMBER_RE = re.compile(
+    r'\b((?:PORT|CHO)[\s\-]?\d{6,8}[\s\-]?\d{3,6})\b',
+    re.IGNORECASE,
+)
 _LC_RE = re.compile(r'\b(LC[\s\-]?\d{4}[\s\-]?[A-Za-z0-9]{4,8})\b', re.IGNORECASE)
 _DATE_RE = re.compile(
     r'\b(\d{1,2}[/\-]\d{1,2}[/\-]\d{2,4}'
@@ -119,9 +122,11 @@ def _normalize_ocr_text(raw_text: str) -> str:
 def _normalize_id(value: str) -> str:
     value = _clean(value).upper().replace(' ', '')
     value = re.sub(r'[^A-Z0-9\-]', '', value)
-    if '-' not in value and re.fullmatch(r'PORT\d{9,14}', value):
-        # PORT + YYYYMM (6) + serial
-        value = f'{value[:10]}-{value[10:]}'
+    if '-' not in value and re.fullmatch(r'(?:PORT|CHO)\d{9,14}', value):
+        # Facility prefix + YYYYMM (6) + serial.
+        prefix_length = 4 if value.startswith('PORT') else 3
+        split_at = prefix_length + 6
+        value = f'{value[:split_at]}-{value[split_at:]}'
     if '-' not in value and re.fullmatch(r'LC\d{4}[A-Z0-9]{4,8}', value):
         value = f'LC-{value[2:6]}-{value[6:]}'
     return value
@@ -139,17 +144,20 @@ def _first_group(pattern: str, text: str, flags=re.IGNORECASE) -> str:
 
 def _extract_lab_identifiers(text: str) -> tuple[str, str]:
     """Return (control_number, lab_number) using patterns first, labels second."""
-    port_match = _PORT_RE.search(text)
+    lab_id_match = _LAB_NUMBER_RE.search(text)
     lc_match = _LC_RE.search(text)
-    lab_number = _normalize_id(port_match.group(1)) if port_match else ''
+    lab_number = _normalize_id(lab_id_match.group(1)) if lab_id_match else ''
     control_number = _normalize_id(lc_match.group(1)) if lc_match else ''
 
     labeled_lab = _first_group(
-        r'(?:Lab(?:oratory)?\s*(?:Number|No\.?)|Specimen\s*(?:ID|Number|No\.?)|Accession\s*(?:No\.?))\s*[:\-]\s*([A-Za-z0-9\-]+)',
+        r'(?:Lab(?:oratory)?(?:\s*/\s*Specimen)?\s*(?:Number|No\.?)|'
+        r'Specimen\s*(?:ID|Number|No\.?)|Accession\s*(?:No\.?))'
+        r'\s*[:\-]?\s*([A-Za-z0-9\-]+)',
         text,
     )
     labeled_control = _first_group(
-        r'(?:Control\s*(?:Number|No\.?)|Laboratory\s*Control(?:\s*Number)?)\s*[:\-]\s*([A-Za-z0-9\-]+)',
+        r'(?:Control\s*(?:Number|No\.?)|Laboratory\s*Control(?:\s*Number)?)'
+        r'\s*[:\-]?\s*([A-Za-z0-9\-]+)',
         text,
     )
 
@@ -158,7 +166,7 @@ def _extract_lab_identifiers(text: str) -> tuple[str, str]:
         if not raw or _is_junk_identifier(raw):
             return
         normalized = _normalize_id(raw)
-        if normalized.startswith('PORT'):
+        if normalized.startswith(('PORT', 'CHO')):
             lab_number = normalized
         elif normalized.startswith('LC'):
             control_number = normalized
@@ -171,11 +179,11 @@ def _extract_lab_identifiers(text: str) -> tuple[str, str]:
     _assign_identifier(labeled_control)
 
     # Swap if OCR assigned the two identifiers to the opposite labels.
-    if lab_number.startswith('LC-') and control_number.startswith('PORT'):
+    if lab_number.startswith('LC-') and control_number.startswith(('PORT', 'CHO')):
         lab_number, control_number = control_number, lab_number
     if lab_number.startswith('LC-') and not control_number:
         control_number, lab_number = lab_number, ''
-    if control_number.startswith('PORT') and not lab_number:
+    if control_number.startswith(('PORT', 'CHO')) and not lab_number:
         lab_number, control_number = control_number, ''
 
     if _is_junk_identifier(lab_number):

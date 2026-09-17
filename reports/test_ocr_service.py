@@ -130,6 +130,18 @@ IgG ANTIBODY: NOT DETECTED
 Interpretation POSITIVE FOR ACUTE DENGUE FEVER INFECTION
 """
 
+PULSE_CITY_LAB_FOOTER = """
+ADMINISTRATIVE FOOTER
+Lab Number: CHO202609-1001
+Control Number: LC-2026-DF001
+Certificate Issued: 09/17/2026 10:00
+"""
+
+PULSE_CITY_LAB_TABLE_OCR = """
+Lab Number Control Number Certificate Issued
+CHO202609-1001 LC-2026-DF001 09/17/2026 10:00
+"""
+
 
 class ParseLabFieldsTests(SimpleTestCase):
     def test_clean_red_cross_report(self):
@@ -166,6 +178,18 @@ class ParseLabFieldsTests(SimpleTestCase):
         fields = parse_lab_fields(SWAPPED_LABELS)
         self.assertNotEqual(fields['lab_number'].lower(), 'control')
         self.assertEqual(fields['lab_number'], 'PORT202608-3882')
+
+    def test_reads_bago_city_lab_footer_identifiers(self):
+        fields = parse_lab_fields(PULSE_CITY_LAB_FOOTER)
+
+        self.assertEqual(fields['lab_number'], 'CHO202609-1001')
+        self.assertEqual(fields['control_number'], 'LC-2026-DF001')
+
+    def test_reads_identifiers_when_ocr_flattens_footer_table(self):
+        fields = parse_lab_fields(PULSE_CITY_LAB_TABLE_OCR)
+
+        self.assertEqual(fields['lab_number'], 'CHO202609-1001')
+        self.assertEqual(fields['control_number'], 'LC-2026-DF001')
 
     def test_fuzzy_name_match_handles_ocr_typo(self):
         result = cross_validate_patient('AUJERO, JELVN S', 'Jelyn S. Aujero')
