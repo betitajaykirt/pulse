@@ -122,6 +122,8 @@ WSGI_APPLICATION = 'mysite.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+LOCAL_MYSQL_URL = 'mysql://root:@localhost:3306/djangotutorial'
+
 DATABASES = {
     'default': dj_database_url.config(
         default=os.environ.get('DATABASE_URL', LOCAL_MYSQL_URL),
