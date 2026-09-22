@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 import os
 from pathlib import Path
+import dj_database_url
 import environ
 from django.core.exceptions import ImproperlyConfigured
 
@@ -27,16 +28,15 @@ if os.path.exists(env_file):
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-DEBUG = env.bool('DEBUG', default=False)
+SECRET_KEY = os.environ.get('SECRET_KEY', 'your-default-dev-key')
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-SECRET_KEY = env('SECRET_KEY', default=None)
-if not SECRET_KEY:
+if not DEBUG and (
+    SECRET_KEY == 'your-default-dev-key'
+    or SECRET_KEY.startswith('django-insecure-')
+):
     raise ImproperlyConfigured(
-        'SECRET_KEY must be set in the environment or a local .env file.'
-    )
-if not DEBUG and SECRET_KEY.startswith('django-insecure-'):
-    raise ImproperlyConfigured(
-        'Production SECRET_KEY must not use the django-insecure- prefix.'
+        'Production SECRET_KEY must be set and must not use a development value.'
     )
 SECRET_KEY_FALLBACKS = env.list('SECRET_KEY_FALLBACKS', default=[])
 
@@ -50,6 +50,9 @@ ALLOWED_HOSTS = env.list(
         '.vercel.app',
     ],
 )
+RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
+if RENDER_EXTERNAL_HOSTNAME and RENDER_EXTERNAL_HOSTNAME not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
 
 CSRF_TRUSTED_ORIGINS = env.list(
     'CSRF_TRUSTED_ORIGINS',
@@ -59,6 +62,10 @@ CSRF_TRUSTED_ORIGINS = env.list(
         'https://*.vercel.app',
     ],
 )
+if RENDER_EXTERNAL_HOSTNAME:
+    render_origin = f'https://{RENDER_EXTERNAL_HOSTNAME}'
+    if render_origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(render_origin)
 
 
 # Application definition
@@ -116,15 +123,11 @@ WSGI_APPLICATION = 'mysite.wsgi.application'
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': env('DB_NAME', default=''),
-        'USER': env('DB_USER', default=''),
-        'PASSWORD': env('DB_PASSWORD', default=''),
-        'HOST': env('DB_HOST', default=''),
-        'PORT': env('DB_PORT', default='3306'),
-        'OPTIONS': {'charset': 'utf8mb4'},
-    }
+    'default': dj_database_url.config(
+        default=os.environ.get('DATABASE_URL'),
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
 }
 
 
@@ -175,17 +178,9 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles_build', 'static')
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
-
-STORAGES = {
-    "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
-    },
-    "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
-    },
-}
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
