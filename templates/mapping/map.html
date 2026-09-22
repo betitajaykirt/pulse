@@ -308,7 +308,12 @@
 
     <div class="map-canvas-wrap">
 
-      <div id="map" class="pulse-map" aria-label="Geospatial hotspot map"></div>
+      <div
+        id="map"
+        class="pulse-map"
+        aria-label="Geospatial hotspot map"
+        data-can-manage-recommendations="{% if session_role == 'admin' or session_role == 'super_admin' %}true{% else %}false{% endif %}"
+      ></div>
 
     </div>
 
@@ -317,6 +322,38 @@
 
 
 </div>
+
+{% if session_role == 'admin' or session_role == 'super_admin' %}
+<div id="recommendation-edit-modal" class="pulse-modal-backdrop" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:2200;align-items:center;justify-content:center;padding:1rem;">
+  <div class="pulse-modal-content" style="background:#fff;border-radius:16px;width:min(760px,96vw);max-height:90vh;overflow:auto;padding:1.25rem;box-shadow:0 24px 60px rgba(15,23,42,.25);">
+    <div style="display:none;">{% csrf_token %}</div>
+    <div style="display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;">
+      <div>
+        <span class="pulse-eyebrow">Admin Review</span>
+        <h3 id="recommendation-edit-title" style="margin:.2rem 0;">Edit Recommendation</h3>
+        <p class="text-muted" style="margin:0;">Changes remain hidden from field users until you approve them.</p>
+      </div>
+      <button type="button" id="recommendation-edit-close" class="nc-btn nc-btn--outline nc-btn--sm">Close</button>
+    </div>
+    <div id="recommendation-edit-message" style="display:none;margin-top:1rem;padding:.75rem;border-radius:.65rem;"></div>
+    <div class="form-group" style="margin-top:1rem;">
+      <label for="recommendation-edit-state">Recommendation State</label>
+      <select id="recommendation-edit-state" class="input-soft input-soft--plain">
+        <option value="suspected">Suspected</option>
+        <option value="probable">Probable</option>
+        <option value="confirmed">Confirmed</option>
+        <option value="cluster">Cluster</option>
+      </select>
+    </div>
+    <div id="recommendation-edit-actions" style="display:grid;gap:.75rem;margin-top:1rem;"></div>
+    <button type="button" id="recommendation-add-action" class="nc-btn nc-btn--outline nc-btn--sm" style="margin-top:.75rem;">Add Action</button>
+    <div style="display:flex;justify-content:flex-end;gap:.65rem;flex-wrap:wrap;border-top:1px solid #e2e8f0;margin-top:1.25rem;padding-top:1rem;">
+      <button type="button" id="recommendation-approve" class="nc-btn nc-btn--outline" style="display:none;">Approve Pending Changes</button>
+      <button type="button" id="recommendation-save" class="nc-btn nc-btn--primary">Save for Approval</button>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 {% endblock %}
 
@@ -334,6 +371,230 @@
   document.addEventListener('DOMContentLoaded', function () {
 
     if (window.lucide) lucide.createIcons();
+
+    var canManageRecommendations =
+      document.getElementById('map').dataset.canManageRecommendations === 'true';
+    var recommendationCardUrl = "{% url 'recommendation_card' %}";
+    var recommendationApproveUrl = "{% url 'approve_recommendation_revision' 0 %}";
+    var recommendationEditor = {
+      disease: '',
+      actions: {},
+      currentState: 'suspected',
+      pendingRevisionId: null,
+    };
+
+    function csrfToken() {
+      var match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+      return match ? decodeURIComponent(match[1]) : '';
+    }
+
+    function showRecommendationMessage(message, isError) {
+      var element = document.getElementById('recommendation-edit-message');
+      if (!element) return;
+      element.textContent = message;
+      element.style.display = 'block';
+      element.style.background = isError ? '#fef2f2' : '#ecfdf5';
+      element.style.color = isError ? '#b91c1c' : '#047857';
+      element.style.border = '1px solid ' + (isError ? '#fecaca' : '#a7f3d0');
+    }
+
+    function syncRecommendationState() {
+      var container = document.getElementById('recommendation-edit-actions');
+      if (!container) return;
+      recommendationEditor.actions[recommendationEditor.currentState] =
+        Array.from(container.querySelectorAll('[data-recommendation-action]')).map(function (row) {
+          return {
+            code: row.querySelector('[data-field="code"]').value.trim(),
+            en: row.querySelector('[data-field="en"]').value.trim(),
+            local: row.querySelector('[data-field="local"]').value.trim(),
+            targets: row.querySelector('[data-field="targets"]').value
+              .split(',')
+              .map(function (value) { return value.trim(); })
+              .filter(Boolean),
+          };
+        });
+    }
+
+    function renderRecommendationActionEditor() {
+      var container = document.getElementById('recommendation-edit-actions');
+      if (!container) return;
+      var actions = recommendationEditor.actions[recommendationEditor.currentState] || [];
+      container.innerHTML = actions.map(function (action, index) {
+        return '<div data-recommendation-action style="border:1px solid #dbe4ee;border-radius:.75rem;padding:.85rem;background:#f8fafc;">'
+          + '<div style="display:flex;justify-content:space-between;gap:.75rem;align-items:center;margin-bottom:.65rem;">'
+          + '<strong>Action ' + (index + 1) + '</strong>'
+          + '<button type="button" class="nc-btn nc-btn--outline nc-btn--sm" data-remove-recommendation-action="' + index + '">Remove</button></div>'
+          + '<label style="display:block;font-size:.75rem;font-weight:700;">Action Code</label>'
+          + '<input data-field="code" class="input-soft input-soft--plain" value="' + escapeMapPopupHtml(action.code || '') + '">'
+          + '<label style="display:block;font-size:.75rem;font-weight:700;margin-top:.55rem;">English Instruction</label>'
+          + '<textarea data-field="en" class="input-soft input-soft--plain" style="width:100%;min-height:70px;">' + escapeMapPopupHtml(action.en || '') + '</textarea>'
+          + '<label style="display:block;font-size:.75rem;font-weight:700;margin-top:.55rem;">Hiligaynon / Taglish Instruction</label>'
+          + '<textarea data-field="local" class="input-soft input-soft--plain" style="width:100%;min-height:70px;">' + escapeMapPopupHtml(action.local || '') + '</textarea>'
+          + '<label style="display:block;font-size:.75rem;font-weight:700;margin-top:.55rem;">Target Units (comma-separated)</label>'
+          + '<input data-field="targets" class="input-soft input-soft--plain" value="' + escapeMapPopupHtml((action.targets || []).join(', ')) + '">'
+          + '</div>';
+      }).join('');
+    }
+
+    function closeRecommendationEditor() {
+      var modal = document.getElementById('recommendation-edit-modal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function markRecommendationDirty() {
+      var approveButton = document.getElementById('recommendation-approve');
+      if (approveButton) approveButton.style.display = 'none';
+      showRecommendationMessage('Save these edits before approving them.', false);
+    }
+
+    function openRecommendationEditor(disease, status) {
+      if (!canManageRecommendations) return;
+      var modal = document.getElementById('recommendation-edit-modal');
+      var message = document.getElementById('recommendation-edit-message');
+      var stateSelect = document.getElementById('recommendation-edit-state');
+      modal.style.display = 'flex';
+      message.style.display = 'none';
+      document.getElementById('recommendation-edit-title').textContent = 'Edit ' + disease;
+      document.getElementById('recommendation-edit-actions').innerHTML = '<p class="text-muted">Loading recommendations...</p>';
+
+      fetch(recommendationCardUrl + '?disease=' + encodeURIComponent(disease), {
+        credentials: 'same-origin',
+      })
+        .then(function (response) { return response.json().then(function (data) {
+          if (!response.ok) throw new Error(data.error || 'Unable to load recommendations.');
+          return data;
+        }); })
+        .then(function (data) {
+          recommendationEditor.disease = data.disease;
+          recommendationEditor.actions = data.actions;
+          recommendationEditor.pendingRevisionId = data.pending_revision_id;
+          recommendationEditor.currentState = status || 'suspected';
+          stateSelect.value = recommendationEditor.currentState;
+          document.getElementById('recommendation-approve').style.display =
+            data.pending_revision_id ? '' : 'none';
+          renderRecommendationActionEditor();
+          if (data.pending_revision_id) {
+            showRecommendationMessage(
+              'Pending changes are loaded. Review them, then approve when ready.',
+              false
+            );
+          }
+        })
+        .catch(function (error) {
+          showRecommendationMessage(error.message, true);
+          document.getElementById('recommendation-edit-actions').innerHTML = '';
+        });
+    }
+
+    document.addEventListener('click', function (event) {
+      var editButton = event.target.closest('[data-recommendation-edit]');
+      if (editButton) {
+        openRecommendationEditor(
+          editButton.dataset.recommendationEdit,
+          editButton.dataset.recommendationStatus
+        );
+        return;
+      }
+      var removeButton = event.target.closest('[data-remove-recommendation-action]');
+      if (removeButton) {
+        syncRecommendationState();
+        recommendationEditor.actions[recommendationEditor.currentState].splice(
+          Number(removeButton.dataset.removeRecommendationAction),
+          1
+        );
+        markRecommendationDirty();
+        renderRecommendationActionEditor();
+      }
+    });
+
+    var recommendationClose = document.getElementById('recommendation-edit-close');
+    if (recommendationClose) recommendationClose.addEventListener('click', closeRecommendationEditor);
+
+    var recommendationState = document.getElementById('recommendation-edit-state');
+    if (recommendationState) recommendationState.addEventListener('change', function () {
+      syncRecommendationState();
+      recommendationEditor.currentState = recommendationState.value;
+      renderRecommendationActionEditor();
+    });
+
+    var recommendationAdd = document.getElementById('recommendation-add-action');
+    if (recommendationAdd) recommendationAdd.addEventListener('click', function () {
+      syncRecommendationState();
+      var actions = recommendationEditor.actions[recommendationEditor.currentState] || [];
+      actions.push({
+        code: 'custom_' + recommendationEditor.currentState + '_' + Date.now(),
+        en: '',
+        local: '',
+        targets: [],
+      });
+      recommendationEditor.actions[recommendationEditor.currentState] = actions;
+      markRecommendationDirty();
+      renderRecommendationActionEditor();
+    });
+
+    var recommendationActions = document.getElementById('recommendation-edit-actions');
+    if (recommendationActions) recommendationActions.addEventListener('input', markRecommendationDirty);
+
+    var recommendationSave = document.getElementById('recommendation-save');
+    if (recommendationSave) recommendationSave.addEventListener('click', function () {
+      syncRecommendationState();
+      recommendationSave.disabled = true;
+      fetch(recommendationCardUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken(),
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: JSON.stringify({
+          disease: recommendationEditor.disease,
+          actions: recommendationEditor.actions,
+        }),
+      })
+        .then(function (response) { return response.json().then(function (data) {
+          if (!response.ok) throw new Error(data.error || 'Unable to save recommendations.');
+          return data;
+        }); })
+        .then(function (data) {
+          recommendationEditor.pendingRevisionId = data.revision_id;
+          document.getElementById('recommendation-approve').style.display = '';
+          showRecommendationMessage(data.message, false);
+        })
+        .catch(function (error) { showRecommendationMessage(error.message, true); })
+        .finally(function () { recommendationSave.disabled = false; });
+    });
+
+    var recommendationApprove = document.getElementById('recommendation-approve');
+    if (recommendationApprove) recommendationApprove.addEventListener('click', function () {
+      if (!recommendationEditor.pendingRevisionId) return;
+      if (!window.confirm('Approve these recommendations for field users?')) return;
+      recommendationApprove.disabled = true;
+      var approveUrl = recommendationApproveUrl.replace(
+        '/0/',
+        '/' + recommendationEditor.pendingRevisionId + '/'
+      );
+      fetch(approveUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'X-CSRFToken': csrfToken(),
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      })
+        .then(function (response) { return response.json().then(function (data) {
+          if (!response.ok) throw new Error(data.error || 'Unable to approve recommendations.');
+          return data;
+        }); })
+        .then(function (data) {
+          showRecommendationMessage(data.message, false);
+          window.setTimeout(function () { window.location.reload(); }, 700);
+        })
+        .catch(function (error) {
+          showRecommendationMessage(error.message, true);
+          recommendationApprove.disabled = false;
+        });
+    });
 
 
 
@@ -1524,7 +1785,7 @@
       html += '<div class="map-case-popup__rec-head"><strong>Public Health Recommendations</strong></div>';
       html += window.PulseRecommendationEngine.renderRecommendationCards(
         c.recommendation_bundle,
-        { showSummary: false }
+        { showSummary: false, canManage: canManageRecommendations }
       );
       html += '</div>';
 
@@ -1610,7 +1871,7 @@
       html += '<div class="map-cluster-popup__recommendations">';
       html += window.PulseRecommendationEngine.renderRecommendationCards(
         resolved,
-        { showSummary: false }
+        { showSummary: false, canManage: canManageRecommendations }
       );
       html += '</div></div>';
       return html;

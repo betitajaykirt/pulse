@@ -165,7 +165,14 @@
       html += '<div class="rec-case-count">' + Number(card.case_count || 1)
         + ' case' + (Number(card.case_count || 1) === 1 ? '' : 's') + ' in selection</div>';
       html += '<ul class="rec-action-list">'
-        + (card.actions || []).map(renderAction).join('') + '</ul></article>';
+        + (card.actions || []).map(renderAction).join('') + '</ul>';
+      if (options.canManage) {
+        html += '<button type="button" class="nc-btn nc-btn--outline nc-btn--sm rec-edit-button"'
+          + ' data-recommendation-edit="' + escapeHtml(card.disease) + '"'
+          + ' data-recommendation-status="' + escapeHtml(status.toLowerCase()) + '">'
+          + 'Edit &amp; Approve</button>';
+      }
+      html += '</article>';
     });
     if (options.showSummary && Array.isArray(bundle.field_action_summary)
         && bundle.field_action_summary.length) {

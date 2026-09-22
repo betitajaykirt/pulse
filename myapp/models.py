@@ -870,6 +870,7 @@ class RecommendationRevision(models.Model):
     ]
 
     payload = models.JSONField()
+    scope_disease = models.CharField(max_length=150, blank=True, default='')
     status = models.CharField(
         max_length=20, choices=STATUS_CHOICES, default='pending', db_index=True,
     )

@@ -1,8 +1,10 @@
 from copy import deepcopy
+import json
 from unittest.mock import patch
 
-from django.test import SimpleTestCase
+from django.test import RequestFactory, SimpleTestCase
 
+from reports.recommendation_admin import recommendation_card
 from reports.recommendation_repository import (
     approved_recommendation_matrix,
     clear_approved_recommendation_cache,
@@ -52,3 +54,37 @@ class ApprovedRecommendationTests(SimpleTestCase):
             matrix,
             matrix_from_payload(baseline_recommendation_payload()),
         )
+
+
+class RecommendationCardAccessTests(SimpleTestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    @patch('reports.recommendation_admin.RecommendationRevision.objects')
+    def test_admin_can_load_a_card_for_inline_editing(self, objects):
+        objects.filter.return_value.order_by.return_value.first.return_value = None
+        request = self.factory.get(
+            '/reports/recommendations/card/',
+            {'disease': 'Dengue Fever'},
+        )
+        request.session = {'user_id': 1, 'role': 'admin'}
+
+        response = recommendation_card(request)
+        payload = json.loads(response.content)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload['disease'], 'Dengue Fever')
+        self.assertIn('probable', payload['actions'])
+        self.assertIsNone(payload['pending_revision_id'])
+
+    @patch('accounts.auth_utils.messages.error')
+    def test_field_user_cannot_open_inline_editor_api(self, _message):
+        request = self.factory.get(
+            '/reports/recommendations/card/',
+            {'disease': 'Dengue Fever'},
+        )
+        request.session = {'user_id': 9, 'role': 'barangay_health_worker'}
+
+        response = recommendation_card(request)
+
+        self.assertEqual(response.status_code, 302)

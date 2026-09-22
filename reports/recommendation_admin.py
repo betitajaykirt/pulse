@@ -1,11 +1,12 @@
 """Admin editing and approval workflow for public-health recommendations."""
+from copy import deepcopy
 import json
 
-from django.contrib import messages
 from django.db import transaction
-from django.shortcuts import get_object_or_404, redirect, render
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_http_methods, require_POST
 
 from accounts.auth_utils import role_required
 from myapp.audit_utils import log_audit, log_system
@@ -15,6 +16,7 @@ from reports.recommendation_repository import (
 )
 from reports.recommendation_service import (
     baseline_recommendation_payload,
+    canonical_disease_name,
     validate_recommendation_matrix,
 )
 
@@ -22,55 +24,64 @@ from reports.recommendation_service import (
 ADMIN_ROLES = ('admin', 'super_admin')
 
 
-def _editor_context(*, payload_text=None, change_summary=''):
+def _approved_payload():
     approved = (
         RecommendationRevision.objects.filter(status='approved')
         .order_by('-approved_at', '-id')
         .first()
     )
-    pending = list(
-        RecommendationRevision.objects.filter(status='pending')
-        .order_by('-created_at')[:10]
-    )
-    source_payload = pending[0].payload if pending else (
+    return deepcopy(
         approved.payload if approved else baseline_recommendation_payload()
     )
-    return {
-        'approved_revision': approved,
-        'pending_revisions': pending,
-        'payload_text': payload_text or json.dumps(
-            source_payload,
-            indent=2,
-            ensure_ascii=False,
-        ),
-        'change_summary': change_summary,
-    }
 
 
+def _disease_row(payload, disease):
+    return next(
+        (row for row in payload['diseases'] if row['label'] == disease),
+        None,
+    )
+
+
+@require_http_methods(['GET', 'POST'])
 @role_required(*ADMIN_ROLES)
-def recommendation_editor(request):
+def recommendation_card(request):
+    disease = canonical_disease_name(
+        request.GET.get('disease') if request.method == 'GET' else ''
+    )
+
     if request.method == 'POST':
-        payload_text = request.POST.get('payload', '').strip()
-        change_summary = request.POST.get('change_summary', '').strip()
         try:
-            payload = json.loads(payload_text)
+            submitted = json.loads(request.body.decode('utf-8'))
+            if not isinstance(submitted, dict):
+                raise ValueError('Recommendation request must be a JSON object.')
+            disease = canonical_disease_name(submitted.get('disease'))
+            if not disease:
+                raise ValueError('Select a supported monitored disease.')
+            actions = submitted.get('actions')
+            if not isinstance(actions, dict):
+                raise ValueError('Recommendation actions are required.')
+
+            payload = _approved_payload()
+            row = _disease_row(payload, disease)
+            if not row:
+                raise ValueError('Recommendation disease was not found.')
+            row['actions'] = actions
             validate_recommendation_matrix(payload)
         except (json.JSONDecodeError, ValueError) as exc:
-            messages.error(request, f'Recommendation draft was not saved: {exc}')
-            return render(
-                request,
-                'reports/recommendation_editor.html',
-                _editor_context(
-                    payload_text=payload_text,
-                    change_summary=change_summary,
-                ),
+            return JsonResponse(
+                {'ok': False, 'error': str(exc)},
                 status=400,
             )
 
+        RecommendationRevision.objects.filter(
+            status='pending',
+            scope_disease=disease,
+        ).update(status='superseded')
         revision = RecommendationRevision.objects.create(
             payload=payload,
+            scope_disease=disease,
             status='pending',
-            change_summary=change_summary,
+            change_summary=f'Updated map recommendation card for {disease}.',
             created_by_id=request.session['user_id'],
             created_by_role=request.session.get('role', 'admin'),
         )
@@ -79,20 +90,42 @@ def recommendation_editor(request):
             actor_type=request.session.get('role', 'admin'),
             action='recommendation_revision_submitted',
             target_id=revision.id,
-            details=change_summary or 'Recommendation revision submitted for approval.',
+            details=revision.change_summary,
             request=request,
         )
-        messages.success(
-            request,
-            f'Recommendation revision #{revision.id} is pending admin approval.',
-        )
-        return redirect('recommendation_editor')
+        return JsonResponse({
+            'ok': True,
+            'revision_id': revision.id,
+            'message': (
+                f'{disease} changes were saved and are pending admin approval.'
+            ),
+        })
 
-    return render(
-        request,
-        'reports/recommendation_editor.html',
-        _editor_context(),
+    if not disease:
+        return JsonResponse(
+            {'ok': False, 'error': 'Select a supported monitored disease.'},
+            status=400,
+        )
+    pending = (
+        RecommendationRevision.objects
+        .filter(status='pending', scope_disease=disease)
+        .order_by('-created_at', '-id')
+        .first()
     )
+    source_payload = pending.payload if pending else _approved_payload()
+    row = _disease_row(source_payload, disease)
+    if not row:
+        return JsonResponse(
+            {'ok': False, 'error': 'Recommendation disease was not found.'},
+            status=404,
+        )
+    return JsonResponse({
+        'ok': True,
+        'disease': disease,
+        'category': row['category'],
+        'actions': row['actions'],
+        'pending_revision_id': pending.id if pending else None,
+    })
 
 
 @require_POST
@@ -105,6 +138,25 @@ def approve_recommendation_revision(request, revision_id):
             status='pending',
         )
         validate_recommendation_matrix(revision.payload)
+        if revision.scope_disease:
+            merged_payload = _approved_payload()
+            edited_row = _disease_row(
+                revision.payload,
+                revision.scope_disease,
+            )
+            current_row = _disease_row(
+                merged_payload,
+                revision.scope_disease,
+            )
+            if not edited_row or not current_row:
+                return JsonResponse(
+                    {'ok': False, 'error': 'Recommendation disease was not found.'},
+                    status=400,
+                )
+            current_row.clear()
+            current_row.update(deepcopy(edited_row))
+            validate_recommendation_matrix(merged_payload)
+            revision.payload = merged_payload
         RecommendationRevision.objects.filter(status='approved').update(
             status='superseded'
         )
@@ -117,6 +169,7 @@ def approve_recommendation_revision(request, revision_id):
             'approved_by_id',
             'approved_by_role',
             'approved_at',
+            'payload',
         ])
 
     clear_approved_recommendation_cache()
@@ -136,11 +189,15 @@ def approve_recommendation_revision(request, revision_id):
         module='recommendations',
         request=request,
     )
-    messages.success(
-        request,
-        f'Recommendation revision #{revision.id} is now visible to field users.',
-    )
-    return redirect('recommendation_editor')
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({
+            'ok': True,
+            'message': (
+                f'{revision.scope_disease or "Recommendation"} is approved and '
+                'now visible to field users.'
+            ),
+        })
+    return redirect('map_view')
 
 
 @require_POST
@@ -161,5 +218,6 @@ def reject_recommendation_revision(request, revision_id):
         details=revision.change_summary or 'Recommendation revision rejected.',
         request=request,
     )
-    messages.info(request, f'Recommendation revision #{revision.id} was rejected.')
-    return redirect('recommendation_editor')
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'ok': True, 'message': 'Pending changes were rejected.'})
+    return redirect('map_view')

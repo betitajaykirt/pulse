@@ -13,9 +13,9 @@ urlpatterns = [
     path('ocr/parse-lab/',                  views.ocr_parse_lab_document,   name='ocr_parse_lab'),
     path('incidents/',                  views.incident_reports, name='incident_reports'),
     path(
-        'recommendations/',
-        recommendation_admin.recommendation_editor,
-        name='recommendation_editor',
+        'recommendations/card/',
+        recommendation_admin.recommendation_card,
+        name='recommendation_card',
     ),
     path(
         'recommendations/<int:revision_id>/approve/',
