@@ -122,11 +122,13 @@ WSGI_APPLICATION = 'mysite.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASE_URL = 'mysql://u520834156_userPulse26:D%21pnHNM1e.main-hosting.eu:3306/u123456789_pulse'
+pymysql.install_as_MySQLdb()
+
+DATABASE_URL = os.environ.get('DATABASE_URL')
 
 DATABASES = {
     'default': dj_database_url.config(
-        default=os.environ.get('DATABASE_URL', DATABASE_URL),
+        default=DATABASE_URL,
         conn_max_age=600,
         conn_health_checks=True,
     )
