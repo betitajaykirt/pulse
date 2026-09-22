@@ -859,6 +859,37 @@ class AuditLog(models.Model):
         return f"Audit #{self.pk} — {self.action}"
 
 
+# ── Recommendation approval workflow ──────────────────────────────
+
+class RecommendationRevision(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending Approval'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+        ('superseded', 'Superseded'),
+    ]
+
+    payload = models.JSONField()
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default='pending', db_index=True,
+    )
+    change_summary = models.CharField(max_length=255, blank=True, default='')
+    created_by_id = models.PositiveIntegerField()
+    created_by_role = models.CharField(max_length=20)
+    created_at = models.DateTimeField(auto_now_add=True)
+    approved_by_id = models.PositiveIntegerField(null=True, blank=True)
+    approved_by_role = models.CharField(max_length=20, blank=True, default='')
+    approved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        managed = True
+        db_table = 'recommendation_revisions'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Recommendation revision #{self.pk} — {self.status}"
+
+
 # ── Field Tasks (table: myapp_fieldtask) ──────────────────────────
 
 class FieldTask(models.Model):

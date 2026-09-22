@@ -503,6 +503,9 @@ def api_notifications(request):
         user_id=user_id,
         user_type=user_type
     ).values_list('notification_id', flat=True))
+    from reports.recommendation_repository import approved_recommendation_matrix
+
+    recommendation_matrix = approved_recommendation_matrix()
 
     def _notification_recommendations(notif, report=None):
         from reports.recommendation_service import (
@@ -512,7 +515,11 @@ def api_notifications(request):
 
         disease = notif.disease or (report.syndrome_type if report else '')
         status = status_for_case(report) if report else 'probable'
-        bundle = resolve_case_recommendation(disease, status)
+        bundle = resolve_case_recommendation(
+            disease,
+            status,
+            matrix=recommendation_matrix,
+        )
         if bundle:
             return ' '.join(action['text_en'] for action in bundle['actions'])
         if report:
@@ -587,9 +594,11 @@ def api_notifications(request):
             resolve_case_recommendation,
             status_for_case,
         )
+
         recommendation_bundle = resolve_case_recommendation(
             notif.disease or (report.syndrome_type if report else ''),
             status_for_case(report) if report else case_status,
+            matrix=recommendation_matrix,
         )
 
         return {

@@ -22,6 +22,7 @@ from reports.case_scope import (
     parse_scope_time_range,
 )
 from reports.recommendation_service import resolve_case_recommendation
+from reports.recommendation_repository import approved_recommendation_matrix
 from reports.ml_display import (
     official_disease_label,
     parse_ml_confidence,
@@ -432,6 +433,7 @@ def api_cases(request):
     ])
 
     cases = []
+    recommendation_matrix = approved_recommendation_matrix()
     for r in rows:
         ml_confidence = parse_ml_confidence(r.remarks or '')
         if not should_show_map_pin(r, ml_confidence):
@@ -470,6 +472,7 @@ def api_cases(request):
         recommendation_bundle = resolve_case_recommendation(
             action_disease,
             'confirmed' if status_norm.casefold() == 'confirmed' else classif_norm,
+            matrix=recommendation_matrix,
         )
         aptas_scores, aptas_risk_level, aptas_stored = _map_pin_aptas(r, assessment, risk_logs)
         purok = r.detailed_address or ''

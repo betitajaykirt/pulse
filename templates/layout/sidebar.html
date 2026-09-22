@@ -51,6 +51,13 @@
       <span class="nav-icon"><i data-lucide="sliders" class="lucide-icon lucide-icon--sm"></i></span>
       <span>Outbreak Thresholds</span>
     </a>
+    {% if session_role == 'admin' or session_role == 'super_admin' %}
+    <a href="{% url 'recommendation_editor' %}"
+      class="nav-item {% if request.resolver_match.url_name == 'recommendation_editor' %}active{% endif %}">
+      <span class="nav-icon"><i data-lucide="clipboard-check" class="lucide-icon lucide-icon--sm"></i></span>
+      <span>Recommendation Approval</span>
+    </a>
+    {% endif %}
     {% endif %}
 
     {% if session_role == 'catchment_nurse' %}
@@ -79,7 +86,7 @@
       <span class="nav-icon"><i data-lucide="bell-ring" class="lucide-icon lucide-icon--sm"></i></span>
       <span>Alerts</span>
     </a>
-    
+
     {% if session_role != 'barangay_health_worker' %}
     <a href="{% url 'environmental_intelligence' %}" class="nav-item {% if 'environmental' in request.path %}active{% endif %}">
       <span class="nav-icon"><i data-lucide="cloud-rain" class="lucide-icon lucide-icon--sm"></i></span>

@@ -125,9 +125,15 @@ def validate_recommendation_matrix(payload: dict) -> None:
 
 
 @lru_cache(maxsize=1)
-def recommendation_matrix() -> dict[str, dict]:
+def baseline_recommendation_payload() -> dict:
     payload = json.loads(MATRIX_PATH.read_text(encoding='utf-8'))
     validate_recommendation_matrix(payload)
+    return payload
+
+
+@lru_cache(maxsize=1)
+def recommendation_matrix() -> dict[str, dict]:
+    payload = baseline_recommendation_payload()
     return {row['label']: row for row in payload['diseases']}
 
 
@@ -148,9 +154,10 @@ def resolve_case_recommendation(
     status: str,
     *,
     include_cluster_actions: bool = True,
+    matrix: dict[str, dict] | None = None,
 ) -> dict | None:
     disease = canonical_disease_name(disease_name)
-    row = recommendation_matrix().get(disease)
+    row = (matrix if matrix is not None else recommendation_matrix()).get(disease)
     if not row:
         return None
     state = normalize_case_status(status)
@@ -190,7 +197,11 @@ def _dedupe_actions(actions: Iterable[dict]) -> list[dict]:
     return list(combined.values())
 
 
-def resolve_cluster_recommendations(cases_array: Iterable[Any]) -> dict:
+def resolve_cluster_recommendations(
+    cases_array: Iterable[Any],
+    *,
+    matrix: dict[str, dict] | None = None,
+) -> dict:
     """Resolve sorted pathogen cards and one deduplicated BHW field summary."""
     grouped: dict[str, list[Any]] = defaultdict(list)
     for case in cases_array or []:
@@ -202,7 +213,7 @@ def resolve_cluster_recommendations(cases_array: Iterable[Any]) -> dict:
     for disease, cases in grouped.items():
         statuses = [status_for_case(case) for case in cases]
         highest = max(statuses, key=lambda item: STATUS_RANK[item])
-        card = resolve_case_recommendation(disease, highest)
+        card = resolve_case_recommendation(disease, highest, matrix=matrix)
         if not card:
             continue
         card['case_count'] = sum(

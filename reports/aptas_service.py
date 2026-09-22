@@ -80,7 +80,12 @@ PIDSR_STATUS_HEADLINE = {
 }
 
 
-def _enrich_card_context(card: Dict[str, Any], *, nurses_by_barangay: dict | None = None) -> Dict[str, Any]:
+def _enrich_card_context(
+    card: Dict[str, Any],
+    *,
+    nurses_by_barangay: dict | None = None,
+    recommendation_matrix: dict | None = None,
+) -> Dict[str, Any]:
     """Attach report-level context (officer, purok, coordinates, active cases) to a card."""
     from myapp.barangay_scope import catchment_nurse_officer_fields
     from myapp.models import Alert
@@ -147,19 +152,28 @@ def _enrich_card_context(card: Dict[str, Any], *, nurses_by_barangay: dict | Non
         resolve_cluster_recommendations,
         status_for_case,
     )
+    from reports.recommendation_repository import approved_recommendation_matrix
+
+    if recommendation_matrix is None:
+        recommendation_matrix = approved_recommendation_matrix()
 
     if active_reports and (card.get('is_pidsr_threshold') or len(active_reports) > 1):
-        recommendation_bundle = resolve_cluster_recommendations(active_reports)
+        recommendation_bundle = resolve_cluster_recommendations(
+            active_reports,
+            matrix=recommendation_matrix,
+        )
         recommendation_bundle['is_cluster'] = True
     elif anchor:
         recommendation_bundle = resolve_case_recommendation(
             syndrome_name,
             status_for_case(anchor),
+            matrix=recommendation_matrix,
         )
     else:
         recommendation_bundle = resolve_case_recommendation(
             syndrome_name,
             'confirmed' if card.get('is_pidsr_threshold') else 'probable',
+            matrix=recommendation_matrix,
         )
     card['recommendation_bundle'] = recommendation_bundle or {}
     card['recommendation_bundle_json'] = json.dumps(
@@ -323,8 +337,14 @@ def get_aptas_dashboard_context(*, barangay_name=None, limit=12):
     nurses_by_barangay = catchment_nurses_by_barangay(
         [card.get('barangay') for card in merged_alerts]
     )
+    from reports.recommendation_repository import approved_recommendation_matrix
+    recommendation_matrix = approved_recommendation_matrix()
     merged_alerts = [
-        _enrich_card_context(card, nurses_by_barangay=nurses_by_barangay)
+        _enrich_card_context(
+            card,
+            nurses_by_barangay=nurses_by_barangay,
+            recommendation_matrix=recommendation_matrix,
+        )
         for card in merged_alerts
     ]
 

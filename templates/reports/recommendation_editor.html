@@ -1,0 +1,123 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% block page_title %}Recommendation Approval{% endblock %}
+{% block content %}
+<div class="pulse-page">
+  <header class="pulse-page-header">
+    <div class="pulse-page-header__text">
+      <span class="pulse-eyebrow">Administration</span>
+      <h2>Recommendation Editor &amp; Approval</h2>
+      <p>Only approved recommendation revisions are delivered to field users.</p>
+    </div>
+  </header>
+
+  <div class="pulse-stat-grid" style="margin-bottom:1rem;">
+    <div class="pulse-stat-card">
+      <div>
+        <div class="pulse-stat-card__value">
+          {% if approved_revision %}#{{ approved_revision.id }}{% else %}Baseline{% endif %}
+        </div>
+        <div class="pulse-stat-card__label">Currently Approved</div>
+      </div>
+    </div>
+    <div class="pulse-stat-card">
+      <div>
+        <div class="pulse-stat-card__value">{{ pending_revisions|length }}</div>
+        <div class="pulse-stat-card__label">Pending Approval</div>
+      </div>
+    </div>
+  </div>
+
+  {% if pending_revisions %}
+  <div class="pulse-panel pulse-table-panel" style="margin-bottom:1rem;">
+    <div class="pulse-table-panel__head">
+      <div>
+        <h3>Pending Revisions</h3>
+        <p class="text-muted" style="margin:.25rem 0 0;">
+          These changes are hidden from BHWs, encoders, nurses, and other non-admin users.
+        </p>
+      </div>
+    </div>
+    <div class="pulse-table-wrap">
+      <table class="pulse-table">
+        <thead>
+          <tr>
+            <th>Revision</th>
+            <th>Summary</th>
+            <th>Submitted By</th>
+            <th>Submitted</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for revision in pending_revisions %}
+          <tr>
+            <td><strong>#{{ revision.id }}</strong></td>
+            <td>{{ revision.change_summary|default:"No summary provided" }}</td>
+            <td>{{ revision.created_by_role|title }} #{{ revision.created_by_id }}</td>
+            <td>{{ revision.created_at|date:"m/d/Y h:i A" }}</td>
+            <td>
+              <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                <form method="post" action="{% url 'approve_recommendation_revision' revision.id %}" onsubmit="return confirm('Approve this revision and publish it to field users?');">
+                  {% csrf_token %}
+                  <button type="submit" class="nc-btn nc-btn--primary nc-btn--sm">Approve</button>
+                </form>
+                <form method="post" action="{% url 'reject_recommendation_revision' revision.id %}" onsubmit="return confirm('Reject this pending revision?');">
+                  {% csrf_token %}
+                  <button type="submit" class="nc-btn nc-btn--outline nc-btn--sm">Reject</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="pulse-panel">
+    <div style="margin-bottom:1rem;">
+      <h3 style="margin:0 0 .35rem;">Create Recommendation Revision</h3>
+      <p class="text-muted" style="margin:0;">
+        Edit the bilingual disease matrix below. Saving creates a pending revision;
+        it does not change recommendations shown to field users until an admin approves it.
+      </p>
+    </div>
+
+    <form method="post">
+      {% csrf_token %}
+      <div class="form-group">
+        <label for="change-summary">Change Summary</label>
+        <input
+          type="text"
+          id="change-summary"
+          name="change_summary"
+          class="input-soft input-soft--plain"
+          maxlength="255"
+          value="{{ change_summary }}"
+          placeholder="Example: Updated confirmed dengue field actions"
+        >
+      </div>
+      <div class="form-group" style="margin-top:1rem;">
+        <label for="recommendation-payload">Recommendation Matrix (JSON)</label>
+        <textarea
+          id="recommendation-payload"
+          name="payload"
+          spellcheck="false"
+          required
+          style="width:100%;min-height:520px;padding:1rem;border:1px solid #cbd5e1;border-radius:.75rem;background:#f8fafc;color:#0f172a;font:12px/1.5 Consolas,Monaco,monospace;resize:vertical;"
+        >{{ payload_text }}</textarea>
+        <small class="text-muted">
+          Every monitored disease must retain suspected, probable, confirmed, and cluster actions,
+          including English text, local text, action code, and target units.
+        </small>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:1rem;">
+        <button type="submit" class="nc-btn nc-btn--primary">
+          Save for Admin Approval
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

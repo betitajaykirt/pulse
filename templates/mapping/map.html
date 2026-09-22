@@ -1358,10 +1358,10 @@
       if (confPct == null && c.ml_classification_confidence != null) {
         confPct = Math.round(c.ml_classification_confidence * 1000) / 10;
       }
-      
+
       var secondary = c.ml_secondary_predicted_disease;
       var secConfPct = c.ml_secondary_confidence_pct;
-      
+
       if (!top) {
           if (c.suspected_disease || c.syndrome_type) {
             var storedLabel = c.suspected_disease || c.syndrome_type;
@@ -1374,7 +1374,7 @@
       }
 
       var html = '<div style="margin-top:2px;">';
-      
+
       // Primary
       html += '<div>';
       if (secondary) html += '<strong>Primary:</strong> ';
@@ -1397,7 +1397,7 @@
           html += '</div>';
           html += '<div style="margin-top:6px; display:inline-block; font-size:0.7rem; font-weight:600; color:#b45309; background:#fef3c7; padding:2px 6px; border-radius:4px;">Differential Diagnosis: High Symptom Overlap</div>';
       }
-      
+
       html += '</div>';
       return html;
     }
@@ -1601,8 +1601,8 @@
         html += '<div class="cluster-accordion__actions">';
         html += '<button type="button" class="nc-btn nc-btn--sm nc-btn--outline" style="width:100%;justify-content:center;padding:6px;" onclick="showSingleCasePopup(' + c.id + ',\'' + clusterId + '\')">View Full Details</button>';
         html += '</div>';
-        html += '</div>'; 
-        html += '</details>'; 
+        html += '</div>';
+        html += '</details>';
       });
 
       html += '</div>';
@@ -1610,7 +1610,7 @@
       html += '<div class="map-cluster-popup__recommendations">';
       html += window.PulseRecommendationEngine.renderRecommendationCards(
         resolved,
-        { showSummary: true }
+        { showSummary: false }
       );
       html += '</div></div>';
       return html;

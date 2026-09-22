@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from . import recommendation_admin
 
 urlpatterns = [
     path('submit/',                     views.submit_report,    name='submit_report'),
@@ -11,5 +12,20 @@ urlpatterns = [
     path('confirm-cases/',                  views.admin_confirmation_panel, name='admin_confirmation_panel'),
     path('ocr/parse-lab/',                  views.ocr_parse_lab_document,   name='ocr_parse_lab'),
     path('incidents/',                  views.incident_reports, name='incident_reports'),
+    path(
+        'recommendations/',
+        recommendation_admin.recommendation_editor,
+        name='recommendation_editor',
+    ),
+    path(
+        'recommendations/<int:revision_id>/approve/',
+        recommendation_admin.approve_recommendation_revision,
+        name='approve_recommendation_revision',
+    ),
+    path(
+        'recommendations/<int:revision_id>/reject/',
+        recommendation_admin.reject_recommendation_revision,
+        name='reject_recommendation_revision',
+    ),
     path('api/recent/',                 views.api_recent_reports, name='api_recent_reports'),
 ]
