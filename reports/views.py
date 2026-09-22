@@ -16,7 +16,7 @@ from django.contrib import messages
 from django.utils import timezone
 from django.db.models import Q, F, Value, CharField, Sum
 from django.db.models.functions import Concat
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from accounts.auth_utils import login_required, role_required
 from myapp.models import Barangay, User, SurveillanceReport, Admin, Patient, PatientCase, SYMPTOM_CATEGORY_CHOICES
 from myapp.barangay_scope import (
@@ -1246,6 +1246,12 @@ def _update_barangay_risk(barangay_id):
 
 # ── Incident Reports (Admin) ──────────────────────────────────────
 
+def _incident_report_date_bound(value):
+    """Return local midnight as an aware datetime for database-safe filtering."""
+    local_midnight = datetime.combine(value, time.min)
+    return timezone.make_aware(local_midnight, timezone.get_current_timezone())
+
+
 @role_required('admin', 'super_admin', 'surveillance_officer', 'health_officer')
 def incident_reports(request):
     """Generate structured health incident reports from validated data."""
@@ -1259,11 +1265,16 @@ def incident_reports(request):
     if date_from:
         parsed_from = parse_user_date(date_from)
         if parsed_from:
-            q &= Q(report_date__date__gte=parsed_from)
+            q &= Q(report_date__gte=_incident_report_date_bound(parsed_from))
     if date_to:
         parsed_to = parse_user_date(date_to)
         if parsed_to:
-            q &= Q(report_date__date__lte=parsed_to)
+            # Use an exclusive next-day boundary so every time on date_to is included.
+            q &= Q(
+                report_date__lt=_incident_report_date_bound(
+                    parsed_to + timedelta(days=1)
+                )
+            )
     if syndrome:
         q &= Q(syndrome_type=syndrome)
     if barangay:
