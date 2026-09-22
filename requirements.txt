@@ -55,3 +55,8 @@ urllib3==2.7.0
 whitenoise==6.12.0
 xlsxwriter==3.2.9
 yarl==1.24.2
+Django>=4.2,<5.0
+gunicorn
+dj-database-url
+whitenoise
+psycopg2-binary
