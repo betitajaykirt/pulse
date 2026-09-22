@@ -122,8 +122,6 @@ WSGI_APPLICATION = 'mysite.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-pymysql.install_as_MySQLdb()
-
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 DATABASES = {
