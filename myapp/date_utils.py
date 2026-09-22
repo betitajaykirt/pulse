@@ -6,6 +6,9 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Optional, Union
 
+from django.conf import settings
+from django.utils import timezone
+
 DateLike = Union[date, datetime, str, None]
 
 DISPLAY_DATE_FORMAT = '%m/%d/%Y'
@@ -18,12 +21,19 @@ INPUT_DATE_FORMATS = (
 )
 
 
+def _display_datetime(value: datetime) -> datetime:
+    """Convert aware timestamps to the configured display timezone."""
+    if settings.USE_TZ and timezone.is_aware(value):
+        return timezone.localtime(value)
+    return value
+
+
 def parse_user_date(value: DateLike) -> Optional[date]:
     """Parse a user-entered date string into a ``date`` object."""
     if value is None or value == '':
         return None
     if isinstance(value, datetime):
-        return value.date()
+        return _display_datetime(value).date()
     if isinstance(value, date):
         return value
 
@@ -44,7 +54,7 @@ def format_display_date(value: DateLike, empty: str = '—') -> str:
     if value is None or value == '':
         return empty
     if isinstance(value, datetime):
-        return value.strftime(DISPLAY_DATE_FORMAT)
+        return _display_datetime(value).strftime(DISPLAY_DATE_FORMAT)
     if isinstance(value, date):
         return value.strftime(DISPLAY_DATE_FORMAT)
 
@@ -59,7 +69,7 @@ def format_display_datetime(value: DateLike, empty: str = '—') -> str:
     if value is None or value == '':
         return empty
     if isinstance(value, datetime):
-        return value.strftime(DISPLAY_DATETIME_FORMAT)
+        return _display_datetime(value).strftime(DISPLAY_DATETIME_FORMAT)
     if isinstance(value, date):
         return value.strftime(DISPLAY_DATE_FORMAT)
 
