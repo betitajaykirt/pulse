@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: pulse-ai
+    runtime: python
+    buildCommand: ./build.sh
+    startCommand: gunicorn mysite.wsgi:application
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DEBUG
+        value: "False"
