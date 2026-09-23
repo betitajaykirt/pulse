@@ -17,6 +17,7 @@ from reports.recommendation_repository import (
 from reports.recommendation_service import (
     baseline_recommendation_payload,
     canonical_disease_name,
+    normalize_case_status,
     validate_recommendation_matrix,
 )
 
@@ -42,11 +43,42 @@ def _disease_row(payload, disease):
     )
 
 
+def _combined_action(actions):
+    unique = {}
+    for action in actions:
+        unique.setdefault(action.get('code'), action)
+    actions = list(unique.values())
+    targets = []
+    for action in actions:
+        for target in action.get('targets') or []:
+            if target not in targets:
+                targets.append(target)
+    return {
+        'en': ' '.join(
+            action.get('en', '').strip() for action in actions
+            if action.get('en', '').strip()
+        ),
+        'local': ' '.join(
+            action.get('local', '').strip() for action in actions
+            if action.get('local', '').strip()
+        ),
+        'targets': targets,
+    }
+
+
 @require_http_methods(['GET', 'POST'])
 @role_required(*ADMIN_ROLES)
 def recommendation_card(request):
     disease = canonical_disease_name(
         request.GET.get('disease') if request.method == 'GET' else ''
+    )
+    state = normalize_case_status(
+        request.GET.get('state') if request.method == 'GET' else ''
+    )
+    is_cluster = (
+        request.GET.get('cluster') == 'true'
+        if request.method == 'GET'
+        else False
     )
 
     if request.method == 'POST':
@@ -57,15 +89,34 @@ def recommendation_card(request):
             disease = canonical_disease_name(submitted.get('disease'))
             if not disease:
                 raise ValueError('Select a supported monitored disease.')
-            actions = submitted.get('actions')
-            if not isinstance(actions, dict):
-                raise ValueError('Recommendation actions are required.')
+            state = normalize_case_status(submitted.get('state'))
+            is_cluster = bool(submitted.get('is_cluster'))
+            recommendation = submitted.get('recommendation')
+            if not isinstance(recommendation, dict):
+                raise ValueError('Recommendation details are required.')
 
             payload = _approved_payload()
             row = _disease_row(payload, disease)
             if not row:
                 raise ValueError('Recommendation disease was not found.')
-            row['actions'] = actions
+            existing = row['actions'].get(state) or []
+            recommendation = {
+                'code': (
+                    existing[0].get('code')
+                    if existing and existing[0].get('code')
+                    else f'{disease.casefold().replace(" ", "_")}_{state}_recommendation'
+                ),
+                'en': str(recommendation.get('en') or '').strip(),
+                'local': str(recommendation.get('local') or '').strip(),
+                'targets': [
+                    str(target).strip()
+                    for target in recommendation.get('targets') or []
+                    if str(target).strip()
+                ],
+            }
+            row['actions'][state] = [recommendation]
+            if is_cluster:
+                row['actions']['cluster'] = [deepcopy(recommendation)]
             validate_recommendation_matrix(payload)
         except (json.JSONDecodeError, ValueError) as exc:
             return JsonResponse(
@@ -119,11 +170,16 @@ def recommendation_card(request):
             {'ok': False, 'error': 'Recommendation disease was not found.'},
             status=404,
         )
+    actions = list(row['actions'][state])
+    if is_cluster:
+        actions += list(row['actions']['cluster'])
     return JsonResponse({
         'ok': True,
         'disease': disease,
         'category': row['category'],
-        'actions': row['actions'],
+        'state': state,
+        'is_cluster': is_cluster,
+        'recommendation': _combined_action(actions),
         'pending_revision_id': pending.id if pending else None,
     })
 

@@ -336,17 +336,21 @@
       <button type="button" id="recommendation-edit-close" class="nc-btn nc-btn--outline nc-btn--sm">Close</button>
     </div>
     <div id="recommendation-edit-message" style="display:none;margin-top:1rem;padding:.75rem;border-radius:.65rem;"></div>
-    <div class="form-group" style="margin-top:1rem;">
-      <label for="recommendation-edit-state">Recommendation State</label>
-      <select id="recommendation-edit-state" class="input-soft input-soft--plain">
-        <option value="suspected">Suspected</option>
-        <option value="probable">Probable</option>
-        <option value="confirmed">Confirmed</option>
-        <option value="cluster">Cluster</option>
-      </select>
+    <div style="margin-top:1rem;">
+      <span id="recommendation-edit-state-label" class="pill-badge badge-info"></span>
     </div>
-    <div id="recommendation-edit-actions" style="display:grid;gap:.75rem;margin-top:1rem;"></div>
-    <button type="button" id="recommendation-add-action" class="nc-btn nc-btn--outline nc-btn--sm" style="margin-top:.75rem;">Add Action</button>
+    <div class="form-group" style="margin-top:1rem;">
+      <label for="recommendation-edit-en">English Instruction</label>
+      <textarea id="recommendation-edit-en" class="input-soft input-soft--plain" style="width:100%;min-height:120px;"></textarea>
+    </div>
+    <div class="form-group" style="margin-top:1rem;">
+      <label for="recommendation-edit-local">Hiligaynon / Taglish Instruction</label>
+      <textarea id="recommendation-edit-local" class="input-soft input-soft--plain" style="width:100%;min-height:120px;"></textarea>
+    </div>
+    <div class="form-group" style="margin-top:1rem;">
+      <label for="recommendation-edit-targets">Target Units (comma-separated)</label>
+      <input id="recommendation-edit-targets" class="input-soft input-soft--plain">
+    </div>
     <div style="display:flex;justify-content:flex-end;gap:.65rem;flex-wrap:wrap;border-top:1px solid #e2e8f0;margin-top:1.25rem;padding-top:1rem;">
       <button type="button" id="recommendation-approve" class="nc-btn nc-btn--outline" style="display:none;">Approve Pending Changes</button>
       <button type="button" id="recommendation-save" class="nc-btn nc-btn--primary">Save for Approval</button>
@@ -378,8 +382,8 @@
     var recommendationApproveUrl = "{% url 'approve_recommendation_revision' 0 %}";
     var recommendationEditor = {
       disease: '',
-      actions: {},
-      currentState: 'suspected',
+      state: 'suspected',
+      isCluster: false,
       pendingRevisionId: null,
     };
 
@@ -398,44 +402,6 @@
       element.style.border = '1px solid ' + (isError ? '#fecaca' : '#a7f3d0');
     }
 
-    function syncRecommendationState() {
-      var container = document.getElementById('recommendation-edit-actions');
-      if (!container) return;
-      recommendationEditor.actions[recommendationEditor.currentState] =
-        Array.from(container.querySelectorAll('[data-recommendation-action]')).map(function (row) {
-          return {
-            code: row.querySelector('[data-field="code"]').value.trim(),
-            en: row.querySelector('[data-field="en"]').value.trim(),
-            local: row.querySelector('[data-field="local"]').value.trim(),
-            targets: row.querySelector('[data-field="targets"]').value
-              .split(',')
-              .map(function (value) { return value.trim(); })
-              .filter(Boolean),
-          };
-        });
-    }
-
-    function renderRecommendationActionEditor() {
-      var container = document.getElementById('recommendation-edit-actions');
-      if (!container) return;
-      var actions = recommendationEditor.actions[recommendationEditor.currentState] || [];
-      container.innerHTML = actions.map(function (action, index) {
-        return '<div data-recommendation-action style="border:1px solid #dbe4ee;border-radius:.75rem;padding:.85rem;background:#f8fafc;">'
-          + '<div style="display:flex;justify-content:space-between;gap:.75rem;align-items:center;margin-bottom:.65rem;">'
-          + '<strong>Action ' + (index + 1) + '</strong>'
-          + '<button type="button" class="nc-btn nc-btn--outline nc-btn--sm" data-remove-recommendation-action="' + index + '">Remove</button></div>'
-          + '<label style="display:block;font-size:.75rem;font-weight:700;">Action Code</label>'
-          + '<input data-field="code" class="input-soft input-soft--plain" value="' + escapeMapPopupHtml(action.code || '') + '">'
-          + '<label style="display:block;font-size:.75rem;font-weight:700;margin-top:.55rem;">English Instruction</label>'
-          + '<textarea data-field="en" class="input-soft input-soft--plain" style="width:100%;min-height:70px;">' + escapeMapPopupHtml(action.en || '') + '</textarea>'
-          + '<label style="display:block;font-size:.75rem;font-weight:700;margin-top:.55rem;">Hiligaynon / Taglish Instruction</label>'
-          + '<textarea data-field="local" class="input-soft input-soft--plain" style="width:100%;min-height:70px;">' + escapeMapPopupHtml(action.local || '') + '</textarea>'
-          + '<label style="display:block;font-size:.75rem;font-weight:700;margin-top:.55rem;">Target Units (comma-separated)</label>'
-          + '<input data-field="targets" class="input-soft input-soft--plain" value="' + escapeMapPopupHtml((action.targets || []).join(', ')) + '">'
-          + '</div>';
-      }).join('');
-    }
-
     function closeRecommendationEditor() {
       var modal = document.getElementById('recommendation-edit-modal');
       if (modal) modal.style.display = 'none';
@@ -447,32 +413,43 @@
       showRecommendationMessage('Save these edits before approving them.', false);
     }
 
-    function openRecommendationEditor(disease, status) {
+    function openRecommendationEditor(disease, status, isCluster) {
       if (!canManageRecommendations) return;
       var modal = document.getElementById('recommendation-edit-modal');
       var message = document.getElementById('recommendation-edit-message');
-      var stateSelect = document.getElementById('recommendation-edit-state');
       modal.style.display = 'flex';
       message.style.display = 'none';
       document.getElementById('recommendation-edit-title').textContent = 'Edit ' + disease;
-      document.getElementById('recommendation-edit-actions').innerHTML = '<p class="text-muted">Loading recommendations...</p>';
+      document.getElementById('recommendation-edit-state-label').textContent =
+        (status || 'suspected').toUpperCase() + (isCluster ? ' · CLUSTER' : '');
+      document.getElementById('recommendation-edit-en').value = 'Loading...';
+      document.getElementById('recommendation-edit-local').value = '';
+      document.getElementById('recommendation-edit-targets').value = '';
 
-      fetch(recommendationCardUrl + '?disease=' + encodeURIComponent(disease), {
+      fetch(
+        recommendationCardUrl
+          + '?disease=' + encodeURIComponent(disease)
+          + '&state=' + encodeURIComponent(status || 'suspected')
+          + '&cluster=' + (isCluster ? 'true' : 'false'),
+        {
         credentials: 'same-origin',
-      })
+        }
+      )
         .then(function (response) { return response.json().then(function (data) {
           if (!response.ok) throw new Error(data.error || 'Unable to load recommendations.');
           return data;
         }); })
         .then(function (data) {
           recommendationEditor.disease = data.disease;
-          recommendationEditor.actions = data.actions;
+          recommendationEditor.state = data.state;
+          recommendationEditor.isCluster = data.is_cluster;
           recommendationEditor.pendingRevisionId = data.pending_revision_id;
-          recommendationEditor.currentState = status || 'suspected';
-          stateSelect.value = recommendationEditor.currentState;
+          document.getElementById('recommendation-edit-en').value = data.recommendation.en;
+          document.getElementById('recommendation-edit-local').value = data.recommendation.local;
+          document.getElementById('recommendation-edit-targets').value =
+            (data.recommendation.targets || []).join(', ');
           document.getElementById('recommendation-approve').style.display =
             data.pending_revision_id ? '' : 'none';
-          renderRecommendationActionEditor();
           if (data.pending_revision_id) {
             showRecommendationMessage(
               'Pending changes are loaded. Review them, then approve when ready.',
@@ -482,7 +459,7 @@
         })
         .catch(function (error) {
           showRecommendationMessage(error.message, true);
-          document.getElementById('recommendation-edit-actions').innerHTML = '';
+          document.getElementById('recommendation-edit-en').value = '';
         });
     }
 
@@ -491,53 +468,23 @@
       if (editButton) {
         openRecommendationEditor(
           editButton.dataset.recommendationEdit,
-          editButton.dataset.recommendationStatus
+          editButton.dataset.recommendationStatus,
+          editButton.dataset.recommendationCluster === 'true'
         );
-        return;
-      }
-      var removeButton = event.target.closest('[data-remove-recommendation-action]');
-      if (removeButton) {
-        syncRecommendationState();
-        recommendationEditor.actions[recommendationEditor.currentState].splice(
-          Number(removeButton.dataset.removeRecommendationAction),
-          1
-        );
-        markRecommendationDirty();
-        renderRecommendationActionEditor();
       }
     });
 
     var recommendationClose = document.getElementById('recommendation-edit-close');
     if (recommendationClose) recommendationClose.addEventListener('click', closeRecommendationEditor);
 
-    var recommendationState = document.getElementById('recommendation-edit-state');
-    if (recommendationState) recommendationState.addEventListener('change', function () {
-      syncRecommendationState();
-      recommendationEditor.currentState = recommendationState.value;
-      renderRecommendationActionEditor();
-    });
-
-    var recommendationAdd = document.getElementById('recommendation-add-action');
-    if (recommendationAdd) recommendationAdd.addEventListener('click', function () {
-      syncRecommendationState();
-      var actions = recommendationEditor.actions[recommendationEditor.currentState] || [];
-      actions.push({
-        code: 'custom_' + recommendationEditor.currentState + '_' + Date.now(),
-        en: '',
-        local: '',
-        targets: [],
+    ['recommendation-edit-en', 'recommendation-edit-local', 'recommendation-edit-targets']
+      .forEach(function (id) {
+        var field = document.getElementById(id);
+        if (field) field.addEventListener('input', markRecommendationDirty);
       });
-      recommendationEditor.actions[recommendationEditor.currentState] = actions;
-      markRecommendationDirty();
-      renderRecommendationActionEditor();
-    });
-
-    var recommendationActions = document.getElementById('recommendation-edit-actions');
-    if (recommendationActions) recommendationActions.addEventListener('input', markRecommendationDirty);
 
     var recommendationSave = document.getElementById('recommendation-save');
     if (recommendationSave) recommendationSave.addEventListener('click', function () {
-      syncRecommendationState();
       recommendationSave.disabled = true;
       fetch(recommendationCardUrl, {
         method: 'POST',
@@ -549,7 +496,16 @@
         },
         body: JSON.stringify({
           disease: recommendationEditor.disease,
-          actions: recommendationEditor.actions,
+          state: recommendationEditor.state,
+          is_cluster: recommendationEditor.isCluster,
+          recommendation: {
+            en: document.getElementById('recommendation-edit-en').value.trim(),
+            local: document.getElementById('recommendation-edit-local').value.trim(),
+            targets: document.getElementById('recommendation-edit-targets').value
+              .split(',')
+              .map(function (value) { return value.trim(); })
+              .filter(Boolean),
+          },
         }),
       })
         .then(function (response) { return response.json().then(function (data) {

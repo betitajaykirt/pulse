@@ -74,7 +74,9 @@ class RecommendationCardAccessTests(SimpleTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(payload['disease'], 'Dengue Fever')
-        self.assertIn('probable', payload['actions'])
+        self.assertEqual(payload['state'], 'suspected')
+        self.assertTrue(payload['recommendation']['en'])
+        self.assertNotIn('code', payload['recommendation'])
         self.assertIsNone(payload['pending_revision_id'])
 
     @patch('accounts.auth_utils.messages.error')

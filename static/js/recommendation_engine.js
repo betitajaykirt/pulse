@@ -134,6 +134,23 @@
       + '</li>';
   }
 
+  function collapseActions(actions) {
+    var merged = mergeActions(actions || []);
+    if (!merged.length) return [];
+    var targets = [];
+    merged.forEach(function (action) {
+      (action.target_units || []).forEach(function (target) {
+        if (targets.indexOf(target) === -1) targets.push(target);
+      });
+    });
+    return [{
+      code: 'combined_recommendation',
+      text_en: merged.map(function (action) { return action.text_en; }).filter(Boolean).join(' '),
+      text_local: merged.map(function (action) { return action.text_local; }).filter(Boolean).join(' '),
+      target_units: targets,
+    }];
+  }
+
   function renderRecommendationCards(bundle, options) {
     options = options || {};
     var cards = recommendationCards(bundle);
@@ -164,12 +181,14 @@
       html += '</div></header>';
       html += '<div class="rec-case-count">' + Number(card.case_count || 1)
         + ' case' + (Number(card.case_count || 1) === 1 ? '' : 's') + ' in selection</div>';
+      var displayActions = collapseActions(card.actions || []);
       html += '<ul class="rec-action-list">'
-        + (card.actions || []).map(renderAction).join('') + '</ul>';
+        + displayActions.map(renderAction).join('') + '</ul>';
       if (options.canManage) {
         html += '<button type="button" class="nc-btn nc-btn--outline nc-btn--sm rec-edit-button"'
           + ' data-recommendation-edit="' + escapeHtml(card.disease) + '"'
-          + ' data-recommendation-status="' + escapeHtml(status.toLowerCase()) + '">'
+          + ' data-recommendation-status="' + escapeHtml(status.toLowerCase()) + '"'
+          + ' data-recommendation-cluster="' + ((card.is_cluster || bundle.is_cluster) ? 'true' : 'false') + '">'
           + 'Edit &amp; Approve</button>';
       }
       html += '</article>';
