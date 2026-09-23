@@ -160,6 +160,19 @@ Certificate Issued: 09/17/2026
 10:00
 """
 
+COLUMNAR_DENGUE_RESULTS = """
+Analyte / Marker
+DENGUE VIRUS NS1 ANTIGEN
+DENGUE IgM ANTIBODY
+DENGUE IgG ANTIBODY
+Result
+DETECTED
+DETECTED
+NOT DETECTED
+Interpretation
+POSITIVE FOR ACUTE DENGUE FEVER INFECTION
+"""
+
 
 class ParseLabFieldsTests(SimpleTestCase):
     def test_clean_red_cross_report(self):
@@ -208,6 +221,18 @@ class ParseLabFieldsTests(SimpleTestCase):
 
         self.assertEqual(fields['lab_number'], 'CHO202609-1001')
         self.assertEqual(fields['control_number'], 'LC-2026-DF001')
+
+    def test_pairs_columnar_analytes_with_results_on_the_same_line(self):
+        fields = parse_lab_fields(COLUMNAR_DENGUE_RESULTS)
+
+        self.assertEqual(
+            fields['lab_results'].splitlines(),
+            [
+                'DENGUE VIRUS NS1 ANTIGEN: DETECTED',
+                'DENGUE IgM ANTIBODY: DETECTED',
+                'DENGUE IgG ANTIBODY: NOT DETECTED',
+            ],
+        )
 
     def test_city_lab_header_does_not_contaminate_address_fields(self):
         fields = parse_lab_fields(PULSE_ENGINE3_OCR)

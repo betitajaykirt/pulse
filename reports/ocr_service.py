@@ -306,6 +306,67 @@ def _extract_dengue_markers(text: str) -> list[dict]:
     return markers
 
 
+def _dengue_marker_name(label: str) -> str:
+    if re.search(r'\bNS[\s\-]?1\b', label, re.IGNORECASE):
+        return 'NS1'
+    if re.search(r'\bIg[\s\-]?M\b', label, re.IGNORECASE):
+        return 'IgM'
+    if re.search(r'\bIg[\s\-]?G\b', label, re.IGNORECASE):
+        return 'IgG'
+    return ''
+
+
+def _extract_columnar_markers(text: str) -> list[dict]:
+    """Pair OCR table columns emitted as analytes followed by result values."""
+    lines = [_clean(line) for line in text.splitlines() if _clean(line)]
+    analyte_index = next(
+        (
+            index for index, line in enumerate(lines)
+            if re.search(r'\bANALYTE\b|\bMARKER\b', line, re.IGNORECASE)
+        ),
+        None,
+    )
+    if analyte_index is None:
+        return []
+    result_index = next(
+        (
+            index for index in range(analyte_index + 1, len(lines))
+            if re.fullmatch(r'RESULTS?', lines[index], re.IGNORECASE)
+        ),
+        None,
+    )
+    if result_index is None:
+        return []
+
+    analytes = []
+    for line in lines[analyte_index + 1:result_index]:
+        marker_name = _dengue_marker_name(line)
+        if marker_name:
+            analytes.append(marker_name)
+
+    statuses = []
+    for line in lines[result_index + 1:]:
+        match = re.fullmatch(_STATUS_CAPTURE, line, re.IGNORECASE)
+        if not match:
+            if statuses:
+                break
+            continue
+        statuses.append(_marker_status(match.group(1)))
+        if len(statuses) == len(analytes):
+            break
+
+    if not analytes or len(statuses) != len(analytes):
+        return []
+    return [
+        {
+            'name': name,
+            'status': status,
+            'positive': _marker_is_positive(status),
+        }
+        for name, status in zip(analytes, statuses)
+    ]
+
+
 def _extract_generic_markers(text: str, existing: list[dict]) -> list[dict]:
     dengue_names = {m['name'] for m in existing}
     extras = []
@@ -335,7 +396,7 @@ def _extract_generic_markers(text: str, existing: list[dict]) -> list[dict]:
 
 
 def _extract_markers(text: str) -> list[dict]:
-    dengue = _extract_dengue_markers(text)
+    dengue = _extract_columnar_markers(text) or _extract_dengue_markers(text)
     return dengue + _extract_generic_markers(text, dengue)
 
 
