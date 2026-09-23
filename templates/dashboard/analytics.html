@@ -270,7 +270,7 @@ function buildEpiChart(ctx, payload, emptyMsgId) {
   if (el) el.style.display = isEmpty ? 'block' : 'none';
 
   var datasets = isEmpty ? emptyChartData().datasets : payload.datasets;
-  
+
   if (!isEmpty) {
     datasets = datasets.map(ds => ({
       ...ds,
@@ -302,10 +302,10 @@ function buildEpiChart(ctx, payload, emptyMsgId) {
         tooltip: { enabled: !isEmpty, mode: 'index', intersect: false },
       },
       scales: {
-        x: { 
-          stacked: true, 
-          grid: { display: false }, 
-          ticks: { font: { family: 'Inter', size: 10 }, color: themeChart().tick, maxTicksLimit: maxTicks, autoSkip: !isDaily, maxRotation: 45, minRotation: 0 } 
+        x: {
+          stacked: true,
+          grid: { display: false },
+          ticks: { font: { family: 'Inter', size: 10 }, color: themeChart().tick, maxTicksLimit: maxTicks, autoSkip: !isDaily, maxRotation: 45, minRotation: 0 }
         },
         y: {
           stacked: true,
@@ -392,7 +392,17 @@ function buildHorizontalBarChart(ctx, payload, emptyMsgId) {
         tooltip: { enabled: !isEmpty },
       },
       scales: {
-        x: { grid: { color: themeChart().grid }, ticks: { font: { family: 'Inter', size: 11 }, color: themeChart().tick }, border: { display: false }, beginAtZero: true },
+        x: {
+          grid: { color: themeChart().grid },
+          ticks: {
+            stepSize: 1,
+            precision: 0,
+            font: { family: 'Inter', size: 11 },
+            color: themeChart().tick,
+          },
+          border: { display: false },
+          beginAtZero: true,
+        },
         y: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: themeChart().tick }, border: { display: false } }
       }
     }
@@ -466,7 +476,7 @@ async function loadAnalytics() {
     const demoCanvas = document.getElementById('demo-chart');
     const diseaseCanvas = document.getElementById('disease-chart');
     const hotspotCanvas = document.getElementById('hotspot-chart');
-    
+
     if (!epiCanvas || !demoCanvas || !diseaseCanvas || typeof Chart === 'undefined') return;
 
     epiChart = buildEpiChart(
@@ -484,7 +494,7 @@ async function loadAnalytics() {
       data.disease_distribution || {},
       'disease-empty-msg'
     );
-    
+
     if (hotspotCanvas) {
       hotspotChart = buildHorizontalBarChart(
         hotspotCanvas.getContext('2d'),

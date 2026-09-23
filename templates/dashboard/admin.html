@@ -221,7 +221,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       y: { grid: { color: grid }, ticks: { font: { family: 'Inter', size: 11 }, color: tick }, border: { display: false } }
     }
   };
-  
+
   const pieOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -233,7 +233,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   try {
     const res = await fetch('{% url "api_analytics" %}?time_range=current_month&_ts=' + Date.now(), { cache: 'no-store' });
     const data = await res.json();
-    
+
     if (!data.ok) {
       console.error('Failed to load analytics data for dashboard');
       return;
@@ -246,7 +246,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         ...ds,
         type: 'bar',
       }));
-      
+
       var epiMaxTicks = (data.epi_curve.labels || []).length;
       if (data.epi_curve.interval !== 'day' && epiMaxTicks > 14) {
         epiMaxTicks = 12;
@@ -255,7 +255,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       if (epiTitle && data.epi_curve.period_title) {
         epiTitle.textContent = 'Epidemic Curve — ' + data.epi_curve.period_title;
       }
-      
+
       new Chart(epiCanvas.getContext('2d'), {
         type: 'bar',
         data: {
@@ -310,10 +310,20 @@ document.addEventListener('DOMContentLoaded', async function() {
           labels: data.hotspots.labels,
           datasets: data.hotspots.datasets
         },
-        options: Object.assign({}, chartOptions, { 
+        options: Object.assign({}, chartOptions, {
           indexAxis: 'y',
           scales: {
-            x: { grid: { color: grid }, ticks: { font: { family: 'Inter', size: 11 }, color: tick }, border: { display: false }, beginAtZero: true },
+            x: {
+              grid: { color: grid },
+              ticks: {
+                stepSize: 1,
+                precision: 0,
+                font: { family: 'Inter', size: 11 },
+                color: tick,
+              },
+              border: { display: false },
+              beginAtZero: true,
+            },
             y: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: tick } }
           }
         })
