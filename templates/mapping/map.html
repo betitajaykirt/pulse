@@ -565,35 +565,6 @@
       maxZoom: MAP_ZOOM.max,
     }).setView([10.5389, 122.8366], 13);
 
-    var MAP_VIEW = Object.freeze({ center: [10.5389, 122.8366], zoom: 13 });
-
-    function popupScaleForZoom(zoom) {
-      var scale = Math.pow(1.18, zoom - MAP_VIEW.zoom);
-      return Math.max(0.42, Math.min(1.35, scale));
-    }
-
-    function applyMapPopupScale() {
-      var scale = popupScaleForZoom(map.getZoom());
-      map.getContainer().style.setProperty('--map-popup-scale', String(scale));
-    }
-
-    function wrapPopupForScale(popupEl) {
-      if (!popupEl) return;
-      var first = popupEl.firstElementChild;
-      if (first && first.classList.contains('map-popup-scale')) return;
-      var wrap = document.createElement('div');
-      wrap.className = 'map-popup-scale';
-      while (popupEl.firstChild) wrap.appendChild(popupEl.firstChild);
-      popupEl.appendChild(wrap);
-    }
-
-    map.on('popupopen', function (e) {
-      wrapPopupForScale(e.popup && e.popup.getElement());
-      applyMapPopupScale();
-    });
-    map.on('zoom zoomend', applyMapPopupScale);
-    applyMapPopupScale();
-
     var streetLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       referrerPolicy: 'strict-origin-when-cross-origin',
