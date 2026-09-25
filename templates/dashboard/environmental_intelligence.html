@@ -13,6 +13,11 @@
   <!-- Weather & Climate Top Row -->
   <section class="dash-section" style="margin-bottom: 2rem;">
     <h3 class="dash-section__title">Current Climate (Bago City)</h3>
+    {% if not weather.ok %}
+      <p class="text-muted" style="margin-top:-.5rem;margin-bottom:1rem;">
+        Live weather feed unavailable. Climate values are temporarily hidden rather than reported as zero.
+      </p>
+    {% endif %}
     <div class="dash-widget-grid" style="grid-template-columns: repeat(4, 1fr);">
       <article class="dash-metric-card">
         <div class="dash-metric-card__head">
@@ -20,7 +25,7 @@
             <i data-lucide="thermometer" class="lucide-icon lucide-icon--sm"></i>
           </div>
         </div>
-        <div class="dash-metric-card__value">{{ weather.temperature_c }}°C</div>
+        <div class="dash-metric-card__value">{% if weather.ok %}{{ weather.temperature_c }}°C{% else %}—{% endif %}</div>
         <div class="dash-metric-card__label">Temperature</div>
       </article>
       <article class="dash-metric-card">
@@ -29,8 +34,8 @@
             <i data-lucide="cloud-rain" class="lucide-icon lucide-icon--sm"></i>
           </div>
         </div>
-        <div class="dash-metric-card__value">{{ weather.precipitation_mm }}mm</div>
-        <div class="dash-metric-card__label">Rainfall</div>
+        <div class="dash-metric-card__value">{% if weather.ok %}{{ weather.precipitation_mm }}mm{% else %}—{% endif %}</div>
+        <div class="dash-metric-card__label">Rainfall (Past 24 Hours)</div>
       </article>
       <article class="dash-metric-card">
         <div class="dash-metric-card__head">
@@ -38,7 +43,7 @@
             <i data-lucide="droplets" class="lucide-icon lucide-icon--sm"></i>
           </div>
         </div>
-        <div class="dash-metric-card__value">{{ weather.humidity_pct }}%</div>
+        <div class="dash-metric-card__value">{% if weather.ok %}{{ weather.humidity_pct }}%{% else %}—{% endif %}</div>
         <div class="dash-metric-card__label">Humidity</div>
       </article>
       <article class="dash-metric-card">
@@ -47,7 +52,9 @@
             <i data-lucide="bug" class="lucide-icon lucide-icon--sm"></i>
           </div>
         </div>
-        <div class="dash-metric-card__value">{% if weather.vector_breeding_risk %}High Risk{% else %}Low Risk{% endif %}</div>
+        <div class="dash-metric-card__value">
+          {% if not weather.ok %}Unavailable{% elif weather.vector_breeding_risk %}High Risk{% else %}Low Risk{% endif %}
+        </div>
         <div class="dash-metric-card__label">Vector-Breeding Status</div>
       </article>
     </div>

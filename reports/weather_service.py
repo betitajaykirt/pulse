@@ -4,7 +4,7 @@ Real-time environmental weather feed for Bago City — Open-Meteo integration.
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, Dict
 
@@ -21,7 +21,10 @@ OPEN_METEO_URL = (
     'https://api.open-meteo.com/v1/forecast'
     f'?latitude={BAGO_LATITUDE}&longitude={BAGO_LONGITUDE}'
     '&current=temperature_2m,relative_humidity_2m,precipitation'
+    '&hourly=precipitation'
     '&daily=precipitation_sum'
+    '&past_days=1'
+    '&forecast_days=1'
     '&timezone=Asia/Manila'
 )
 DATA_SOURCE = 'open-meteo-bago-city'
@@ -64,6 +67,33 @@ def _build_payload(
         'vector_breeding_risk': float(precipitation_mm) > 0,
         'fetched_at': timezone.now().isoformat(),
     }
+
+
+def _recent_precipitation_mm(payload: dict, current: dict) -> float | None:
+    """Sum observed/modelled precipitation over the trailing 24 hours."""
+    hourly = payload.get('hourly') or {}
+    times = hourly.get('time') or []
+    values = hourly.get('precipitation') or []
+    current_text = current.get('time')
+    if not current_text or len(times) != len(values):
+        return None
+    try:
+        current_time = datetime.fromisoformat(current_text)
+    except (TypeError, ValueError):
+        return None
+    cutoff = current_time - timedelta(hours=24)
+    total = 0.0
+    found = False
+    for timestamp, value in zip(times, values):
+        try:
+            observed_at = datetime.fromisoformat(timestamp)
+            precipitation = float(value or 0.0)
+        except (TypeError, ValueError):
+            continue
+        if cutoff < observed_at <= current_time:
+            total += precipitation
+            found = True
+    return round(total, 2) if found else None
 
 
 def _should_persist_snapshot() -> bool:
@@ -126,8 +156,9 @@ def fetch_bago_city_weather(*, persist: bool = True) -> Dict[str, Any]:
         temperature = current.get('temperature_2m')
         humidity = current.get('relative_humidity_2m')
         current_precip = current.get('precipitation')
-        
-        # Extract daily precipitation for UI display
+        recent_precip = _recent_precipitation_mm(payload, current)
+
+        # Use the daily total only if hourly observations are unavailable.
         precip_list = daily.get('precipitation_sum')
         if precip_list and len(precip_list) > 0:
             daily_precip = precip_list[0]
@@ -140,11 +171,14 @@ def fetch_bago_city_weather(*, persist: bool = True) -> Dict[str, Any]:
         weather = _build_payload(
             temperature_c=float(temperature),
             humidity_pct=float(humidity),
-            precipitation_mm=float(daily_precip),
+            precipitation_mm=float(
+                recent_precip if recent_precip is not None else daily_precip
+            ),
             ok=True,
             source='open-meteo',
         )
         weather['hourly_precipitation'] = float(current_precip)
+        weather['rainfall_period'] = 'past_24_hours'
     except Exception as exc:
         logger.warning('Weather fetch failed, using fallback values: %s', exc)
         weather = dict(FALLBACK_WEATHER)
