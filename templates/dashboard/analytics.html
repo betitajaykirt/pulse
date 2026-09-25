@@ -2,7 +2,7 @@
 {% load pidsr_tags %}
 {% block page_title %}Surveillance Analytics{% endblock %}
 {% block content %}
-<div class="pulse-page dash-home">
+<div class="pulse-page dash-home analytics-page">
 
   <header class="dash-hero">
     <div class="dash-hero__text">
@@ -193,7 +193,7 @@
           <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
         </div>
         <p>Confirmed and ML-predicted diseases, using the same labels as the map.</p>
-        <div class="chart-height-side" style="position: relative; height: 250px;">
+        <div class="chart-height-compact">
           <canvas id="disease-chart"></canvas>
         </div>
         <p id="disease-empty-msg" class="text-muted text-center mt-2" style="display:none;font-size:.82rem;">No disease data available.</p>
@@ -212,7 +212,7 @@
           <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
         </div>
         <p>Highest case counts by area.</p>
-        <div class="chart-height-main" style="position: relative; height: 250px;">
+        <div class="chart-height-compact">
           <canvas id="hotspot-chart"></canvas>
         </div>
         <p id="hotspot-empty-msg" class="text-muted text-center mt-2" style="display:none;font-size:.82rem;">No hotspot data available.</p>
@@ -230,6 +230,11 @@
 const API_URL = '{% url "api_analytics" %}';
 const CHART_PRIMARY = '#0F4C81';
 const CHART_SECONDARY = '#00A6A6';
+const CASE_STATUS_STYLES = {
+  suspected: { background: 'rgba(245, 158, 11, 0.82)', border: '#B45309' },
+  probable: { background: 'rgba(37, 99, 235, 0.82)', border: '#1D4ED8' },
+  confirmed: { background: 'rgba(220, 38, 38, 0.82)', border: '#B91C1C' },
+};
 function themeChart() {
   return (window.PulseTheme && window.PulseTheme.chartColors()) || {
     tick: '#64748B',
@@ -264,6 +269,20 @@ function emptyChartData() {
   };
 }
 
+function caseStatusStyle(label) {
+  const normalized = String(label || '').trim().toLowerCase();
+  return Object.keys(CASE_STATUS_STYLES).find(function(status) {
+    return normalized.includes(status);
+  });
+}
+
+function responsiveTickLimit(canvas) {
+  const width = canvas && canvas.parentElement ? canvas.parentElement.clientWidth : window.innerWidth;
+  if (width < 440) return 5;
+  if (width < 720) return 8;
+  return 12;
+}
+
 function buildEpiChart(ctx, payload, emptyMsgId) {
   const isEmpty = !hasChartData(payload);
   const el = document.getElementById(emptyMsgId);
@@ -272,17 +291,25 @@ function buildEpiChart(ctx, payload, emptyMsgId) {
   var datasets = isEmpty ? emptyChartData().datasets : payload.datasets;
 
   if (!isEmpty) {
-    datasets = datasets.map(ds => ({
-      ...ds,
-      type: 'bar',
-    }));
+    datasets = datasets.map(function(ds) {
+      const status = caseStatusStyle(ds.label);
+      const style = CASE_STATUS_STYLES[status];
+      return {
+        ...ds,
+        type: 'bar',
+        backgroundColor: style ? style.background : ds.backgroundColor,
+        borderColor: style ? style.border : ds.borderColor,
+        borderWidth: 1,
+        borderRadius: 3,
+        borderSkipped: false,
+        maxBarThickness: 34,
+        categoryPercentage: 0.82,
+        barPercentage: 0.9,
+      };
+    });
   }
 
-  var maxTicks = (payload.labels || []).length || 12;
-  var isDaily = payload.interval === 'day';
-  if (!isDaily && maxTicks > 14) {
-    maxTicks = 12;
-  }
+  var maxTicks = responsiveTickLimit(ctx.canvas);
 
   var epiTitle = document.getElementById('epi-chart-title');
   if (epiTitle) {
@@ -297,15 +324,34 @@ function buildEpiChart(ctx, payload, emptyMsgId) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      layout: { padding: { top: 4, right: 8, bottom: 0, left: 4 } },
       plugins: {
-        legend: { display: !isEmpty, position: 'top', labels: { font: { family: 'Inter', size: 11 }, usePointStyle: true } },
+        legend: {
+          display: !isEmpty,
+          position: 'top',
+          labels: {
+            color: themeChart().tick,
+            font: { family: 'Inter', size: 11 },
+            usePointStyle: true,
+            boxWidth: 10,
+            boxHeight: 10,
+            padding: 14,
+          },
+        },
         tooltip: { enabled: !isEmpty, mode: 'index', intersect: false },
       },
       scales: {
         x: {
           stacked: true,
           grid: { display: false },
-          ticks: { font: { family: 'Inter', size: 10 }, color: themeChart().tick, maxTicksLimit: maxTicks, autoSkip: !isDaily, maxRotation: 45, minRotation: 0 }
+          ticks: {
+            font: { family: 'Inter', size: 10 },
+            color: themeChart().tick,
+            maxTicksLimit: maxTicks,
+            autoSkip: true,
+            maxRotation: 0,
+            minRotation: 0,
+          },
         },
         y: {
           stacked: true,
