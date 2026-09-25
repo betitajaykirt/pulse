@@ -138,10 +138,8 @@
           <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
         </div>
         <p>Cases over time by case status for the selected dates.</p>
-        <div class="chart-height-main chart-scroll">
-          <div class="chart-scroll__stage" id="epi-chart-stage">
-            <canvas id="epi-chart"></canvas>
-          </div>
+        <div class="chart-height-main">
+          <canvas id="epi-chart"></canvas>
         </div>
         <p id="epi-empty-msg" class="text-muted text-center mt-2" style="display:none;font-size:.82rem;">No case data for the selected filters.</p>
       </div>
@@ -304,12 +302,10 @@ function buildEpiChart(ctx, payload, emptyMsgId) {
     });
   }
 
-  var stage = document.getElementById('epi-chart-stage');
-  var chartContainer = stage ? stage.parentElement : null;
-  if (stage && chartContainer) {
-    var minimumWidth = Math.max(chartContainer.clientWidth, (payload.labels || []).length * 52);
-    stage.style.width = minimumWidth + 'px';
-  }
+  var chartWidth = ctx.canvas.parentElement ? ctx.canvas.parentElement.clientWidth : window.innerWidth;
+  var labelCount = (payload.labels || []).length;
+  var pixelsPerLabel = labelCount ? chartWidth / labelCount : chartWidth;
+  var labelRotation = pixelsPerLabel < 22 ? 70 : (pixelsPerLabel < 42 ? 50 : 0);
 
   var epiTitle = document.getElementById('epi-chart-title');
   if (epiTitle) {
@@ -348,8 +344,8 @@ function buildEpiChart(ctx, payload, emptyMsgId) {
             font: { family: 'Inter', size: 10 },
             color: themeChart().tick,
             autoSkip: false,
-            maxRotation: 0,
-            minRotation: 0,
+            maxRotation: labelRotation,
+            minRotation: labelRotation,
           },
         },
         y: {
