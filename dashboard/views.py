@@ -20,7 +20,7 @@ from .analytics_service import (
     VALID_TIME_RANGES, get_analytics_payload, get_barangay_options,
     build_top_disease_breakdown, get_analytics_disease_choices,
 )
-from reports.weather_service import fetch_bago_city_weather
+from reports.weather_service import OPEN_METEO_URL, fetch_bago_city_weather
 from reports.aptas_service import get_aptas_dashboard_context, resolve_aptas_barangay_filter
 import json
 from django.db.models import Count, Avg, Sum
@@ -977,6 +977,7 @@ def environmental_intelligence_view(request):
     
     context = {
         'weather': weather,
+        'weather_browser_url': OPEN_METEO_URL,
         'chart_labels': json.dumps(chart_labels),
         'chart_temp': json.dumps(chart_temp),
         'chart_rain': json.dumps(chart_rain),

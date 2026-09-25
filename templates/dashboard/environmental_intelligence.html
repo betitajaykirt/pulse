@@ -14,7 +14,7 @@
   <section class="dash-section" style="margin-bottom: 2rem;">
     <h3 class="dash-section__title">Current Climate (Bago City)</h3>
     {% if not weather.ok %}
-      <p class="text-muted" style="margin-top:-.5rem;margin-bottom:1rem;">
+      <p id="weather-feed-status" class="text-muted" style="margin-top:-.5rem;margin-bottom:1rem;">
         Live weather feed unavailable. Climate values are temporarily hidden rather than reported as zero.
       </p>
     {% endif %}
@@ -25,7 +25,7 @@
             <i data-lucide="thermometer" class="lucide-icon lucide-icon--sm"></i>
           </div>
         </div>
-        <div class="dash-metric-card__value">{% if weather.ok %}{{ weather.temperature_c }}°C{% else %}—{% endif %}</div>
+        <div id="current-temperature" class="dash-metric-card__value">{% if weather.ok %}{{ weather.temperature_c }}°C{% else %}—{% endif %}</div>
         <div class="dash-metric-card__label">Temperature</div>
       </article>
       <article class="dash-metric-card">
@@ -34,7 +34,7 @@
             <i data-lucide="cloud-rain" class="lucide-icon lucide-icon--sm"></i>
           </div>
         </div>
-        <div class="dash-metric-card__value">{% if weather.ok %}{{ weather.precipitation_mm }}mm{% else %}—{% endif %}</div>
+        <div id="current-rainfall" class="dash-metric-card__value">{% if weather.ok %}{{ weather.precipitation_mm }}mm{% else %}—{% endif %}</div>
         <div class="dash-metric-card__label">Rainfall (Past 24 Hours)</div>
       </article>
       <article class="dash-metric-card">
@@ -43,7 +43,7 @@
             <i data-lucide="droplets" class="lucide-icon lucide-icon--sm"></i>
           </div>
         </div>
-        <div class="dash-metric-card__value">{% if weather.ok %}{{ weather.humidity_pct }}%{% else %}—{% endif %}</div>
+        <div id="current-humidity" class="dash-metric-card__value">{% if weather.ok %}{{ weather.humidity_pct }}%{% else %}—{% endif %}</div>
         <div class="dash-metric-card__label">Humidity</div>
       </article>
       <article class="dash-metric-card">
@@ -52,7 +52,7 @@
             <i data-lucide="bug" class="lucide-icon lucide-icon--sm"></i>
           </div>
         </div>
-        <div class="dash-metric-card__value">
+        <div id="current-vector-risk" class="dash-metric-card__value">
           {% if not weather.ok %}Unavailable{% elif weather.vector_breeding_risk %}High Risk{% else %}Low Risk{% endif %}
         </div>
         <div class="dash-metric-card__label">Vector-Breeding Status</div>
@@ -113,7 +113,60 @@
 <!-- Include Chart.js (We load it from CDN for this view) -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+const WEATHER_BROWSER_URL = "{{ weather_browser_url|escapejs }}";
+
+function recoverWeatherFromBrowser() {
+    const status = document.getElementById('weather-feed-status');
+    if (!status || !WEATHER_BROWSER_URL) return;
+
+    fetch(WEATHER_BROWSER_URL, { cache: 'no-store' })
+        .then(response => {
+            if (!response.ok) throw new Error('Weather provider returned ' + response.status);
+            return response.json();
+        })
+        .then(payload => {
+            const current = payload.current || {};
+            const hourly = payload.hourly || {};
+            const times = hourly.time || [];
+            const values = hourly.precipitation || [];
+            const currentTime = new Date(current.time);
+            const cutoff = new Date(currentTime.getTime() - (24 * 60 * 60 * 1000));
+            let rainfall = 0;
+            let observations = 0;
+
+            times.forEach((timestamp, index) => {
+                const observedAt = new Date(timestamp);
+                if (observedAt > cutoff && observedAt <= currentTime) {
+                    rainfall += Number(values[index] || 0);
+                    observations += 1;
+                }
+            });
+            if (
+                current.temperature_2m == null ||
+                current.relative_humidity_2m == null ||
+                observations === 0
+            ) {
+                throw new Error('Weather provider response was incomplete.');
+            }
+
+            document.getElementById('current-temperature').textContent =
+                Number(current.temperature_2m).toFixed(1) + '°C';
+            document.getElementById('current-rainfall').textContent =
+                rainfall.toFixed(2) + 'mm';
+            document.getElementById('current-humidity').textContent =
+                Number(current.relative_humidity_2m).toFixed(1) + '%';
+            document.getElementById('current-vector-risk').textContent =
+                rainfall > 0 ? 'High Risk' : 'Low Risk';
+            status.textContent =
+                'Live weather restored through the browser weather feed.';
+        })
+        .catch(error => {
+            console.warn('Browser weather fallback failed:', error);
+        });
+}
+
 document.addEventListener("DOMContentLoaded", function() {
+    recoverWeatherFromBrowser();
     const ctx = document.getElementById('envCorrelationChart').getContext('2d');
     
     const labels = {{ chart_labels|safe }};

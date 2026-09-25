@@ -10,6 +10,8 @@ from typing import Any, Dict
 
 import requests
 from django.utils import timezone
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from myapp.models import Barangay, EnvironmentalData
 
@@ -29,6 +31,25 @@ OPEN_METEO_URL = (
 )
 DATA_SOURCE = 'open-meteo-bago-city'
 PERSIST_INTERVAL_MINUTES = 30
+
+_WEATHER_SESSION = requests.Session()
+_WEATHER_SESSION.headers.update({
+    'User-Agent': 'PULSE-AI/1.0 (+Bago City Health Office)',
+})
+_WEATHER_SESSION.mount(
+    'https://',
+    HTTPAdapter(
+        max_retries=Retry(
+            total=1,
+            connect=1,
+            read=1,
+            status=1,
+            backoff_factor=0.25,
+            status_forcelist=(429, 500, 502, 503, 504),
+            allowed_methods=frozenset({'GET'}),
+        )
+    ),
+)
 
 FALLBACK_WEATHER = {
     'temperature_c': 30.0,
@@ -147,7 +168,7 @@ def fetch_bago_city_weather(*, persist: bool = True) -> Dict[str, Any]:
     On API failure, returns conservative fallback defaults without raising.
     """
     try:
-        response = requests.get(OPEN_METEO_URL, timeout=8)
+        response = _WEATHER_SESSION.get(OPEN_METEO_URL, timeout=(4, 8))
         response.raise_for_status()
         payload = response.json()
         current = payload.get('current') or {}
