@@ -1494,7 +1494,8 @@ tbody tr:last-child td { border-bottom: none; }
 .chart-box p { font-size: .82rem; color: var(--muted); margin: 0 0 1.25rem; }
 .chart-height-main,
 .chart-height-side,
-.chart-height-compact {
+.chart-height-compact,
+.chart-height-disease {
   position: relative;
   width: 100%;
   min-width: 0;
@@ -1502,12 +1503,26 @@ tbody tr:last-child td { border-bottom: none; }
 .chart-height-main { height: 350px; }
 .chart-height-side { height: 280px; }
 .chart-height-compact { height: 250px; }
+.chart-height-disease { height: 360px; }
 .chart-height-main canvas,
 .chart-height-side canvas,
-.chart-height-compact canvas {
+.chart-height-compact canvas,
+.chart-height-disease canvas {
   display: block;
   max-width: 100%;
 }
+.chart-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, .45) transparent;
+}
+.chart-scroll__stage {
+  position: relative;
+  height: 100%;
+  min-width: 100%;
+}
+.chart-scroll__stage canvas { max-width: none; }
 
 .dash-summary-panel {
   background: var(--surface);
@@ -1944,6 +1959,7 @@ html[data-theme="dark"] .aptas-alert-card--pidsr .aptas-alert-card__logged {
   .analytics-page .chart-height-main { height: 300px; }
   .analytics-page .chart-height-side { height: 260px; }
   .analytics-page .chart-height-compact { height: 250px; }
+  .analytics-page .chart-height-disease { height: 420px; }
   .analytics-page .filter-drawer__actions { flex-wrap: wrap; }
 }
 

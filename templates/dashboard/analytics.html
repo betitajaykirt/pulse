@@ -138,8 +138,10 @@
           <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
         </div>
         <p>Cases over time by case status for the selected dates.</p>
-        <div class="chart-height-main">
-          <canvas id="epi-chart"></canvas>
+        <div class="chart-height-main chart-scroll">
+          <div class="chart-scroll__stage" id="epi-chart-stage">
+            <canvas id="epi-chart"></canvas>
+          </div>
         </div>
         <p id="epi-empty-msg" class="text-muted text-center mt-2" style="display:none;font-size:.82rem;">No case data for the selected filters.</p>
       </div>
@@ -193,7 +195,7 @@
           <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
         </div>
         <p>Confirmed and ML-predicted diseases, using the same labels as the map.</p>
-        <div class="chart-height-compact">
+        <div class="chart-height-disease">
           <canvas id="disease-chart"></canvas>
         </div>
         <p id="disease-empty-msg" class="text-muted text-center mt-2" style="display:none;font-size:.82rem;">No disease data available.</p>
@@ -276,13 +278,6 @@ function caseStatusStyle(label) {
   });
 }
 
-function responsiveTickLimit(canvas) {
-  const width = canvas && canvas.parentElement ? canvas.parentElement.clientWidth : window.innerWidth;
-  if (width < 440) return 5;
-  if (width < 720) return 8;
-  return 12;
-}
-
 function buildEpiChart(ctx, payload, emptyMsgId) {
   const isEmpty = !hasChartData(payload);
   const el = document.getElementById(emptyMsgId);
@@ -309,7 +304,12 @@ function buildEpiChart(ctx, payload, emptyMsgId) {
     });
   }
 
-  var maxTicks = responsiveTickLimit(ctx.canvas);
+  var stage = document.getElementById('epi-chart-stage');
+  var chartContainer = stage ? stage.parentElement : null;
+  if (stage && chartContainer) {
+    var minimumWidth = Math.max(chartContainer.clientWidth, (payload.labels || []).length * 52);
+    stage.style.width = minimumWidth + 'px';
+  }
 
   var epiTitle = document.getElementById('epi-chart-title');
   if (epiTitle) {
@@ -342,19 +342,18 @@ function buildEpiChart(ctx, payload, emptyMsgId) {
       },
       scales: {
         x: {
-          stacked: true,
+          stacked: false,
           grid: { display: false },
           ticks: {
             font: { family: 'Inter', size: 10 },
             color: themeChart().tick,
-            maxTicksLimit: maxTicks,
-            autoSkip: true,
+            autoSkip: false,
             maxRotation: 0,
             minRotation: 0,
           },
         },
         y: {
-          stacked: true,
+          stacked: false,
           beginAtZero: true,
           ticks: { precision: 0, font: { family: 'Inter', size: 11 }, color: themeChart().tick },
           grid: { color: themeChart().grid, drawBorder: false },
