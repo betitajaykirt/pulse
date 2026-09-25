@@ -2439,7 +2439,10 @@ html[data-theme="dark"] .map-layer-btn:hover {
 }
 .hotspot-tip::before { border-top-color: var(--text); }
 
-/* Fixed popup dimensions: map zoom must not resize case or cluster cards. */
+/* Case and cluster cards scale in the same direction as Leaflet zoom. */
+#map {
+  --map-popup-scale: 1;
+}
 .leaflet-popup.custom-fixed-popup {
   overflow: visible;
 }
@@ -2453,6 +2456,10 @@ html[data-theme="dark"] .map-layer-btn:hover {
   border-radius: 12px !important;
   padding: 0 !important;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+  transform: scale(var(--map-popup-scale));
+  transform-origin: bottom center;
+  transition: transform 120ms ease-out;
+  will-change: transform;
 }
 .custom-fixed-popup .leaflet-popup-content {
   margin: 0 !important;

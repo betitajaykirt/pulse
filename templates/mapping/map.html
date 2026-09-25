@@ -565,6 +565,17 @@
       maxZoom: MAP_ZOOM.max,
     }).setView([10.5389, 122.8366], 13);
 
+    var POPUP_BASE_ZOOM = 13;
+
+    function applyMapPopupScale() {
+      var scale = Math.pow(1.1, map.getZoom() - POPUP_BASE_ZOOM);
+      scale = Math.max(0.65, Math.min(1.35, scale));
+      map.getContainer().style.setProperty('--map-popup-scale', scale.toFixed(3));
+    }
+
+    map.on('zoom zoomend', applyMapPopupScale);
+    applyMapPopupScale();
+
     var streetLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       referrerPolicy: 'strict-origin-when-cross-origin',
