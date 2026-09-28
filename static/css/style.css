@@ -3056,6 +3056,30 @@ html[data-theme="dark"] .map-layer-btn:hover {
 .pulse-modal--lab-wide {
   max-width: 1120px;
 }
+.pulse-modal--case-record {
+  max-width: 960px;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+.pulse-modal--case-record .pulse-modal__body,
+.pulse-modal--case-record form,
+.pulse-modal--case-record #confirmed-close-ocr,
+.pulse-modal--case-record .ocr-upload-zone,
+.pulse-modal--case-record .ocr-compare,
+.pulse-modal--case-record .ocr-section {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.pulse-modal--case-record .detail-value,
+.pulse-modal--case-record .ocr-upload-zone__text,
+.pulse-modal--case-record .ocr-demo-value,
+.pulse-modal--case-record .ocr-verify-banner {
+  overflow-wrap: anywhere;
+}
+.pulse-modal--case-record .ocr-compare {
+  grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+}
 
 .ocr-patient-card {
   margin-top: 0;
@@ -3271,11 +3295,18 @@ html[data-theme="dark"] .map-layer-btn:hover {
   .ocr-compare {
     grid-template-columns: 1fr;
   }
+  .pulse-modal--case-record .ocr-compare {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .ocr-compare__scan { position: static; }
   .ocr-demo-grid--names { grid-template-columns: 1fr 1fr; }
 }
 
 @media (max-width: 640px) {
+  .pulse-modal-overlay { padding: .5rem; }
+  .pulse-modal--case-record .pulse-modal__body { padding: 1rem; }
+  .pulse-modal--case-record .detail-row { gap: .4rem; }
+  .pulse-modal--case-record .detail-label { min-width: 105px; }
   .ocr-form-grid,
   .ocr-form-grid--two,
   .ocr-demo-grid,
