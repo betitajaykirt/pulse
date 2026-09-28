@@ -192,7 +192,7 @@
   <div class="pulse-modal">
     <div class="pulse-modal__head">
       <h3 id="modal-title">Case Report Details</h3>
-      <button type="button" class="pulse-modal__close" onclick="document.getElementById('record-modal').classList.remove('open')">&times;</button>
+      <button type="button" class="pulse-modal__close" onclick="closeRecordModal()">&times;</button>
     </div>
     <div class="pulse-modal__body" id="modal-body"></div>
     <div class="pulse-modal__body" id="close-case-container" style="display:none; border-top: 1px solid var(--border); padding-top: 1rem;">
@@ -235,7 +235,45 @@
             </svg>
             <p>Scanning laboratory result…</p>
           </div>
-          <div class="ocr-verify-banner" id="close-ocr-result" style="display:none;"></div>
+          <div class="ocr-compare" id="close-ocr-compare" style="display:none;">
+            <div class="ocr-section ocr-compare__scan">
+              <div class="ocr-section__title">
+                <i data-lucide="file-scan" class="lucide-icon lucide-icon--xs"></i>
+                Uploaded Lab Document
+              </div>
+              <div class="ocr-scan-frame">
+                <img id="close-ocr-preview-img" alt="Uploaded laboratory document" style="display:none;">
+                <iframe id="close-ocr-preview-frame" title="Uploaded laboratory PDF" style="display:none;"></iframe>
+                <p class="um-muted" id="close-ocr-preview-fallback" style="display:none;">Preview is unavailable for this file type.</p>
+              </div>
+              <p class="ocr-scan-hint">Compare the original document with the OCR result.</p>
+            </div>
+            <div class="ocr-compare__extracted">
+              <div class="ocr-verify-banner" id="close-ocr-result" style="display:none;"></div>
+              <div class="ocr-section ocr-overview" id="close-ocr-overview" style="display:none;">
+                <div class="ocr-section__title">
+                  <i data-lucide="clipboard-check" class="lucide-icon lucide-icon--xs"></i>
+                  Extracted Lab Result
+                </div>
+                <div class="ocr-overview__verdict" id="close-ocr-verdict"></div>
+                <div class="ocr-overview__meta">
+                  <div class="ocr-demo-field">
+                    <span class="ocr-demo-label">Patient</span>
+                    <span class="ocr-demo-value" id="close-ocr-patient">—</span>
+                  </div>
+                  <div class="ocr-demo-field">
+                    <span class="ocr-demo-label">Test / Issue Date</span>
+                    <span class="ocr-demo-value" id="close-ocr-date">—</span>
+                  </div>
+                  <div class="ocr-demo-field ocr-demo-field--full">
+                    <span class="ocr-demo-label">Marker Summary</span>
+                    <span class="ocr-demo-value" id="close-ocr-markers">—</span>
+                  </div>
+                </div>
+                <div class="ocr-marker-pills" id="close-ocr-pills"></div>
+              </div>
+            </div>
+          </div>
           <input type="hidden" name="lab_control_number" id="close-lab-control-number">
           <input type="hidden" name="lab_specimen_number" id="close-lab-specimen-number">
           <input type="hidden" name="lab_issue_date" id="close-lab-issue-date">
@@ -273,6 +311,7 @@ const CAN_CLOSE_CASES = {{ can_close_cases|yesno:"true,false" }};
 const CAN_CLOSE_UNCONFIRMED = {{ can_close_unconfirmed|yesno:"true,false" }};
 let activeCloseReportId = null;
 let activeCloseStatus = '';
+let closeOcrPreviewUrl = null;
 const closeOcrGate = { scanned: false, matched: false, outcome: '' };
 
 function viewRecord(id, barangay, disease, classif, cases, onset, caseStatus, validationStatus, reporter, date, confirmedAt, lat, lng, remarks, resolutionOutcome, closedAt) {
@@ -380,18 +419,54 @@ function configureCloseForm(reportId, caseStatus) {
 }
 
 function resetCloseOcr() {
+  revokeCloseOcrPreview();
   closeOcrGate.scanned = false;
   closeOcrGate.matched = false;
   closeOcrGate.outcome = '';
   document.getElementById('close-lab-document').value = '';
   document.getElementById('close-ocr-upload-zone').style.display = '';
   document.getElementById('close-ocr-loading').style.display = 'none';
+  document.getElementById('close-ocr-compare').style.display = 'none';
   document.getElementById('close-ocr-result').style.display = 'none';
+  document.getElementById('close-ocr-overview').style.display = 'none';
   [
     'close-lab-control-number', 'close-lab-specimen-number',
     'close-lab-issue-date', 'close-test-type',
     'close-lab-findings', 'close-lab-interpretation'
   ].forEach(function(id) { document.getElementById(id).value = ''; });
+}
+
+function revokeCloseOcrPreview() {
+  if (closeOcrPreviewUrl) {
+    URL.revokeObjectURL(closeOcrPreviewUrl);
+    closeOcrPreviewUrl = null;
+  }
+  const img = document.getElementById('close-ocr-preview-img');
+  const frame = document.getElementById('close-ocr-preview-frame');
+  const fallback = document.getElementById('close-ocr-preview-fallback');
+  img.src = '';
+  frame.src = 'about:blank';
+  img.style.display = 'none';
+  frame.style.display = 'none';
+  fallback.style.display = 'none';
+}
+
+function showCloseOcrPreview(file) {
+  revokeCloseOcrPreview();
+  closeOcrPreviewUrl = URL.createObjectURL(file);
+  const img = document.getElementById('close-ocr-preview-img');
+  const frame = document.getElementById('close-ocr-preview-frame');
+  const fallback = document.getElementById('close-ocr-preview-fallback');
+  if ((file.type || '').indexOf('pdf') !== -1 || /\.pdf$/i.test(file.name || '')) {
+    frame.src = closeOcrPreviewUrl;
+    frame.style.display = '';
+  } else if ((file.type || '').indexOf('image/') === 0) {
+    img.src = closeOcrPreviewUrl;
+    img.style.display = '';
+  } else {
+    fallback.style.display = '';
+  }
+  document.getElementById('close-ocr-compare').style.display = 'grid';
 }
 
 function refreshCloseOcrGate() {
@@ -437,6 +512,39 @@ function setCloseOcrResult(ok, message) {
   result.style.display = 'flex';
 }
 
+function esc(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+function renderCloseOcrOverview(data, fields) {
+  const overview = data.overview || fields.overview || {};
+  const verdict = overview.verdict || String(data.lab_outcome || '').toUpperCase();
+  const verdictEl = document.getElementById('close-ocr-verdict');
+  verdictEl.className = 'ocr-overview__verdict';
+  if (verdict === 'NEGATIVE') verdictEl.classList.add('ocr-overview__verdict--negative');
+  else if (verdict === 'POSITIVE') verdictEl.classList.add('ocr-overview__verdict--positive');
+  verdictEl.textContent = overview.primary_result || verdict || 'Result unclear';
+
+  document.getElementById('close-ocr-patient').textContent =
+    overview.patient || fields.patient_name || data.record_patient_name || '—';
+  document.getElementById('close-ocr-date').textContent =
+    overview.test_date || fields.result_date || '—';
+  document.getElementById('close-ocr-markers').textContent =
+    overview.marker_summary || fields.marker_summary || '—';
+
+  const markers = overview.markers || fields.markers || [];
+  document.getElementById('close-ocr-pills').innerHTML = markers.map(function(marker) {
+    const cls = marker.positive
+      ? 'ocr-marker-pill ocr-marker-pill--pos'
+      : 'ocr-marker-pill ocr-marker-pill--neg';
+    return '<span class="' + cls + '">' + esc(marker.name || '') +
+      ' ' + (marker.positive ? '(+)' : '(-)') + ' · ' + esc(marker.status || '') + '</span>';
+  }).join('');
+  document.getElementById('close-ocr-overview').style.display = '';
+}
+
 function processCloseOcr(file) {
   if (!file || !activeCloseReportId) return;
   const formData = new FormData();
@@ -450,6 +558,8 @@ function processCloseOcr(file) {
   document.getElementById('close-ocr-upload-zone').style.display = 'none';
   document.getElementById('close-ocr-loading').style.display = 'flex';
   document.getElementById('close-ocr-result').style.display = 'none';
+  document.getElementById('close-ocr-overview').style.display = 'none';
+  showCloseOcrPreview(file);
   refreshCloseOcrGate();
 
   const csrfToken = document.querySelector('#close-case-form [name=csrfmiddlewaretoken]').value;
@@ -481,6 +591,7 @@ function processCloseOcr(file) {
     document.getElementById('close-test-type').value = data.test_type || '';
     document.getElementById('close-lab-findings').value = fields.lab_results || '';
     document.getElementById('close-lab-interpretation').value = fields.interpretation || '';
+    renderCloseOcrOverview(data, fields);
 
     if (!closeOcrGate.matched) {
       setCloseOcrResult(false, 'Patient mismatch: upload the laboratory result for this case’s patient.');
@@ -497,7 +608,9 @@ function processCloseOcr(file) {
   .catch(function(error) {
     document.getElementById('close-ocr-loading').style.display = 'none';
     document.getElementById('close-ocr-upload-zone').style.display = '';
-    resetCloseOcr();
+    closeOcrGate.scanned = false;
+    closeOcrGate.matched = false;
+    closeOcrGate.outcome = '';
     setCloseOcrResult(false, error.message || 'OCR processing failed.');
     refreshCloseOcrGate();
   });
@@ -515,8 +628,12 @@ function guardCaseClose(event) {
 }
 
 function closeModal(e) {
-  if (e.target === document.getElementById('record-modal'))
-    document.getElementById('record-modal').classList.remove('open');
+  if (e.target === document.getElementById('record-modal')) closeRecordModal();
+}
+
+function closeRecordModal() {
+  revokeCloseOcrPreview();
+  document.getElementById('record-modal').classList.remove('open');
 }
 </script>
 {% endblock %}
