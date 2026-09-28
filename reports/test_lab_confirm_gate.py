@@ -7,6 +7,7 @@ from django.utils import timezone
 from reports.views import (
     LAB_OCR_SCAN_MAX_AGE_SECONDS,
     _clear_lab_ocr_scan,
+    _evaluate_confirmed_close_lab,
     _evaluate_lab_confirmation,
     _get_valid_lab_ocr_scan,
     _store_lab_ocr_scan,
@@ -44,6 +45,15 @@ class CloseCasePolicyTests(SimpleTestCase):
         self.assertIsNone(close_case_rejection(
             'health_officer', 'Probable', 'Lost to Follow-up',
         ))
+
+    def test_probable_can_use_standard_recovered_outcome(self):
+        self.assertIsNone(close_case_rejection(
+            'health_officer', 'Probable', 'Recovered',
+        ))
+
+    def test_confirmed_cannot_use_standard_recovered_outcome(self):
+        msg = close_case_rejection('admin', 'Confirmed', 'Recovered')
+        self.assertIsNotNone(msg)
 
 
 class _Session(dict):
@@ -94,6 +104,23 @@ class LabOcrScanSessionTests(SimpleTestCase):
         )
         _clear_lab_ocr_scan(request)
         self.assertIsNone(_get_valid_lab_ocr_scan(request, 12))
+
+    def test_scan_purpose_must_match(self):
+        request = _request()
+        _store_lab_ocr_scan(
+            request,
+            report_id=12,
+            ocr_patient_name='Jelyn Aujero',
+            identity_match=True,
+            lab_outcome='negative',
+            purpose='close',
+        )
+        self.assertIsNone(
+            _get_valid_lab_ocr_scan(request, 12, purpose='confirmation')
+        )
+        self.assertIsNotNone(
+            _get_valid_lab_ocr_scan(request, 12, purpose='close')
+        )
 
 
 class EvaluateLabConfirmationTests(SimpleTestCase):
@@ -161,3 +188,44 @@ class EvaluateLabConfirmationTests(SimpleTestCase):
         gate = _evaluate_lab_confirmation(request, self.report)
         self.assertTrue(gate['ok'])
         self.assertEqual(gate['lab_outcome'], 'positive')
+
+
+class EvaluateConfirmedCloseLabTests(SimpleTestCase):
+    def setUp(self):
+        self.report = SimpleNamespace(id=12)
+
+    def test_refuses_close_without_scan(self):
+        gate = _evaluate_confirmed_close_lab(_request(), self.report)
+        self.assertFalse(gate['ok'])
+        self.assertIn('negative laboratory result', gate['error'])
+
+    @patch('reports.views._patient_display_for_report')
+    def test_refuses_positive_scan(self, display):
+        display.return_value = {'name': 'Jelyn Aujero'}
+        request = _request()
+        _store_lab_ocr_scan(
+            request,
+            report_id=12,
+            ocr_patient_name='Jelyn Aujero',
+            identity_match=True,
+            lab_outcome='positive',
+            purpose='close',
+        )
+        gate = _evaluate_confirmed_close_lab(request, self.report)
+        self.assertFalse(gate['ok'])
+        self.assertIn('NEGATIVE', gate['error'])
+
+    @patch('reports.views._patient_display_for_report')
+    def test_allows_matching_negative_scan(self, display):
+        display.return_value = {'name': 'Jelyn Aujero'}
+        request = _request()
+        _store_lab_ocr_scan(
+            request,
+            report_id=12,
+            ocr_patient_name='Jelyn S. Aujero',
+            identity_match=True,
+            lab_outcome='negative',
+            purpose='close',
+        )
+        gate = _evaluate_confirmed_close_lab(request, self.report)
+        self.assertTrue(gate['ok'])

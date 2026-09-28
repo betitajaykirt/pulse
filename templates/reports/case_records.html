@@ -197,19 +197,51 @@
     <div class="pulse-modal__body" id="modal-body"></div>
     <div class="pulse-modal__body" id="close-case-container" style="display:none; border-top: 1px solid var(--border); padding-top: 1rem;">
       <h4 style="margin-top:0; margin-bottom:.5rem;">Close Active Case</h4>
-      <form method="POST" id="close-case-form" action="">
+      <form method="POST" id="close-case-form" action="" onsubmit="return guardCaseClose(event)">
         {% csrf_token %}
         <div class="form-group">
           <label>Resolution Outcome <span class="um-muted">(required)</span></label>
-          <select name="resolution_outcome" class="input-soft" required>
+          <select name="resolution_outcome" id="close-resolution-outcome" class="input-soft" required>
             <option value="">Select outcome...</option>
-            <option value="Recovered (Confirmed Case)">Recovered (Confirmed Case)</option>
+            <option value="Recovered" id="close-recovered-standard">Recovered</option>
+            <option value="Recovered (Confirmed Case)" id="close-recovered-confirmed">Recovered (Confirmed Case)</option>
             <option value="Deceased">Deceased</option>
             <option value="Lost to Follow-up">Lost to Follow-up</option>
           </select>
-          <p class="um-muted" style="font-size:.78rem;margin:.4rem 0 0;">
-            Laboratory-negative discard is done on Case Confirmation after a matching lab scan. It is not available here.
-          </p>
+        </div>
+        <div id="confirmed-close-ocr" style="display:none;">
+          <div class="ocr-verify-banner ocr-verify-banner--pending" id="close-ocr-required">
+            <i data-lucide="scan-line" class="lucide-icon lucide-icon--sm"></i>
+            <span><strong>Negative lab result required:</strong> Upload this confirmed patient’s laboratory result. Closing remains blocked until OCR verifies the patient and a NEGATIVE result.</span>
+          </div>
+          <div class="ocr-upload-zone" id="close-ocr-upload-zone"
+               ondrop="handleCloseOcrDrop(event)"
+               ondragover="handleCloseOcrDragOver(event)"
+               ondragleave="handleCloseOcrDragLeave(event)">
+            <input type="file" id="close-lab-document" accept="image/*,application/pdf"
+                   style="display:none;" onchange="handleCloseOcrFile(event)">
+            <i data-lucide="upload-cloud" class="lucide-icon ocr-upload-zone__icon"></i>
+            <p class="ocr-upload-zone__text">
+              <strong>Drag &amp; Drop</strong> a negative lab result here or
+              <button type="button" class="nc-btn nc-btn--outline nc-btn--sm"
+                      onclick="document.getElementById('close-lab-document').click()">Browse File</button>
+            </p>
+            <span class="um-muted" style="font-size:.78rem;">Supports JPG, PNG, and PDF</span>
+          </div>
+          <div class="ocr-loading" id="close-ocr-loading" style="display:none;">
+            <svg class="ocr-spinner" viewBox="0 0 50 50">
+              <circle cx="25" cy="25" r="20" fill="none" stroke="currentColor"
+                      stroke-width="4" stroke-dasharray="90 150" stroke-linecap="round"/>
+            </svg>
+            <p>Scanning laboratory result…</p>
+          </div>
+          <div class="ocr-verify-banner" id="close-ocr-result" style="display:none;"></div>
+          <input type="hidden" name="lab_control_number" id="close-lab-control-number">
+          <input type="hidden" name="lab_specimen_number" id="close-lab-specimen-number">
+          <input type="hidden" name="lab_issue_date" id="close-lab-issue-date">
+          <input type="hidden" name="test_type" id="close-test-type">
+          <input type="hidden" name="lab_findings" id="close-lab-findings">
+          <input type="hidden" name="lab_interpretation" id="close-lab-interpretation">
         </div>
         <div class="form-group">
           <label>Resolution Date</label>
@@ -220,7 +252,7 @@
           <textarea name="closing_notes" class="input-soft" rows="2" placeholder="Any final remarks..."></textarea>
         </div>
         <div class="pulse-modal__actions" style="margin-top: 1rem;">
-          <button type="submit" class="nc-btn nc-btn--danger" onclick="return confirm('Are you sure you want to close this case? This will remove it from active tracking.');">
+          <button type="submit" class="nc-btn nc-btn--danger" id="close-case-submit">
             <i data-lucide="archive" class="lucide-icon lucide-icon--xs"></i> Close Case
           </button>
         </div>
@@ -236,8 +268,12 @@
 document.addEventListener('DOMContentLoaded', function () { if (window.lucide) lucide.createIcons(); });
 
 const CLOSE_URL_TEMPLATE = "{% url 'close_case' 0 %}";
+const CLOSE_OCR_URL = "{% url 'ocr_parse_lab' %}";
 const CAN_CLOSE_CASES = {{ can_close_cases|yesno:"true,false" }};
 const CAN_CLOSE_UNCONFIRMED = {{ can_close_unconfirmed|yesno:"true,false" }};
+let activeCloseReportId = null;
+let activeCloseStatus = '';
+const closeOcrGate = { scanned: false, matched: false, outcome: '' };
 
 function viewRecord(id, barangay, disease, classif, cases, onset, caseStatus, validationStatus, reporter, date, confirmedAt, lat, lng, remarks, resolutionOutcome, closedAt) {
   document.getElementById('modal-title').textContent = 'Case Report #' + id;
@@ -317,6 +353,7 @@ function viewRecord(id, barangay, disease, classif, cases, onset, caseStatus, va
   if (canCloseThis) {
     closeContainer.style.display = 'block';
     document.getElementById('close-case-form').action = CLOSE_URL_TEMPLATE.replace('/0/', '/' + id + '/');
+    configureCloseForm(id, caseStatus);
   } else {
     closeContainer.style.display = 'none';
   }
@@ -329,6 +366,154 @@ function row(label, value) {
   return `<div class="detail-row"><span class="detail-label">${label}</span><span class="detail-value">${value}</span></div>`;
 }
 function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+
+function configureCloseForm(reportId, caseStatus) {
+  activeCloseReportId = reportId;
+  activeCloseStatus = caseStatus;
+  const isConfirmed = caseStatus === 'Confirmed';
+  document.getElementById('confirmed-close-ocr').style.display = isConfirmed ? 'block' : 'none';
+  document.getElementById('close-recovered-standard').hidden = isConfirmed;
+  document.getElementById('close-recovered-confirmed').hidden = !isConfirmed;
+  document.getElementById('close-resolution-outcome').value = '';
+  resetCloseOcr();
+  refreshCloseOcrGate();
+}
+
+function resetCloseOcr() {
+  closeOcrGate.scanned = false;
+  closeOcrGate.matched = false;
+  closeOcrGate.outcome = '';
+  document.getElementById('close-lab-document').value = '';
+  document.getElementById('close-ocr-upload-zone').style.display = '';
+  document.getElementById('close-ocr-loading').style.display = 'none';
+  document.getElementById('close-ocr-result').style.display = 'none';
+  [
+    'close-lab-control-number', 'close-lab-specimen-number',
+    'close-lab-issue-date', 'close-test-type',
+    'close-lab-findings', 'close-lab-interpretation'
+  ].forEach(function(id) { document.getElementById(id).value = ''; });
+}
+
+function refreshCloseOcrGate() {
+  const requiresOcr = activeCloseStatus === 'Confirmed';
+  const verified = closeOcrGate.scanned && closeOcrGate.matched &&
+    closeOcrGate.outcome === 'negative';
+  const submit = document.getElementById('close-case-submit');
+  submit.disabled = requiresOcr && !verified;
+  submit.setAttribute('aria-disabled', submit.disabled ? 'true' : 'false');
+  document.getElementById('close-ocr-required').style.display =
+    requiresOcr && !verified ? 'flex' : 'none';
+}
+
+function handleCloseOcrDragOver(event) {
+  event.preventDefault();
+  event.currentTarget.classList.add('ocr-upload-zone--active');
+}
+
+function handleCloseOcrDragLeave(event) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('ocr-upload-zone--active');
+}
+
+function handleCloseOcrDrop(event) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('ocr-upload-zone--active');
+  if (event.dataTransfer.files && event.dataTransfer.files.length) {
+    processCloseOcr(event.dataTransfer.files[0]);
+  }
+}
+
+function handleCloseOcrFile(event) {
+  if (event.target.files && event.target.files.length) {
+    processCloseOcr(event.target.files[0]);
+  }
+}
+
+function setCloseOcrResult(ok, message) {
+  const result = document.getElementById('close-ocr-result');
+  result.className = 'ocr-verify-banner ' +
+    (ok ? 'ocr-verify-banner--match' : 'ocr-verify-banner--mismatch');
+  result.textContent = message;
+  result.style.display = 'flex';
+}
+
+function processCloseOcr(file) {
+  if (!file || !activeCloseReportId) return;
+  const formData = new FormData();
+  formData.append('lab_document', file);
+  formData.append('report_id', activeCloseReportId);
+  formData.append('purpose', 'close');
+
+  closeOcrGate.scanned = false;
+  closeOcrGate.matched = false;
+  closeOcrGate.outcome = '';
+  document.getElementById('close-ocr-upload-zone').style.display = 'none';
+  document.getElementById('close-ocr-loading').style.display = 'flex';
+  document.getElementById('close-ocr-result').style.display = 'none';
+  refreshCloseOcrGate();
+
+  const csrfToken = document.querySelector('#close-case-form [name=csrfmiddlewaretoken]').value;
+  fetch(CLOSE_OCR_URL, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': csrfToken },
+    body: formData
+  })
+  .then(function(response) {
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.indexOf('application/json') === -1) {
+      throw new Error('Unexpected server response. Refresh the page and try again.');
+    }
+    return response.json();
+  })
+  .then(function(data) {
+    document.getElementById('close-ocr-loading').style.display = 'none';
+    document.getElementById('close-ocr-upload-zone').style.display = '';
+    if (!data.success) throw new Error(data.error || 'OCR could not read the document.');
+
+    const fields = data.fields || {};
+    closeOcrGate.scanned = true;
+    closeOcrGate.matched = !!(data.validation && data.validation.match);
+    closeOcrGate.outcome = data.lab_outcome || '';
+
+    document.getElementById('close-lab-control-number').value = fields.control_number || '';
+    document.getElementById('close-lab-specimen-number').value = fields.lab_number || '';
+    document.getElementById('close-lab-issue-date').value = fields.result_date || '';
+    document.getElementById('close-test-type').value = data.test_type || '';
+    document.getElementById('close-lab-findings').value = fields.lab_results || '';
+    document.getElementById('close-lab-interpretation').value = fields.interpretation || '';
+
+    if (!closeOcrGate.matched) {
+      setCloseOcrResult(false, 'Patient mismatch: upload the laboratory result for this case’s patient.');
+    } else if (closeOcrGate.outcome !== 'negative') {
+      setCloseOcrResult(false, closeOcrGate.outcome === 'positive'
+        ? 'Positive result detected. A confirmed case requires a negative result before closure.'
+        : 'The result is unclear. Upload a clearer document showing a NEGATIVE result.');
+    } else {
+      const patient = fields.patient_name || data.record_patient_name || 'Patient';
+      setCloseOcrResult(true, patient + ' verified — NEGATIVE laboratory result detected. You may close this case.');
+    }
+    refreshCloseOcrGate();
+  })
+  .catch(function(error) {
+    document.getElementById('close-ocr-loading').style.display = 'none';
+    document.getElementById('close-ocr-upload-zone').style.display = '';
+    resetCloseOcr();
+    setCloseOcrResult(false, error.message || 'OCR processing failed.');
+    refreshCloseOcrGate();
+  });
+}
+
+function guardCaseClose(event) {
+  if (activeCloseStatus === 'Confirmed' && (
+    !closeOcrGate.scanned || !closeOcrGate.matched || closeOcrGate.outcome !== 'negative'
+  )) {
+    event.preventDefault();
+    alert('Upload a matching NEGATIVE laboratory result before closing this confirmed case.');
+    return false;
+  }
+  return confirm('Are you sure you want to close this case? This will remove it from active tracking.');
+}
+
 function closeModal(e) {
   if (e.target === document.getElementById('record-modal'))
     document.getElementById('record-modal').classList.remove('open');

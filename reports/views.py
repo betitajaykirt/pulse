@@ -834,18 +834,29 @@ LAB_OCR_SESSION_KEY = 'pulse_lab_ocr_scan'
 LAB_OCR_SCAN_MAX_AGE_SECONDS = 30 * 60
 
 
-def _store_lab_ocr_scan(request, *, report_id, ocr_patient_name, identity_match, lab_outcome=''):
+def _store_lab_ocr_scan(
+    request,
+    *,
+    report_id,
+    ocr_patient_name,
+    identity_match,
+    lab_outcome='',
+    purpose='confirmation',
+    lab_fields=None,
+):
     request.session[LAB_OCR_SESSION_KEY] = {
         'report_id': int(report_id),
         'ocr_patient_name': (ocr_patient_name or '').strip(),
         'identity_match': bool(identity_match),
         'lab_outcome': (lab_outcome or '').strip().lower(),
+        'purpose': (purpose or 'confirmation').strip().lower(),
+        'lab_fields': lab_fields or {},
         'scanned_at': timezone.now().timestamp(),
     }
     request.session.modified = True
 
 
-def _get_valid_lab_ocr_scan(request, report_id):
+def _get_valid_lab_ocr_scan(request, report_id, purpose=None):
     data = request.session.get(LAB_OCR_SESSION_KEY) or {}
     try:
         scanned_id = int(data.get('report_id') or 0)
@@ -853,6 +864,8 @@ def _get_valid_lab_ocr_scan(request, report_id):
     except (TypeError, ValueError):
         return None
     if scanned_id != int(report_id):
+        return None
+    if purpose and (data.get('purpose') or 'confirmation') != purpose:
         return None
     if timezone.now().timestamp() - scanned_at > LAB_OCR_SCAN_MAX_AGE_SECONDS:
         return None
@@ -869,7 +882,7 @@ def _evaluate_lab_confirmation(request, report):
     """Server-side gates: matching OCR scan required; unclear labs stay blocked."""
     from reports.ocr_service import cross_validate_patient, resolve_confirm_lab_outcome
 
-    scan = _get_valid_lab_ocr_scan(request, report.id)
+    scan = _get_valid_lab_ocr_scan(request, report.id, purpose='confirmation')
     if not scan:
         return {
             'ok': False,
@@ -915,9 +928,54 @@ def _evaluate_lab_confirmation(request, report):
     return {'ok': True, 'lab_outcome': outcome}
 
 
+def _evaluate_confirmed_close_lab(request, report):
+    """Require a recent matching negative OCR scan before closing a confirmed case."""
+    from reports.ocr_service import cross_validate_patient
+
+    scan = _get_valid_lab_ocr_scan(request, report.id, purpose='close')
+    if not scan:
+        return {
+            'ok': False,
+            'error': (
+                'Upload the confirmed patient’s negative laboratory result first. '
+                'The case cannot be closed without OCR verification.'
+            ),
+        }
+
+    ocr_name = (scan.get('ocr_patient_name') or '').strip()
+    record_name = _patient_display_for_report(report).get('name') or ''
+    identity = cross_validate_patient(ocr_name, record_name)
+    if not ocr_name or not identity.get('match') or not scan.get('identity_match'):
+        return {
+            'ok': False,
+            'error': (
+                'The scanned laboratory document does not match the patient on record. '
+                'Upload the correct negative lab result.'
+            ),
+        }
+
+    if scan.get('lab_outcome') != 'negative':
+        return {
+            'ok': False,
+            'error': (
+                'Confirmed cases can only be closed after OCR verifies a NEGATIVE '
+                'laboratory result.'
+            ),
+        }
+
+    return {'ok': True, 'lab_fields': scan.get('lab_fields') or {}}
+
+
 @require_POST
 @login_required
-@role_required('admin', 'super_admin', 'health_officer')
+@role_required(
+    'admin',
+    'super_admin',
+    'health_officer',
+    'surveillance_officer',
+    'barangay_health_worker',
+    'encoder',
+)
 def ocr_parse_lab_document(request):
     try:
         from .ocr_service import (
@@ -940,9 +998,31 @@ def ocr_parse_lab_document(request):
         report = barangay_queryset_filter(request, report).first()
         if not report:
             return JsonResponse({'success': False, 'error': 'Report not found.'}, status=404)
-        if report.status not in ('Suspected', 'Probable'):
+        purpose = (request.POST.get('purpose') or 'confirmation').strip().lower()
+        if purpose not in ('confirmation', 'close'):
             return JsonResponse(
-                {'success': False, 'error': f'Only suspected or probable cases can be scanned (current status: {report.status}).'},
+                {'success': False, 'error': 'Invalid laboratory scan purpose.'},
+                status=400,
+            )
+        if (
+            purpose == 'confirmation'
+            and request.session.get('role') not in {'admin', 'super_admin', 'health_officer'}
+        ):
+            return JsonResponse(
+                {'success': False, 'error': 'You are not authorized to confirm cases.'},
+                status=403,
+            )
+        allowed_statuses = ('Confirmed',) if purpose == 'close' else ('Suspected', 'Probable')
+        if report.status not in allowed_statuses:
+            allowed_label = 'confirmed' if purpose == 'close' else 'suspected or probable'
+            return JsonResponse(
+                {
+                    'success': False,
+                    'error': (
+                        f'Only {allowed_label} cases can be scanned for this action '
+                        f'(current status: {report.status}).'
+                    ),
+                },
                 status=400,
             )
 
@@ -979,6 +1059,15 @@ def ocr_parse_lab_document(request):
             ocr_patient_name=fields.get('raw_patient_name') or fields.get('patient_name') or '',
             identity_match=bool(validation.get('match')),
             lab_outcome=lab_outcome,
+            purpose=purpose,
+            lab_fields={
+                'lab_control_number': (fields.get('control_number') or '')[:64],
+                'lab_specimen_number': (fields.get('lab_number') or '')[:64],
+                'lab_issue_date': (fields.get('result_date') or '')[:64],
+                'test_type': (test_type or '')[:128],
+                'lab_findings': (fields.get('lab_results') or '')[:2000],
+                'lab_interpretation': (fields.get('interpretation') or '')[:1000],
+            },
         )
 
         return JsonResponse({
@@ -1080,6 +1169,7 @@ FIELD_ROLES_CONFIRMED_CLOSE_ONLY = frozenset({
 UNCONFIRMED_CLOSE_STATUSES = frozenset({'Probable', 'Suspected'})
 LAB_NEGATIVE_CLOSE_OUTCOME = 'Discarded (Not a Case / False Alarm)'
 ALLOWED_CLOSE_OUTCOMES = frozenset({
+    'Recovered',
     'Recovered (Confirmed Case)',
     'Deceased',
     'Lost to Follow-up',
@@ -1119,6 +1209,12 @@ def close_case_rejection(role, status, outcome=''):
     if outcome not in ALLOWED_CLOSE_OUTCOMES:
         return 'Select a valid resolution outcome.'
 
+    if status == 'Confirmed' and outcome == 'Recovered':
+        return 'Select the confirmed-case recovery outcome.'
+
+    if status in UNCONFIRMED_CLOSE_STATUSES and outcome == 'Recovered (Confirmed Case)':
+        return 'Select the standard recovery outcome for a suspected or probable case.'
+
     return None
 
 
@@ -1151,6 +1247,12 @@ def close_case(request, report_id):
         messages.error(request, rejection)
         return redirect('case_records')
 
+    if report.status == 'Confirmed':
+        gate = _evaluate_confirmed_close_lab(request, report)
+        if not gate.get('ok'):
+            messages.error(request, gate.get('error') or 'Negative laboratory verification is required.')
+            return redirect('case_records')
+
     closed_at_str = request.POST.get('closed_at', '').strip()
     notes = request.POST.get('closing_notes', '').strip()
 
@@ -1161,15 +1263,25 @@ def close_case(request, report_id):
         except ValueError:
             pass
 
-    update_fields = {
+    verified_lab = gate.get('lab_fields') if report.status == 'Confirmed' else {}
+    update_fields = _lab_detail_update_fields(
+        report,
+        lab_control_number=verified_lab.get('lab_control_number', ''),
+        test_type=verified_lab.get('test_type', ''),
+        lab_specimen_number=verified_lab.get('lab_specimen_number', ''),
+        lab_issue_date=verified_lab.get('lab_issue_date', ''),
+        lab_findings=verified_lab.get('lab_findings', ''),
+        lab_interpretation=verified_lab.get('lab_interpretation', ''),
+    ) if report.status == 'Confirmed' else {'updated_at': timezone.now()}
+    update_fields.update({
         'status': 'Closed',
         'resolution_outcome': outcome,
         'closed_at': closed_at,
         'updated_at': timezone.now()
-    }
+    })
 
     if notes:
-        existing = (report.remarks or '').strip()
+        existing = (update_fields.get('remarks') or report.remarks or '').strip()
         new_remarks = f"Closing Notes: {notes}"
         update_fields['remarks'] = f"{existing} | {new_remarks}".strip(" | ") if existing else new_remarks
 
@@ -1177,6 +1289,8 @@ def close_case(request, report_id):
     actor_type = request.session.get('user_type', 'admin')
 
     SurveillanceReport.objects.filter(id=report.id).update(**update_fields)
+    if report.status == 'Confirmed':
+        _clear_lab_ocr_scan(request)
 
     from reports.case_state_service import handle_case_state_change
     handle_case_state_change(
