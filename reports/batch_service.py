@@ -207,7 +207,12 @@ def save_batch_submission(*, payload, submitted_by_id, locked_barangay=None):
     ml_results = analyze_batch_cases(cases, barangay_names=barangay_name_map)
     # ML analysis can leave a remote MariaDB connection idle long enough for
     # the server/proxy to drop it. Force a fresh connection for the write phase.
-    connection.close()
+    try:
+        connection.close()
+    except Exception:
+        # Some MySQL drivers raise OperationalError(0, '') while closing an
+        # already-dropped socket. Discard that wrapper so Django reconnects.
+        connection.connection = None
 
     return _persist_batch_submission(
         payload=payload,

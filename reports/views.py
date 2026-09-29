@@ -148,11 +148,18 @@ def _process_batch_submission(request, locked_barangay=None):
         return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
     except Exception as exc:
         logger.exception('Batch report submission failed for user %s', uid)
+        error_type = type(exc).__name__
+        error_code = (
+            str(exc.args[0])
+            if getattr(exc, 'args', None) and isinstance(exc.args[0], (int, str))
+            else ''
+        )
+        reference = f'{error_type}{f" {error_code}" if error_code else ""}'
         return JsonResponse({
             'ok': False,
             'error': (
                 'The report could not be saved because of a temporary server or '
-                'database error. Please try again.'
+                f'database error. Please try again. Reference: {reference}.'
             ),
         }, status=500)
 
