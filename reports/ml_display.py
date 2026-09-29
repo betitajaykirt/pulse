@@ -16,6 +16,7 @@ _ML_CLASS_RE = re.compile(r'ML Classification:\s*([^|]+)', re.IGNORECASE)
 _ML_CONF_RE = re.compile(r'ML Confidence:\s*([\d.]+)\s*%?', re.IGNORECASE)
 _ML_SEC_TOP_RE = re.compile(r'ML Secondary Prediction:\s*([^|]+)', re.IGNORECASE)
 _ML_SEC_CONF_RE = re.compile(r'ML Secondary Confidence:\s*([\d.]+)\s*%?', re.IGNORECASE)
+_ALERT_CONFIDENCE_THRESHOLD = 0.30
 
 
 def is_inconclusive_disease_label(label: str) -> bool:
@@ -76,6 +77,9 @@ def report_ml_classification_inconclusive(report) -> bool:
 
 def report_has_alertable_disease(report) -> bool:
     if report_ml_classification_inconclusive(report):
+        return False
+    confidence = parse_ml_confidence(getattr(report, 'remarks', None) or '')
+    if confidence is not None and confidence < _ALERT_CONFIDENCE_THRESHOLD:
         return False
     return is_alertable_disease_label(official_disease_label(report))
 

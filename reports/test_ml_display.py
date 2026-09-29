@@ -39,6 +39,15 @@ class OfficialDiseaseIdentityTests(SimpleTestCase):
         self.assertEqual(official_disease_label(report), 'Leptospirosis')
         self.assertTrue(report_has_alertable_disease(report))
 
+    def test_low_confidence_prediction_is_displayed_without_disease_alert(self):
+        report = _report(
+            syndrome_type='Dengue Fever',
+            suspected_disease='Dengue Fever',
+            remarks='ML Classification: Dengue Fever | ML Top Prediction: Dengue Fever | ML Confidence: 29.5%',
+        )
+        self.assertEqual(predicted_disease_display(report)['primary'], 'Dengue Fever')
+        self.assertFalse(report_has_alertable_disease(report))
+
     def test_confirmed_uses_lab_disease(self):
         report = _report(
             status='Confirmed',

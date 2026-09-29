@@ -318,15 +318,14 @@ def classify_with_fitted_forest(
             secondary_prob = sec_p
             has_multiple_probable = True
 
-    if max_prob < confidence_threshold:
-        disease_label = low_confidence_label
-    else:
-        disease_label = top_label
-
     return {
-        'disease_label': disease_label,
+        # Always expose the model's best prediction. Confidence is returned
+        # separately so callers can still gate automated alerts/actions without
+        # replacing a valid prediction with an inconclusive display label.
+        'disease_label': top_label,
         'top_predicted_disease': top_label,
         'classification_confidence': max_prob,
+        'meets_confidence_threshold': max_prob >= confidence_threshold,
         'secondary_predicted_disease': secondary_label,
         'secondary_classification_confidence': secondary_prob,
         'has_multiple_probable': has_multiple_probable,
