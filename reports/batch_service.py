@@ -6,7 +6,7 @@ from decimal import Decimal
 
 
 
-from django.db import transaction
+from django.db import connection, transaction
 from django.utils import timezone
 
 from myapp.models import (
@@ -194,46 +194,40 @@ def _extract_demographics(case):
 
 
 
-@transaction.atomic
 def save_batch_submission(*, payload, submitted_by_id, locked_barangay=None):
-
-    """
-
-    Create a SurveillanceSession parent and PatientCase + SurveillanceReport children.
-
-
-
-    Each case is analyzed live via ``ml_pipeline.py`` (Isolation Forest + Random Forest)
-
-    before persistence. Reports are stored as auto-validated **Probable** cases.
-
-    """
-
+    """Analyze all cases before opening the database write transaction."""
     cases = payload.get('cases') or []
-
     if not cases:
-
         raise ValueError('At least one patient case is required.')
-
-
-
-    # Resolve barangay names for spatial-temporal ML features
-
     barangay_name_map = {
-
         str(b.id): b.barangay_name for b in Barangay.objects.all()
-
     }
-
     if locked_barangay:
-
         barangay_name_map[str(locked_barangay.id)] = locked_barangay.barangay_name
-
-
-
     ml_results = analyze_batch_cases(cases, barangay_names=barangay_name_map)
+    # ML analysis can leave a remote MariaDB connection idle long enough for
+    # the server/proxy to drop it. Force a fresh connection for the write phase.
+    connection.close()
+
+    return _persist_batch_submission(
+        payload=payload,
+        submitted_by_id=submitted_by_id,
+        locked_barangay=locked_barangay,
+        cases=cases,
+        ml_results=ml_results,
+    )
 
 
+@transaction.atomic
+def _persist_batch_submission(
+    *,
+    payload,
+    submitted_by_id,
+    locked_barangay,
+    cases,
+    ml_results,
+):
+    """Persist an already-analyzed batch in one short atomic transaction."""
 
     now = timezone.now()
 
