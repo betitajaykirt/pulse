@@ -66,7 +66,9 @@
             PIDSR {{ alert.threshold_status_display }}
             · Evaluated {{ alert.created_at|date:"M d, Y H:i" }}
           </span>
-          {% if alert.is_active_alert %}
+          {% if alert.review_status == 'pending' %}
+          <span class="aptas-alert-card__active">Pending Admin Review</span>
+          {% elif alert.is_active_alert %}
           <span class="aptas-alert-card__active">Active Alert</span>
           {% endif %}
         </footer>
@@ -88,7 +90,7 @@
         data-purok="{{ alert.purok|default:'' }}"
         data-officer-name="{{ alert.officer_name|default:'' }}"
         data-officer-contact="{{ alert.officer_contact|default:'' }}"
-        data-trigger-source="{{ alert.trigger_source|default:'Spatial Cluster Spike' }}"
+        data-trigger-source="{{ alert.trigger_source|default:'APTAS Risk Signal' }}"
         data-map-url="{{ alert.map_url }}"
         data-created-at="{{ alert.created_at|date:'M d, Y H:i' }}"
         data-is-pidsr="false"
@@ -102,7 +104,7 @@
           <div class="aptas-alert-card__copy">
             <h4 class="aptas-alert-card__title">{{ alert.syndrome }}</h4>
             <p class="aptas-alert-card__syndrome">
-              {{ alert.barangay }}{% if alert.purok %} — {{ alert.purok }}{% endif %} • {{ alert.active_cases|default:0 }} Active Case{{ alert.active_cases|pluralize }} • Triggered by {{ alert.trigger_source|default:"Spatial Cluster Spike" }}
+              {{ alert.barangay }}{% if alert.purok %} — {{ alert.purok }}{% endif %} • {{ alert.active_cases|default:0 }} Active Case{{ alert.active_cases|pluralize }} • Triggered by {{ alert.trigger_source|default:"APTAS Risk Signal" }}
             </p>
             {% if alert.officer_name %}
             <p class="aptas-alert-card__officer">
@@ -140,7 +142,9 @@
           <span class="aptas-alert-card__logged">
             Logged {{ alert.created_at|date:"M d, Y" }}<br>{{ alert.created_at|date:"H:i" }}
           </span>
-          {% if alert.is_active_alert %}
+          {% if alert.review_status == 'pending' %}
+          <span class="aptas-alert-card__active">Pending Admin Review</span>
+          {% elif alert.is_active_alert %}
           <span class="aptas-alert-card__active">Active Alert</span>
           {% endif %}
         </footer>

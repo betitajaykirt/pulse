@@ -1,7 +1,9 @@
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_POST
 from django.urls import reverse
+from django.contrib import messages
+from django.db import transaction
 from urllib.parse import urlencode
 from accounts.auth_utils import login_required
 from myapp.audit_utils import display_name_for_audit_log, display_name_for_system_log, log_audit, log_system
@@ -59,7 +61,10 @@ def dashboard(request):
     barangay_filter = resolve_aptas_barangay_filter(
         role, request.session.get('user_id'), ctx,
     )
-    ctx.update(get_aptas_dashboard_context(barangay_name=barangay_filter))
+    ctx.update(get_aptas_dashboard_context(
+        barangay_name=barangay_filter,
+        viewer_role=role,
+    ))
     if barangay_filter:
         ctx['aptas_barangay_scope'] = barangay_filter
 
@@ -255,16 +260,122 @@ def alerts_inbox_view(request):
         'alert_history': alert_history,
         'notifications': notifications,
         'can_acknowledge_alerts': can_acknowledge_alerts(role),
+        'can_review_alerts': role in ('admin', 'super_admin'),
     }
+    if ctx['can_review_alerts']:
+        from dashboard.models import AppNotification
+
+        ctx['pending_alert_reviews'] = AppNotification.objects.filter(
+            review_status='pending',
+        ).order_by('-created_at')[:50]
+    else:
+        ctx['pending_alert_reviews'] = []
 
     barangay_filter = resolve_aptas_barangay_filter(
         role, request.session.get('user_id'), ctx,
     )
-    ctx.update(get_aptas_dashboard_context(barangay_name=barangay_filter))
+    ctx.update(get_aptas_dashboard_context(
+        barangay_name=barangay_filter,
+        viewer_role=role,
+    ))
     if barangay_filter:
         ctx['aptas_barangay_scope'] = barangay_filter
 
     return render(request, 'dashboard/alerts_inbox.html', ctx)
+
+
+@require_POST
+@role_required('admin', 'super_admin')
+def review_alert_notification(request, notif_id):
+    from dashboard.models import AppNotification, AppNotificationRead
+
+    action = (request.POST.get('action') or '').strip().lower()
+    recommendation = (request.POST.get('recommendation_text') or '').strip()
+    if action not in ('approve', 'reject'):
+        messages.error(request, 'Select a valid alert review action.')
+        return redirect('alerts_inbox')
+    if action == 'approve' and not recommendation:
+        messages.error(request, 'Add a recommendation before approving the alert.')
+        return redirect('alerts_inbox')
+
+    with transaction.atomic():
+        notification = AppNotification.objects.select_for_update().filter(
+            id=notif_id,
+            review_status='pending',
+        ).first()
+        if not notification:
+            messages.error(request, 'This alert is no longer awaiting review.')
+            return redirect('alerts_inbox')
+
+        now = timezone.now()
+        notification.recommendation_text = recommendation
+        notification.reviewed_by_id = request.session.get('user_id')
+        notification.reviewed_by_role = request.session.get('role', 'admin')
+        notification.reviewed_at = now
+
+        alert = Alert.objects.filter(id=notification.alert_id).first()
+        if action == 'reject':
+            notification.review_status = 'rejected'
+            notification.sent_at = None
+            notification.save(update_fields=[
+                'recommendation_text', 'review_status', 'reviewed_by_id',
+                'reviewed_by_role', 'reviewed_at', 'sent_at',
+            ])
+            if alert:
+                alert.status = 'rejected'
+                alert.save(update_fields=['status'])
+            log_audit(
+                request.session.get('user_id'),
+                request.session.get('role', 'admin'),
+                'alert_rejected',
+                target_id=notification.alert_id,
+                request=request,
+            )
+            messages.success(request, 'Alert rejected. It was not sent to the barangay.')
+            return redirect('alerts_inbox')
+
+        notification.review_status = 'approved'
+        notification.sent_at = now
+        notification.save(update_fields=[
+            'recommendation_text', 'review_status', 'reviewed_by_id',
+            'reviewed_by_role', 'reviewed_at', 'sent_at',
+        ])
+        if alert:
+            alert.status = 'active'
+            alert.save(update_fields=['status'])
+        AppNotificationRead.objects.filter(notification=notification).delete()
+
+        summary = (
+            f'{notification.trigger_source or "APTAS Alert"}: '
+            f'{notification.disease} in {notification.barangay_name}. '
+            f'Recommendation: {recommendation}'
+        )
+        for recipient_role in BARANGAY_SCOPED_ROLES:
+            NotificationLog.objects.update_or_create(
+                alert_id=notification.alert_id,
+                recipient_role=recipient_role,
+                channel='dashboard',
+                defaults={
+                    'message_summary': summary,
+                    'delivery_status': 'sent',
+                    'sent_at': now,
+                    'created_at': now,
+                },
+            )
+
+        log_audit(
+            request.session.get('user_id'),
+            request.session.get('role', 'admin'),
+            'alert_approved_and_sent',
+            target_id=notification.alert_id,
+            request=request,
+        )
+
+    messages.success(
+        request,
+        f'Alert approved and sent to {notification.barangay_name}.',
+    )
+    return redirect('alerts_inbox')
 
 
 def get_dynamic_disease_choices():
@@ -284,7 +395,10 @@ def analytics_view(request):
     })
     
     barangay_filter = resolve_aptas_barangay_filter(role, user_id, ctx)
-    ctx.update(get_aptas_dashboard_context(barangay_name=barangay_filter))
+    ctx.update(get_aptas_dashboard_context(
+        barangay_name=barangay_filter,
+        viewer_role=role,
+    ))
     
     return render(request, 'dashboard/analytics.html', ctx)
 
@@ -304,7 +418,10 @@ def nurse_analytics_view(request):
     })
     
     barangay_filter = resolve_aptas_barangay_filter('catchment_nurse', user_id, ctx)
-    ctx.update(get_aptas_dashboard_context(barangay_name=barangay_filter))
+    ctx.update(get_aptas_dashboard_context(
+        barangay_name=barangay_filter,
+        viewer_role='catchment_nurse',
+    ))
     
     return render(request, 'dashboard/analytics.html', ctx)
 
@@ -351,7 +468,10 @@ def api_alerts_aptas(request):
     barangay_filter = resolve_aptas_barangay_filter(
         role, request.session.get('user_id'), {},
     )
-    ctx = get_aptas_dashboard_context(barangay_name=barangay_filter)
+    ctx = get_aptas_dashboard_context(
+        barangay_name=barangay_filter,
+        viewer_role=role,
+    )
     from reports.pidsr_schema import normalize_disease_label
     merged_map = {}
     
@@ -483,13 +603,20 @@ def api_notifications(request):
     user_id = request.session.get('user_id')
     user_type = request.session.get('user_type', role)
 
-    if is_city_wide_role(role):
-        base_qs = AppNotification.objects.all()
+    if role in ('admin', 'super_admin'):
+        base_qs = AppNotification.objects.filter(
+            review_status__in=('pending', 'approved'),
+        )
+    elif is_city_wide_role(role):
+        base_qs = AppNotification.objects.filter(review_status='approved')
     elif role in BARANGAY_SCOPED_ROLES:
         user = User.objects.filter(id=user_id).first()
         barangay = resolve_user_barangay(user)
         if barangay:
-            base_qs = AppNotification.objects.filter(barangay_name__iexact=barangay.barangay_name)
+            base_qs = AppNotification.objects.filter(
+                barangay_name__iexact=barangay.barangay_name,
+                review_status='approved',
+            )
         else:
             base_qs = AppNotification.objects.none()
     else:
@@ -508,6 +635,8 @@ def api_notifications(request):
     recommendation_matrix = approved_recommendation_matrix()
 
     def _notification_recommendations(notif, report=None):
+        if (notif.recommendation_text or '').strip():
+            return notif.recommendation_text.strip()
         from reports.recommendation_service import (
             resolve_case_recommendation,
             status_for_case,
@@ -615,6 +744,7 @@ def api_notifications(request):
             'anomaly_score': anomaly,
             'active_cases': notif.active_cases,
             'trigger_source': notif.trigger_source or '',
+            'review_status': notif.review_status,
             'score_shift': float(notif.score_shift) if notif.score_shift is not None else None,
             'last_evaluated_at': notif.last_evaluated_at.isoformat() if notif.last_evaluated_at else None,
             'case_status': case_status,
@@ -656,7 +786,20 @@ def api_notification_read(request, notif_id):
     user_type = request.session.get('user_type', request.session.get('role'))
     
     if request.method == 'POST':
-        notification = AppNotification.objects.filter(id=notif_id).first()
+        role = request.session.get('role')
+        qs = AppNotification.objects.all()
+        if role in ('admin', 'super_admin'):
+            qs = qs.filter(review_status__in=('pending', 'approved'))
+        elif role in BARANGAY_SCOPED_ROLES:
+            user = User.objects.filter(id=user_id).first()
+            barangay = resolve_user_barangay(user)
+            qs = qs.filter(
+                review_status='approved',
+                barangay_name__iexact=barangay.barangay_name if barangay else '',
+            )
+        else:
+            qs = qs.filter(review_status='approved')
+        notification = qs.filter(id=notif_id).first()
         if notification:
             AppNotificationRead.objects.get_or_create(
                 notification=notification,
@@ -725,7 +868,10 @@ def nurse_dashboard_view(request):
     barangay_filter = resolve_aptas_barangay_filter(
         'catchment_nurse', request.session.get('user_id'), ctx,
     )
-    ctx.update(get_aptas_dashboard_context(barangay_name=barangay_filter))
+    ctx.update(get_aptas_dashboard_context(
+        barangay_name=barangay_filter,
+        viewer_role='catchment_nurse',
+    ))
     if barangay_filter:
         ctx['aptas_barangay_scope'] = barangay_filter
     

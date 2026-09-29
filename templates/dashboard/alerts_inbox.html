@@ -12,6 +12,58 @@
     </div>
   </header>
 
+  {% if can_review_alerts %}
+  <section class="dash-section">
+    <h3 class="dash-section__title">Pending Admin Review</h3>
+    {% if pending_alert_reviews %}
+      <div class="dash-widget-grid">
+        {% for review in pending_alert_reviews %}
+        <article class="pulse-panel" style="padding:1.25rem;">
+          <div class="d-flex justify-between align-center gap-1" style="margin-bottom:.75rem;">
+            <div>
+              <span class="pill-badge badge-{{ review.severity_level|lower }}">{{ review.severity_level }}</span>
+              <strong style="display:block;margin-top:.45rem;">{{ review.disease }} — {{ review.barangay_name }}</strong>
+            </div>
+            <span class="pill-badge badge-warning">Pending</span>
+          </div>
+          <p class="text-muted" style="font-size:.82rem;margin-bottom:.75rem;">
+            Triggered by {{ review.trigger_source|default:"APTAS Risk Signal" }}
+            {% if review.purok %} • {{ review.purok }}{% endif %}
+            {% if review.active_cases %} • {{ review.active_cases }} active case{{ review.active_cases|pluralize }}{% endif %}
+          </p>
+          <form method="POST" action="{% url 'review_alert_notification' review.id %}">
+            {% csrf_token %}
+            <div class="form-group">
+              <label for="recommendation-{{ review.id }}">Recommendation sent to {{ review.barangay_name }}</label>
+              <textarea id="recommendation-{{ review.id }}" name="recommendation_text"
+                        class="input-soft" rows="4" required>{{ review.recommendation_text }}</textarea>
+            </div>
+            <div class="d-flex gap-1" style="justify-content:flex-end;flex-wrap:wrap;">
+              <button type="submit" name="action" value="reject"
+                      class="nc-btn nc-btn--outline nc-btn--sm"
+                      formnovalidate
+                      onclick="return confirm('Reject this alert without sending it?');">
+                Reject
+              </button>
+              <button type="submit" name="action" value="approve"
+                      class="nc-btn nc-btn--primary nc-btn--sm"
+                      onclick="return confirm('Approve and send this alert to the assigned barangay?');">
+                Approve &amp; Send
+              </button>
+            </div>
+          </form>
+        </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="pulse-panel pulse-empty">
+        <i data-lucide="badge-check" class="lucide-icon"></i>
+        <p>No alerts are waiting for admin review.</p>
+      </div>
+    {% endif %}
+  </section>
+  {% endif %}
+
   {% include "dashboard/partials/aptas_alerts_panel.html" %}
 
   <section class="dash-section">
@@ -326,7 +378,7 @@
     var subtitleParts = [escHtml(d.barangay)];
     if (d.purok) subtitleParts[0] += ' — ' + escHtml(d.purok);
     subtitleParts.push((d.activeCases || '0') + ' Active Case' + (d.activeCases === '1' ? '' : 's'));
-    subtitleParts.push('Triggered by ' + escHtml(d.triggerSource || 'Spatial Cluster Spike'));
+    subtitleParts.push('Triggered by ' + escHtml(d.triggerSource || 'APTAS Risk Signal'));
     var subtitleHtml = '<p style="margin:0 0 6px;">' + subtitleParts.join(' • ') + '</p>';
     if (d.officerName) {
       subtitleHtml += '<p style="margin:0;">Catchment Nurse: ' + escHtml(d.officerName);
@@ -363,7 +415,7 @@
       ['Risk Level', d.riskLevel],
       ['Active Cases', d.activeCases || '0'],
       ['Purok / Address', d.purok || '—'],
-      ['Trigger', d.triggerSource || 'Spatial Cluster Spike'],
+      ['Trigger', d.triggerSource || 'APTAS Risk Signal'],
       ['Catchment Nurse', d.officerName || '—'],
       ['Contact', d.officerContact || '—'],
     ];

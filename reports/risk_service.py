@@ -11,10 +11,9 @@ from django.db.models import Q
 from django.utils import timezone
 
 from myapp.models import (
-    Barangay, SurveillanceReport, RiskAssessment, Alert, NotificationLog,
+    Barangay, SurveillanceReport, RiskAssessment, Alert,
     MlAiPrediction, RiskAnalysis,
 )
-from myapp.barangay_scope import CITY_WIDE_ROLES, BARANGAY_SCOPED_ROLES
 from reports.aptas_service import compute_and_log_barangay_risk, raw_anomaly_for_report
 from reports.ml_display import (
     is_alertable_disease_label,
@@ -23,6 +22,38 @@ from reports.ml_display import (
 )
 
 logger = logging.getLogger(__name__)
+
+ALERT_TRIGGER_LABELS = {
+    'aptas_anomaly': 'High Anomaly Score',
+    'spatial_cluster': 'Spatial Cluster Spike',
+    'pidsr_threshold': 'PIDSR Threshold Breach',
+    'new_confirmed_case': 'New Confirmed Case',
+}
+
+
+def alert_trigger_label(code):
+    return ALERT_TRIGGER_LABELS.get(code, 'APTAS Risk Signal')
+
+
+def _default_alert_recommendation(report):
+    from reports.recommendation_repository import approved_recommendation_matrix
+    from reports.recommendation_service import resolve_case_recommendation, status_for_case
+
+    bundle = resolve_case_recommendation(
+        official_disease_label(report),
+        status_for_case(report),
+        matrix=approved_recommendation_matrix(),
+    )
+    actions = (bundle or {}).get('actions') or []
+    recommendation = ' '.join(
+        (action.get('text_en') or '').strip()
+        for action in actions
+        if (action.get('text_en') or '').strip()
+    )
+    return recommendation or _recommended_action(
+        'high',
+        official_disease_label(report),
+    )
 
 
 def _raw_anomaly_for_report(report, *, is_anomaly=False) -> float | None:
@@ -176,7 +207,7 @@ def _get_purok_for_report(report):
     return ""
 
 def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level=None):
-    """Create a legacy-format alert row (pulse_db.alerts), or update if exists today."""
+    """Create or refresh an alert pending administrator review."""
     if not report_has_alertable_disease(report):
         logger.info(
             'Skipped APTAS alert for report %s — inconclusive until clinically validated.',
@@ -188,12 +219,13 @@ def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level
 
     disease = official_disease_label(report)
     purok = _get_purok_for_report(report)
-
-    summary = (
-        f'APTAS RISK: {disease} at {alert_level.title()} level in {barangay.barangay_name}'
-        if alert_level in ('high', 'critical') else
-        f'{disease} alert in {barangay.barangay_name}'
+    trigger_code = (
+        'aptas_anomaly'
+        if float(assessment.anomaly_score or 0) >= 0.50 or is_anomaly
+        else 'spatial_cluster'
     )
+    trigger_source = alert_trigger_label(trigger_code)
+    recommendation_text = _default_alert_recommendation(report)
 
     from dashboard.models import AppNotification
     from django.utils import timezone
@@ -216,23 +248,37 @@ def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level
     ).order_by('-created_at').first()
     
     if existing_notif and existing_notif.alert_id:
-        alert = Alert.objects.filter(id=existing_notif.alert_id, status='active').first()
+        alert = Alert.objects.filter(id=existing_notif.alert_id).exclude(
+            status__in=('resolved', 'rejected'),
+        ).first()
         if alert:
             if alert_level == 'critical' and alert.alert_level != 'critical':
                 alert.alert_level = 'critical'
-                alert.save(update_fields=['alert_level'])
                 existing_notif.severity_level = 'Critical'
+            alert.status = 'pending_review'
+            alert.save(update_fields=['alert_level', 'status'])
             
             score_shift = float(assessment.risk_score) - float(existing_notif.final_risk_score or 0)
             existing_notif.score_shift = score_shift
             existing_notif.final_risk_score = assessment.risk_score
             existing_notif.anomaly_score = assessment.anomaly_score
             existing_notif.active_cases = active_cases
-            existing_notif.trigger_source = 'New Confirmed Case' if is_anomaly else 'Spatial Cluster Spike'
+            existing_notif.source_report_id = report.id
+            existing_notif.trigger_code = trigger_code
+            existing_notif.trigger_source = trigger_source
+            existing_notif.review_status = 'pending'
+            existing_notif.recommendation_text = recommendation_text
+            existing_notif.reviewed_by_id = None
+            existing_notif.reviewed_by_role = ''
+            existing_notif.reviewed_at = None
+            existing_notif.sent_at = None
             existing_notif.last_evaluated_at = timezone.now()
             existing_notif.save(update_fields=[
                 'final_risk_score', 'anomaly_score', 'severity_level', 
-                'score_shift', 'active_cases', 'trigger_source', 'last_evaluated_at'
+                'score_shift', 'active_cases', 'source_report_id',
+                'trigger_code', 'trigger_source', 'review_status',
+                'recommendation_text', 'reviewed_by_id', 'reviewed_by_role',
+                'reviewed_at', 'sent_at', 'last_evaluated_at',
             ])
             return alert
 
@@ -247,24 +293,14 @@ def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level
     alert = Alert.objects.create(
         alert_level=alert_level,
         alert_date=timezone.now(),
-        status='active',
+        status='pending_review',
         alert_type=disease,
         analysis_id=analysis.id,
     )
 
-    for role in (CITY_WIDE_ROLES | BARANGAY_SCOPED_ROLES):
-        NotificationLog.objects.create(
-            alert_id=alert.id,
-            recipient_role=role,
-            channel='dashboard',
-            message_summary=summary,
-            delivery_status='sent',
-            sent_at=timezone.now(),
-            created_at=timezone.now(),
-        )
-
     AppNotification.objects.create(
         alert_id=alert.id,
+        source_report_id=report.id,
         disease=disease,
         barangay_name=barangay.barangay_name,
         purok=purok,
@@ -272,7 +308,10 @@ def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level
         final_risk_score=assessment.risk_score,
         anomaly_score=assessment.anomaly_score,
         active_cases=active_cases,
-        trigger_source='New Confirmed Case' if is_anomaly else 'Spatial Cluster Spike',
+        trigger_code=trigger_code,
+        trigger_source=trigger_source,
+        review_status='pending',
+        recommendation_text=recommendation_text,
         last_evaluated_at=timezone.now(),
         spatial_metric=f"Spatial Risk: {assessment.risk_score} — Elevated risk in {barangay.barangay_name}",
         temporal_metric=f"Temporal Surge: {assessment.anomaly_score} — Recent anomaly detected",
@@ -340,13 +379,6 @@ def trigger_threshold_outbreak_alert(*, report_id, threshold_result):
         created_at=timezone.now(),
     )
 
-    summary = (
-        f'THRESHOLD {status}: {threshold_result.get("disease_label")} in '
-        f'{threshold_result.get("barangay_name")} '
-        f'({threshold_result.get("confirmed_count")} confirmed / '
-        f'{threshold_result.get("time_window_days")}d)'
-    )
-
     purok = _get_purok_for_report(report)
     from django.utils import timezone
     today = timezone.now().date()
@@ -366,24 +398,39 @@ def trigger_threshold_outbreak_alert(*, report_id, threshold_result):
         created_at__date=today
     ).order_by('-created_at').first()
     
+    recommendation_text = _default_alert_recommendation(report)
     if existing_notif and existing_notif.alert_id:
-        alert = Alert.objects.filter(id=existing_notif.alert_id, status='active').first()
+        alert = Alert.objects.filter(id=existing_notif.alert_id).exclude(
+            status__in=('resolved', 'rejected'),
+        ).first()
         if alert:
             if alert_level == 'critical' and alert.alert_level != 'critical':
                 alert.alert_level = 'critical'
-                alert.save(update_fields=['alert_level'])
                 existing_notif.severity_level = 'Critical'
+            alert.status = 'pending_review'
+            alert.save(update_fields=['alert_level', 'status'])
             
             score_shift = float(risk_score) - float(existing_notif.final_risk_score or 0)
             existing_notif.score_shift = score_shift
             existing_notif.final_risk_score = risk_score
             existing_notif.anomaly_score = anomaly_score
             existing_notif.active_cases = active_cases
-            existing_notif.trigger_source = 'PIDSR Threshold Breach'
+            existing_notif.source_report_id = report.id
+            existing_notif.trigger_code = 'pidsr_threshold'
+            existing_notif.trigger_source = alert_trigger_label('pidsr_threshold')
+            existing_notif.review_status = 'pending'
+            existing_notif.recommendation_text = recommendation_text
+            existing_notif.reviewed_by_id = None
+            existing_notif.reviewed_by_role = ''
+            existing_notif.reviewed_at = None
+            existing_notif.sent_at = None
             existing_notif.last_evaluated_at = timezone.now()
             existing_notif.save(update_fields=[
                 'final_risk_score', 'anomaly_score', 'severity_level', 
-                'score_shift', 'active_cases', 'trigger_source', 'last_evaluated_at'
+                'score_shift', 'active_cases', 'source_report_id',
+                'trigger_code', 'trigger_source', 'review_status',
+                'recommendation_text', 'reviewed_by_id', 'reviewed_by_role',
+                'reviewed_at', 'sent_at', 'last_evaluated_at',
             ])
             return alert
     
@@ -400,24 +447,14 @@ def trigger_threshold_outbreak_alert(*, report_id, threshold_result):
     alert = Alert.objects.create(
         alert_level=alert_level,
         alert_date=now_ts,
-        status='active',
+        status='pending_review',
         alert_type=threshold_result.get('disease_label') or report.syndrome_type,
         analysis_id=analysis.id,
     )
 
-    for role in (CITY_WIDE_ROLES | BARANGAY_SCOPED_ROLES):
-        NotificationLog.objects.create(
-            alert_id=alert.id,
-            recipient_role=role,
-            channel='dashboard',
-            message_summary=summary,
-            delivery_status='sent',
-            sent_at=timezone.now(),
-            created_at=timezone.now(),
-        )
-
     AppNotification.objects.create(
         alert_id=alert.id,
+        source_report_id=report.id,
         disease=threshold_result.get('disease_label') or report.syndrome_type,
         barangay_name=threshold_result.get("barangay_name") or report.barangay.barangay_name,
         purok=purok,
@@ -425,7 +462,10 @@ def trigger_threshold_outbreak_alert(*, report_id, threshold_result):
         final_risk_score=risk_score,
         anomaly_score=anomaly_score,
         active_cases=active_cases,
-        trigger_source='PIDSR Threshold Breach',
+        trigger_code='pidsr_threshold',
+        trigger_source=alert_trigger_label('pidsr_threshold'),
+        review_status='pending',
+        recommendation_text=recommendation_text,
         last_evaluated_at=timezone.now(),
         spatial_metric=f"Spatial Cluster Score: {risk_score} — High density in {threshold_result.get('barangay_name')}",
         temporal_metric=f"Temporal Surge Score: {anomaly_score} — {threshold_result.get('confirmed_count')} cases within {threshold_result.get('time_window_days')} days",

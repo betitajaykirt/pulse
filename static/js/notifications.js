@@ -98,6 +98,7 @@
         // For task notifications, if no contact number, fallback to 'Contact Officer via System' link
         const contactHref = contactTel ? `tel:${contactTel}` : (notif.officer_email ? `mailto:${notif.officer_email}` : '#');
         const mapUrl = notif.map_url || `/map/?barangay=${encodeURIComponent(notif.barangay_name || '')}`;
+        const pendingReview = notif.review_status === 'pending';
         const queuedNote = modalQueue.length > 0
             ? `<p class="pulse-alert-card__queue">+ ${modalQueue.length} more unread alert(s) queued</p>`
             : '';
@@ -141,14 +142,16 @@
                         <div><dt>Contact</dt><dd>${escapeHtml(formatContact(notif))}</dd></div>
                     </dl>
                     <div class="pulse-alert-card__recommendations">
-                        <strong>Recommended actions</strong>
+                        <strong>${pendingReview ? 'Draft recommendations — admin review required' : 'Recommended actions'}</strong>
                         <p>${escapeHtml(notif.recommendations || 'Review case details and coordinate barangay response.')}</p>
                     </div>
                     ${queuedNote}
                     <div class="toast-actions pulse-alert-card__actions">
                         <button type="button" class="btn btn-secondary toast-dismiss-btn">Acknowledge</button>
-                        ${contactTel || notif.officer_email ? `<a href="${escapeHtml(contactHref)}" class="btn btn-outline pulse-alert-card__contact-btn">Contact Nurse</a>` : ''}
-                        <a href="${escapeHtml(mapUrl)}" class="btn btn-primary pulse-alert-card__map-btn">View on Map</a>
+                        ${pendingReview
+                            ? '<a href="/dashboard/alerts/" class="btn btn-primary pulse-alert-card__review-btn">Review Alert</a>'
+                            : `${contactTel || notif.officer_email ? `<a href="${escapeHtml(contactHref)}" class="btn btn-outline pulse-alert-card__contact-btn">Contact Nurse</a>` : ''}
+                               <a href="${escapeHtml(mapUrl)}" class="btn btn-primary pulse-alert-card__map-btn">View on Map</a>`}
                     </div>
                 </div>
             `;
@@ -157,9 +160,14 @@
 
         toast.querySelector('.toast-close').addEventListener('click', acknowledge);
         toast.querySelector('.toast-dismiss-btn').addEventListener('click', acknowledge);
-        toast.querySelector('.pulse-alert-card__map-btn').addEventListener('click', () => {
-            markAsRead(notif.id);
-        });
+        const destinationButton = toast.querySelector(
+            pendingReview ? '.pulse-alert-card__review-btn' : '.pulse-alert-card__map-btn'
+        );
+        if (destinationButton) {
+            destinationButton.addEventListener('click', () => {
+                markAsRead(notif.id);
+            });
+        }
     }
 
     function queueToast(notif) {

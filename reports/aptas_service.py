@@ -88,7 +88,7 @@ def _enrich_card_context(
 ) -> Dict[str, Any]:
     """Attach report-level context (officer, purok, coordinates, active cases) to a card."""
     from myapp.barangay_scope import catchment_nurse_officer_fields
-    from myapp.models import Alert
+    from dashboard.models import AppNotification
 
     barangay_name = card.get('barangay', '')
     syndrome_name = card.get('syndrome', '')
@@ -123,9 +123,21 @@ def _enrich_card_context(
         card['latitude'] = None
         card['longitude'] = None
 
-    # Trigger source
-    if not card.get('trigger_source'):
-        card['trigger_source'] = 'Spatial Cluster Spike'
+    dispatch = (
+        AppNotification.objects.filter(
+            barangay_name__iexact=barangay_name,
+            disease__iexact=syndrome_name,
+        )
+        .order_by('-created_at')
+        .first()
+    )
+    card['dispatch_id'] = dispatch.id if dispatch else None
+    card['review_status'] = dispatch.review_status if dispatch else 'unreviewed'
+    card['trigger_source'] = (
+        dispatch.trigger_source
+        if dispatch and dispatch.trigger_source
+        else 'High Anomaly Score'
+    )
 
     # Build map URL with lat/lng for direct pan
     map_params = {'barangay': barangay_name}
@@ -134,17 +146,7 @@ def _enrich_card_context(
         map_params['lng'] = card['longitude']
     card['map_url'] = f'/map/?{urlencode(map_params)}' if barangay_name else '/map/'
 
-    # Find associated Alert ID (most recent active alert for this syndrome in this barangay)
-    if not card.get('alert_id'):
-        alert = (
-            Alert.objects.filter(
-                alert_type__iexact=syndrome_name,
-                status='active',
-            )
-            .order_by('-alert_date')
-            .first()
-        )
-        card['alert_id'] = alert.id if alert else None
+    card['alert_id'] = dispatch.alert_id if dispatch else None
 
     # The same structured bilingual bundle drives dashboard and map actions.
     from reports.recommendation_service import (
@@ -175,6 +177,25 @@ def _enrich_card_context(
             'confirmed' if card.get('is_pidsr_threshold') else 'probable',
             matrix=recommendation_matrix,
         )
+    edited_recommendation = (
+        (dispatch.recommendation_text or '').strip()
+        if dispatch and dispatch.review_status == 'approved'
+        else ''
+    )
+    if edited_recommendation and recommendation_bundle:
+        custom_action = {
+            'code': 'admin_approved_alert_recommendation',
+            'text_en': edited_recommendation,
+            'text_local': '',
+            'target_units': ['Assigned Barangay Response Team'],
+        }
+        if recommendation_bundle.get('disease'):
+            recommendation_bundle['actions'] = [custom_action]
+        elif recommendation_bundle.get('disease_cards'):
+            first_card = recommendation_bundle['disease_cards'][0]
+            first_card['actions'] = [custom_action]
+            recommendation_bundle['disease_cards'] = [first_card]
+        recommendation_bundle['field_action_summary'] = [custom_action]
     card['recommendation_bundle'] = recommendation_bundle or {}
     card['recommendation_bundle_json'] = json.dumps(
         card['recommendation_bundle'],
@@ -303,7 +324,7 @@ def deactivate_inconclusive_alerts() -> None:
         logger.debug('Inconclusive AppNotification cleanup skipped', exc_info=True)
 
 
-def get_aptas_dashboard_context(*, barangay_name=None, limit=12):
+def get_aptas_dashboard_context(*, barangay_name=None, limit=12, viewer_role=None):
     """Build template context for APTAS alert cards (ML signals + PIDSR thresholds)."""
     deactivate_inconclusive_alerts()
     base_qs = BarangayRiskLog.objects.all()
@@ -332,31 +353,49 @@ def get_aptas_dashboard_context(*, barangay_name=None, limit=12):
         pidsr_rank = 0 if card.get('is_pidsr_threshold') else 1
         return (pidsr_rank, level_rank, -float(card.get('final_risk_score') or 0))
 
-    merged_alerts = sorted(pidsr_cards + ml_cards, key=_sort_key)[:limit]
+    candidate_alerts = sorted(pidsr_cards + ml_cards, key=_sort_key)
     from myapp.barangay_scope import catchment_nurses_by_barangay
     nurses_by_barangay = catchment_nurses_by_barangay(
-        [card.get('barangay') for card in merged_alerts]
+        [card.get('barangay') for card in candidate_alerts]
     )
     from reports.recommendation_repository import approved_recommendation_matrix
     recommendation_matrix = approved_recommendation_matrix()
-    merged_alerts = [
+    candidate_alerts = [
         _enrich_card_context(
             card,
             nurses_by_barangay=nurses_by_barangay,
             recommendation_matrix=recommendation_matrix,
         )
-        for card in merged_alerts
+        for card in candidate_alerts
+    ]
+    admin_review_roles = {'admin', 'super_admin'}
+    if viewer_role in admin_review_roles:
+        visible_alerts = [
+            card for card in candidate_alerts
+            if card.get('review_status') in ('pending', 'approved')
+        ]
+    else:
+        visible_alerts = [
+            card for card in candidate_alerts
+            if card.get('review_status') == 'approved'
+        ]
+    merged_alerts = visible_alerts[:limit]
+    visible_pidsr_cards = [
+        card for card in visible_alerts if card.get('is_pidsr_threshold')
+    ]
+    visible_ml_cards = [
+        card for card in visible_alerts if not card.get('is_pidsr_threshold')
     ]
 
-    critical_count = sum(1 for c in pidsr_cards + ml_cards if c['risk_level'] == 'Critical')
-    high_count = sum(1 for c in pidsr_cards + ml_cards if c['risk_level'] == 'High')
-    moderate_count = sum(1 for c in ml_cards if c['risk_level'] == 'Moderate')
-    low_count = sum(1 for c in ml_cards if c['risk_level'] == 'Low')
-    active_count = len(pidsr_cards) + active_qs.count()
+    critical_count = sum(1 for c in visible_alerts if c['risk_level'] == 'Critical')
+    high_count = sum(1 for c in visible_alerts if c['risk_level'] == 'High')
+    moderate_count = sum(1 for c in visible_ml_cards if c['risk_level'] == 'Moderate')
+    low_count = sum(1 for c in visible_ml_cards if c['risk_level'] == 'Low')
+    active_count = len(visible_alerts)
 
     return {
         'aptas_alerts': merged_alerts,
-        'aptas_pidsr_alerts': pidsr_cards,
+        'aptas_pidsr_alerts': visible_pidsr_cards,
         'aptas_alert_count': active_count,
         'aptas_risk_counts': {
             'critical': critical_count,

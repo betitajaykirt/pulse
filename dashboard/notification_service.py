@@ -9,7 +9,9 @@ from reports.aptas_service import ACTIVE_SURVEILLANCE_STATUSES, _syndrome_match_
 
 
 def _active_alert_ids() -> set[int]:
-    return set(Alert.objects.filter(status='active').values_list('id', flat=True))
+    return set(Alert.objects.filter(
+        status__in=('pending_review', 'active'),
+    ).values_list('id', flat=True))
 
 
 def notification_is_still_relevant(notif, active_alert_ids: set[int] | None = None) -> bool:
