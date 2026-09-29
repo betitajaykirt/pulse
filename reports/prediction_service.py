@@ -4,6 +4,7 @@ Django prediction service — bridges batch intake to ``ml_engine.py``.
 from __future__ import annotations
 
 import logging
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
@@ -40,6 +41,12 @@ def _load_training_frame() -> pd.DataFrame:
     logger.warning('historical_training_data.csv not found — using minimal fallback training set.')
     from ml_pipeline import _build_mock_training_set  # noqa: SLF001
     return _build_mock_training_set()
+
+
+@lru_cache(maxsize=1)
+def _get_fitted_classifier():
+    """Fit once per web worker instead of rebuilding the forest per request."""
+    return fit_random_forest_classifier(_load_training_frame())
 
 
 def _get_outbreak_training_data() -> pd.DataFrame:
@@ -166,34 +173,46 @@ def analyze_patient_case(
     feature_row['submission_date'] = now.date().isoformat()
     incoming = ensure_climate_columns(pd.DataFrame([feature_row]))
 
-    from myapp.models import SurveillanceReport
-    from datetime import datetime, time, timedelta
-    
-    # Safe date filtering for SQLite
-    if timezone.is_naive(now):
-        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    else:
-        start_of_day = timezone.localtime(now).replace(hour=0, minute=0, second=0, microsecond=0)
-        
-    end_of_day = start_of_day + timedelta(days=1)
-    
-    db_today_cases = SurveillanceReport.objects.filter(
-        barangay__barangay_name=barangay_name, 
-        report_date__gte=start_of_day,
-        report_date__lt=end_of_day
-    ).exclude(status__in=['Discarded', 'Closed']).count()
+    # Outbreak screening and disease classification are independent. A
+    # transient database/Isolation Forest failure must not discard a valid
+    # Random Forest disease prediction.
+    is_anomaly = False
+    anomaly_score = 0.0
+    try:
+        from datetime import timedelta
+        from myapp.models import SurveillanceReport
 
-    incoming_outbreak_row = pd.DataFrame([{
-        'active_cases': db_today_cases + max(int(same_day_prior_cases), 0) + 1,
-        'rainfall_mm': climate.get('rainfall', CLIMATE_DEFAULTS['rainfall']),
-        'temperature_c': climate.get('temperature', CLIMATE_DEFAULTS['temperature']),
-        'humidity_pct': climate.get('humidity', CLIMATE_DEFAULTS['humidity']),
-    }])
+        if timezone.is_naive(now):
+            start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        else:
+            start_of_day = timezone.localtime(now).replace(
+                hour=0, minute=0, second=0, microsecond=0,
+            )
+        end_of_day = start_of_day + timedelta(days=1)
 
-    screened = detect_anomalies(pd.concat([outbreak_train_df, incoming_outbreak_row], ignore_index=True))
-    result_row = screened.iloc[-1]
-    is_anomaly = int(result_row['is_anomaly']) == -1
-    anomaly_score = float(result_row['anomaly_score'])
+        db_today_cases = SurveillanceReport.objects.filter(
+            barangay__barangay_name=barangay_name,
+            report_date__gte=start_of_day,
+            report_date__lt=end_of_day,
+        ).exclude(status__in=['Discarded', 'Closed']).count()
+
+        incoming_outbreak_row = pd.DataFrame([{
+            'active_cases': db_today_cases + max(int(same_day_prior_cases), 0) + 1,
+            'rainfall_mm': climate.get('rainfall', CLIMATE_DEFAULTS['rainfall']),
+            'temperature_c': climate.get('temperature', CLIMATE_DEFAULTS['temperature']),
+            'humidity_pct': climate.get('humidity', CLIMATE_DEFAULTS['humidity']),
+        }])
+        screened = detect_anomalies(
+            pd.concat([outbreak_train_df, incoming_outbreak_row], ignore_index=True),
+        )
+        result_row = screened.iloc[-1]
+        is_anomaly = int(result_row['is_anomaly']) == -1
+        anomaly_score = float(result_row['anomaly_score'])
+    except Exception as exc:
+        logger.exception(
+            'Outbreak anomaly screening failed; continuing disease classification: %s',
+            exc,
+        )
 
     if symptom_count < MIN_SYMPTOMS_FOR_CLASSIFICATION:
         disease_label = INSUFFICIENT_DATA_LABEL
@@ -256,7 +275,7 @@ def analyze_batch_cases(
     climate = get_climate_features_for_timestamp()
     fitted_classifier = None
     try:
-        fitted_classifier = fit_random_forest_classifier(train_df)
+        fitted_classifier = _get_fitted_classifier()
     except Exception:
         logger.exception('Shared Random Forest fit failed; falling back to per-case training.')
     results = []
