@@ -504,15 +504,24 @@ def save_batch_submission(*, payload, submitted_by_id, locked_barangay=None):
 
 
 
-        trigger_aptas_for_report(report.id, is_anomaly=ml['is_anomaly'])
+        transaction.on_commit(
+            lambda report_id=report.id, anomaly=ml['is_anomaly']: (
+                trigger_aptas_for_report(report_id, is_anomaly=anomaly)
+            ),
+            robust=True,
+        )
 
 
 
     if created_reports:
         from reports.aptas_service import recalculate_aptas_for_barangay
-        recalculate_aptas_for_barangay(
-            created_reports[0].barangay_id,
-            trigger_report_id=created_reports[-1].id,
+        transaction.on_commit(
+            lambda barangay_id=created_reports[0].barangay_id,
+            report_id=created_reports[-1].id: recalculate_aptas_for_barangay(
+                barangay_id,
+                trigger_report_id=report_id,
+            ),
+            robust=True,
         )
 
 

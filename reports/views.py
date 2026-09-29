@@ -7,6 +7,7 @@ Covers:
 """
 import json
 import csv
+import logging
 from django.shortcuts import render, redirect
 from django.http import JsonResponse, HttpResponse
 from django.urls import reverse
@@ -37,6 +38,8 @@ from .batch_service import save_batch_submission
 from .patient_registry import DuplicatePatientCaseError, link_or_create_patient
 from .threshold_service import process_confirmation_threshold_check
 from myapp.symptom_utils import build_symptom_groups_for_ui
+
+logger = logging.getLogger(__name__)
 
 
 # ── Syndrome / disease reference data ────────────────────────────
@@ -144,7 +147,14 @@ def _process_batch_submission(request, locked_barangay=None):
     except ValueError as exc:
         return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
     except Exception as exc:
-        return JsonResponse({'ok': False, 'error': f'Server error while saving: {exc}'}, status=500)
+        logger.exception('Batch report submission failed for user %s', uid)
+        return JsonResponse({
+            'ok': False,
+            'error': (
+                'The report could not be saved because of a temporary server or '
+                'database error. Please try again.'
+            ),
+        }, status=500)
 
     barangay_label = ''
     if locked_barangay:
