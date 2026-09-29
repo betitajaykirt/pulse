@@ -193,6 +193,70 @@ def _calibrate_anomaly_score(raw_score: float, active_cases: int) -> float:
         return max(0.85, min(blended, 0.99))   # 4+ cases: 0.85–0.99
 
 
+def anomaly_score_for_case_count(active_cases: int) -> float:
+    """Case-density score used when Isolation Forest cannot be fit."""
+    return float(_calibrate_anomaly_score(-0.55, max(int(active_cases or 0), 0)))
+
+
+_OUTBREAK_FEATURE_COLUMNS = ('active_cases', 'rainfall_mm', 'temperature_c', 'humidity_pct')
+
+
+def outbreak_feature_frame(data: pd.DataFrame) -> pd.DataFrame:
+    """Numeric outbreak matrix. Every supplied historical row is retained."""
+    working = data.copy()
+    if 'active_cases' not in working.columns:
+        working['active_cases'] = 0
+    working['active_cases'] = pd.to_numeric(working['active_cases'], errors='coerce').fillna(0)
+
+    if 'rainfall_mm' not in working.columns:
+        working['rainfall_mm'] = working.get('rainfall', CLIMATE_DEFAULTS['rainfall'])
+    if 'temperature_c' not in working.columns:
+        working['temperature_c'] = working.get('temperature', CLIMATE_DEFAULTS['temperature'])
+    if 'humidity_pct' not in working.columns:
+        working['humidity_pct'] = working.get('humidity', CLIMATE_DEFAULTS['humidity'])
+
+    for col, default_key in (
+        ('rainfall_mm', 'rainfall'),
+        ('temperature_c', 'temperature'),
+        ('humidity_pct', 'humidity'),
+    ):
+        working[col] = pd.to_numeric(working[col], errors='coerce').fillna(CLIMATE_DEFAULTS[default_key])
+
+    return working[list(_OUTBREAK_FEATURE_COLUMNS)].astype(float)
+
+
+def fit_isolation_forest(
+    data: pd.DataFrame,
+    *,
+    contamination: float = 0.08,
+    random_state: int = 42,
+) -> IsolationForest:
+    """Fit one Isolation Forest on the complete outbreak history."""
+    if data is None or data.empty:
+        raise ValueError('Outbreak training data must contain historical rows.')
+    model = IsolationForest(
+        n_estimators=200,
+        contamination=contamination,
+        random_state=random_state,
+        # Render instances can reject joblib's attempt to spawn all available
+        # workers, which previously forced the entire case into ML fallback.
+        n_jobs=1,
+    )
+    model.fit(outbreak_feature_frame(data))
+    return model
+
+
+def score_outbreak_case(model: IsolationForest, incoming_case: pd.DataFrame) -> dict:
+    """Score one new case against an already fitted full-history model."""
+    features = outbreak_feature_frame(incoming_case)
+    raw_score = float(model.score_samples(features)[0])
+    active_cases = int(features['active_cases'].iloc[0])
+    return {
+        'is_anomaly': int(model.predict(features)[0]) == -1,
+        'anomaly_score': float(_calibrate_anomaly_score(raw_score, active_cases)),
+    }
+
+
 def detect_anomalies(
     data: pd.DataFrame,
     *,
@@ -205,41 +269,18 @@ def detect_anomalies(
         result['anomaly_score'] = pd.Series(dtype=float)
         return result
 
-    feature_cols = ['active_cases', 'rainfall_mm', 'temperature_c', 'humidity_pct']
-    working = data.copy()
-    
-    if 'active_cases' not in working.columns:
-        working['active_cases'] = 0
-    working['active_cases'] = pd.to_numeric(working['active_cases'], errors='coerce').fillna(0)
-    
-    if 'rainfall_mm' not in working.columns:
-        working['rainfall_mm'] = working.get('rainfall', CLIMATE_DEFAULTS['rainfall'])
-    if 'temperature_c' not in working.columns:
-        working['temperature_c'] = working.get('temperature', CLIMATE_DEFAULTS['temperature'])
-    if 'humidity_pct' not in working.columns:
-        working['humidity_pct'] = working.get('humidity', CLIMATE_DEFAULTS['humidity'])
-        
-    for col, default_key in [('rainfall_mm', 'rainfall'), ('temperature_c', 'temperature'), ('humidity_pct', 'humidity')]:
-        working[col] = pd.to_numeric(working[col], errors='coerce').fillna(CLIMATE_DEFAULTS[default_key])
-
-    features = working[feature_cols].astype(float)
-    
-    model = IsolationForest(
-        n_estimators=200,
+    model = fit_isolation_forest(
+        data,
         contamination=contamination,
         random_state=random_state,
-        # Render instances can reject joblib's attempt to spawn all available
-        # workers, which previously forced the entire case into ML fallback.
-        n_jobs=1,
     )
-    model.fit(features)
-    
+    features = outbreak_feature_frame(data)
     result = data.copy()
     raw_scores = model.score_samples(features)
     result['is_anomaly'] = model.predict(features).astype(int)
     result['anomaly_score'] = [
-        float(_calibrate_anomaly_score(s, c)) 
-        for s, c in zip(raw_scores, working['active_cases'])
+        float(_calibrate_anomaly_score(s, c))
+        for s, c in zip(raw_scores, features['active_cases'])
     ]
 
     # --- Cluster equalization: all records in the same barangay cluster

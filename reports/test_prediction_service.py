@@ -8,16 +8,16 @@ from reports.prediction_service import analyze_patient_case
 
 class PredictionResilienceTests(SimpleTestCase):
     @patch('reports.prediction_service.train_and_classify_result')
-    @patch('reports.prediction_service.detect_anomalies')
+    @patch('reports.prediction_service._get_outbreak_model')
     @patch('myapp.models.SurveillanceReport.objects')
     def test_anomaly_failure_does_not_discard_disease_prediction(
         self,
         report_objects,
-        detect_anomalies,
+        outbreak_model,
         classify,
     ):
         report_objects.filter.return_value.exclude.return_value.count.return_value = 0
-        detect_anomalies.side_effect = RuntimeError('temporary screening failure')
+        outbreak_model.side_effect = RuntimeError('temporary screening failure')
         classify.return_value = {
             'disease_label': 'Dengue Fever',
             'top_predicted_disease': 'Dengue Fever',
@@ -47,4 +47,5 @@ class PredictionResilienceTests(SimpleTestCase):
         self.assertEqual(result['disease_label'], 'Dengue Fever')
         self.assertEqual(result['classification_confidence'], 0.829)
         self.assertFalse(result['is_anomaly'])
-        self.assertEqual(result['anomaly_score'], 0.0)
+        self.assertGreaterEqual(result['anomaly_score'], 0.10)
+        self.assertLessEqual(result['anomaly_score'], 0.22)

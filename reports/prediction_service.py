@@ -4,6 +4,7 @@ Django prediction service — bridges batch intake to ``ml_engine.py``.
 from __future__ import annotations
 
 import logging
+import threading
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
@@ -17,8 +18,10 @@ from ml_engine import (
     DEFAULT_CLASSIFICATION_CONFIDENCE,
     INCONCLUSIVE_SYNDROMIC_LABEL,
     TARGET_COLUMN,
-    detect_anomalies,
+    anomaly_score_for_case_count,
     ensure_climate_columns,
+    fit_isolation_forest,
+    score_outbreak_case,
     fit_random_forest_classifier,
     patient_case_to_feature_row,
     train_and_classify_result,
@@ -33,6 +36,8 @@ HISTORICAL_CSV = Path(settings.BASE_DIR) / 'historical_training_data.csv'
 INSUFFICIENT_DATA_LABEL = 'Insufficient Data for Prediction'
 MIN_SYMPTOMS_FOR_CLASSIFICATION = 2
 CLASSIFICATION_CONFIDENCE_THRESHOLD = DEFAULT_CLASSIFICATION_CONFIDENCE
+_outbreak_model = None
+_outbreak_model_lock = threading.Lock()
 
 
 def _load_training_frame() -> pd.DataFrame:
@@ -41,6 +46,21 @@ def _load_training_frame() -> pd.DataFrame:
     logger.warning('historical_training_data.csv not found — using minimal fallback training set.')
     from ml_pipeline import _build_mock_training_set  # noqa: SLF001
     return _build_mock_training_set()
+
+
+def _get_outbreak_model(outbreak_train_df: pd.DataFrame):
+    """Fit Isolation Forest once on every historical row, then reuse it."""
+    global _outbreak_model
+    if _outbreak_model is not None:
+        return _outbreak_model
+    with _outbreak_model_lock:
+        if _outbreak_model is None:
+            logger.info(
+                'Fitting Isolation Forest on all %s historical outbreak rows.',
+                0 if outbreak_train_df is None else len(outbreak_train_df),
+            )
+            _outbreak_model = fit_isolation_forest(outbreak_train_df)
+    return _outbreak_model
 
 
 @lru_cache(maxsize=1)
@@ -175,9 +195,10 @@ def analyze_patient_case(
 
     # Outbreak screening and disease classification are independent. A
     # transient database/Isolation Forest failure must not discard a valid
-    # Random Forest disease prediction.
+    # Random Forest disease prediction or erase the case-density score.
+    active_cases = max(int(same_day_prior_cases), 0) + 1
     is_anomaly = False
-    anomaly_score = 0.0
+    anomaly_score = anomaly_score_for_case_count(active_cases)
     try:
         from datetime import timedelta
         from myapp.models import SurveillanceReport
@@ -195,24 +216,27 @@ def analyze_patient_case(
             report_date__gte=start_of_day,
             report_date__lt=end_of_day,
         ).exclude(status__in=['Discarded', 'Closed']).count()
+        active_cases = db_today_cases + max(int(same_day_prior_cases), 0) + 1
 
         incoming_outbreak_row = pd.DataFrame([{
-            'active_cases': db_today_cases + max(int(same_day_prior_cases), 0) + 1,
+            'active_cases': active_cases,
             'rainfall_mm': climate.get('rainfall', CLIMATE_DEFAULTS['rainfall']),
             'temperature_c': climate.get('temperature', CLIMATE_DEFAULTS['temperature']),
             'humidity_pct': climate.get('humidity', CLIMATE_DEFAULTS['humidity']),
         }])
-        screened = detect_anomalies(
-            pd.concat([outbreak_train_df, incoming_outbreak_row], ignore_index=True),
+        screened = score_outbreak_case(
+            _get_outbreak_model(outbreak_train_df),
+            incoming_outbreak_row,
         )
-        result_row = screened.iloc[-1]
-        is_anomaly = int(result_row['is_anomaly']) == -1
-        anomaly_score = float(result_row['anomaly_score'])
+        is_anomaly = bool(screened['is_anomaly'])
+        anomaly_score = float(screened['anomaly_score'])
     except Exception as exc:
         logger.exception(
-            'Outbreak anomaly screening failed; continuing disease classification: %s',
+            'Outbreak anomaly screening failed; using case-count score: %s',
             exc,
         )
+        anomaly_score = anomaly_score_for_case_count(active_cases)
+        is_anomaly = anomaly_score >= 0.35
 
     if symptom_count < MIN_SYMPTOMS_FOR_CLASSIFICATION:
         disease_label = INSUFFICIENT_DATA_LABEL
