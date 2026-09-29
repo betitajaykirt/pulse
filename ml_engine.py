@@ -228,7 +228,9 @@ def detect_anomalies(
         n_estimators=200,
         contamination=contamination,
         random_state=random_state,
-        n_jobs=-1,
+        # Render instances can reject joblib's attempt to spawn all available
+        # workers, which previously forced the entire case into ML fallback.
+        n_jobs=1,
     )
     model.fit(features)
     
@@ -272,7 +274,7 @@ def fit_random_forest_classifier(
         min_samples_leaf=2,
         class_weight='balanced_subsample',
         random_state=random_state,
-        n_jobs=-1,
+        n_jobs=1,
     )
     classifier.fit(x_train, y_train)
     return classifier, label_encoder
