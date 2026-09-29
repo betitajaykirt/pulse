@@ -780,7 +780,7 @@
 
       clusterModels.forEach(function (cluster) {
 
-        if (cluster.reportCount < 1) return;
+        if (cluster.reportCount < 2 || cluster.caseCount < 2) return;
 
         if (!isValidLatLng(cluster.lat, cluster.lng)) return;
 
@@ -2090,16 +2090,18 @@
           ? [clusterModel.lat, clusterModel.lng]
           : null;
 
-        var clusterId = 'cluster_' + Math.random().toString(36).substr(2, 9);
-        window.clusterMap[clusterId] = {
+        var isActualCluster = clusterModel.reportCount >= 2 && clusterModel.caseCount >= 2;
+        var clusterId = null;
+
+        if (isActualCluster && ll) {
+          clusterId = 'cluster_' + Math.random().toString(36).substr(2, 9);
+          window.clusterMap[clusterId] = {
             clusterId: clusterId,
             cases: group,
             lat: clusterModel.lat,
             lng: clusterModel.lng,
-            caseCount: clusterModel.caseCount
-        };
-
-        if (clusterModel.reportCount >= 2 && ll) {
+            caseCount: clusterModel.caseCount,
+          };
           window.clusterMap[clusterId].clusterNumber = clusterCounter;
           var popupHtml = buildClusterPopup(group, clusterId);
           clusterCounter++;
