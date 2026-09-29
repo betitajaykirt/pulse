@@ -135,6 +135,14 @@ def _parse_optional_date(raw):
     return parse_user_date(s)
 
 
+def _numeric_score(value, default=0.0):
+    """Normalize optional ML scores so fallback classifications remain saveable."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(default)
+
+
 def _build_patient_name(case) -> str:
     from accounts.auth_utils import build_full_name
 
@@ -270,6 +278,10 @@ def _persist_batch_submission(
         official_disease = stored_disease_identity_from_ml(ml)
 
         case_classif = ml['case_classification']
+        classification_confidence = _numeric_score(
+            ml.get('classification_confidence'),
+        )
+        anomaly_score = _numeric_score(ml.get('anomaly_score'))
 
 
 
@@ -429,13 +441,13 @@ def _persist_batch_submission(
 
             case_classification=case_classif,
 
-            status='Probable' if ml.get('classification_confidence', 0) >= 0.50 else 'Suspected',
+            status='Probable' if classification_confidence >= 0.50 else 'Suspected',
 
             validation_status='validated',
 
             is_anomaly=ml['is_anomaly'],
 
-            ml_anomaly_score=Decimal(str(round(ml['anomaly_score'], 4))),
+            ml_anomaly_score=Decimal(str(round(anomaly_score, 4))),
 
             remarks=remarks,
 
