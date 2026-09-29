@@ -2468,27 +2468,22 @@ html[data-theme="dark"] .map-layer-btn:hover {
 }
 .hotspot-tip::before { border-top-color: var(--text); }
 
-/* Case and cluster cards scale in the same direction as Leaflet zoom. */
-#map {
-  --map-popup-scale: 1;
-}
+/* Keep case and cluster cards readable and independent of map zoom. */
 .leaflet-popup.custom-fixed-popup {
   overflow: visible;
 }
 
 .custom-fixed-popup .leaflet-popup-content-wrapper {
-  width: min(420px, calc(100vw - 56px)) !important;
-  max-width: min(420px, calc(100vw - 56px)) !important;
-  height: min(480px, calc(100vh - 140px)) !important;
-  max-height: min(480px, calc(100vh - 140px)) !important;
+  width: min(380px, calc(100vw - 56px)) !important;
+  max-width: min(380px, calc(100vw - 56px)) !important;
+  height: min(420px, calc(100vh - 150px)) !important;
+  max-height: min(420px, calc(100vh - 150px)) !important;
+  box-sizing: border-box;
   overflow: hidden !important;
   border-radius: 12px !important;
   padding: 0 !important;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
-  transform: scale(var(--map-popup-scale));
-  transform-origin: bottom center;
-  transition: transform 120ms ease-out;
-  will-change: transform;
+  transform: none !important;
 }
 .custom-fixed-popup .leaflet-popup-content {
   margin: 0 !important;
