@@ -725,15 +725,26 @@ def api_notifications(request):
         anomaly = float(notif.anomaly_score) if notif.anomaly_score is not None else None
 
         from reports.recommendation_service import (
+            apply_alert_recommendation,
             resolve_case_recommendation,
             status_for_case,
         )
 
+        disease_label = notif.disease or (report.syndrome_type if report else '')
+        case_state = status_for_case(report) if report else case_status
         recommendation_bundle = resolve_case_recommendation(
-            notif.disease or (report.syndrome_type if report else ''),
-            status_for_case(report) if report else case_status,
+            disease_label,
+            case_state,
             matrix=recommendation_matrix,
         )
+        if notif.review_status == 'approved' and (notif.recommendation_text or '').strip():
+            recommendation_bundle = apply_alert_recommendation(
+                recommendation_bundle,
+                disease_label,
+                notif.recommendation_text,
+                status=case_state,
+                case_count=notif.active_cases or 1,
+            )
 
         return {
             'id': notif.id,

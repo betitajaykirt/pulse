@@ -149,6 +149,88 @@ def _serialize_actions(actions: Iterable[dict]) -> list[dict]:
     ]
 
 
+def alert_recommendation_action(text: str) -> dict:
+    return {
+        'code': 'admin_approved_alert_recommendation',
+        'text_en': (text or '').strip(),
+        'text_local': '',
+        'target_units': ['Assigned Barangay Response Team'],
+    }
+
+
+def bundle_for_alert_recommendation(
+    disease: str,
+    text: str,
+    *,
+    status: str = 'Probable',
+    case_count: int = 1,
+) -> dict:
+    """Card shown after an admin approves an alert recommendation."""
+    from myapp.threshold_data import pidsr_category_display
+
+    label = canonical_disease_name(disease) or (disease or '').strip()
+    category = pidsr_category_display(label) or 'Category II'
+    action = alert_recommendation_action(text)
+    state = normalize_case_status(status).title()
+    return {
+        'disease': label,
+        'disease_code': '',
+        'category': category,
+        'highest_status': state,
+        'case_count': max(1, int(case_count or 1)),
+        'is_cluster': False,
+        'has_category_i': category == 'Category I',
+        'actions': [action],
+        'target_units': list(action['target_units']),
+        'field_action_summary': [action],
+    }
+
+
+def apply_alert_recommendation(
+    bundle: dict | None,
+    disease: str,
+    text: str,
+    *,
+    status: str = 'Probable',
+    case_count: int = 1,
+) -> dict | None:
+    """Use the admin-approved alert text even when no disease protocol is released."""
+    cleaned = (text or '').strip()
+    if not cleaned:
+        return bundle
+    action = alert_recommendation_action(cleaned)
+    if not bundle:
+        return bundle_for_alert_recommendation(
+            disease, cleaned, status=status, case_count=case_count,
+        )
+    cards = bundle.get('disease_cards')
+    if cards is not None:
+        target = canonical_disease_name(disease) or (disease or '').strip()
+        matched = False
+        for card in cards:
+            if (card.get('disease') or '').casefold() == target.casefold():
+                card['actions'] = [action]
+                card['target_units'] = list(action['target_units'])
+                matched = True
+        if not matched:
+            synthetic = bundle_for_alert_recommendation(
+                disease, cleaned, status=status, case_count=case_count,
+            )
+            cards.insert(0, synthetic)
+            if synthetic['category'] == 'Category I':
+                bundle['has_category_i'] = True
+        bundle['field_action_summary'] = [action]
+        return bundle
+    if bundle.get('disease'):
+        bundle['actions'] = [action]
+        bundle['target_units'] = list(action['target_units'])
+        bundle['field_action_summary'] = [action]
+        return bundle
+    return bundle_for_alert_recommendation(
+        disease, cleaned, status=status, case_count=case_count,
+    )
+
+
 def resolve_case_recommendation(
     disease_name: str,
     status: str,

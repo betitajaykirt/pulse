@@ -150,6 +150,7 @@ def _enrich_card_context(
 
     # The same structured bilingual bundle drives dashboard and map actions.
     from reports.recommendation_service import (
+        apply_alert_recommendation,
         resolve_case_recommendation,
         resolve_cluster_recommendations,
         status_for_case,
@@ -182,20 +183,17 @@ def _enrich_card_context(
         if dispatch and dispatch.review_status == 'approved'
         else ''
     )
-    if edited_recommendation and recommendation_bundle:
-        custom_action = {
-            'code': 'admin_approved_alert_recommendation',
-            'text_en': edited_recommendation,
-            'text_local': '',
-            'target_units': ['Assigned Barangay Response Team'],
-        }
-        if recommendation_bundle.get('disease'):
-            recommendation_bundle['actions'] = [custom_action]
-        elif recommendation_bundle.get('disease_cards'):
-            first_card = recommendation_bundle['disease_cards'][0]
-            first_card['actions'] = [custom_action]
-            recommendation_bundle['disease_cards'] = [first_card]
-        recommendation_bundle['field_action_summary'] = [custom_action]
+    if edited_recommendation:
+        anchor_status = status_for_case(anchor) if anchor else (
+            'confirmed' if card.get('is_pidsr_threshold') else 'probable'
+        )
+        recommendation_bundle = apply_alert_recommendation(
+            recommendation_bundle,
+            syndrome_name,
+            edited_recommendation,
+            status=anchor_status,
+            case_count=card.get('active_cases') or 1,
+        )
     card['recommendation_bundle'] = recommendation_bundle or {}
     card['recommendation_bundle_json'] = json.dumps(
         card['recommendation_bundle'],

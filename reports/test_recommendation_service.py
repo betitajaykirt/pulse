@@ -6,6 +6,7 @@ from reports.pidsr_schema import DISEASE_LABELS
 from reports.recommendation_service import (
     CLUSTER_RADIUS_METERS,
     CLUSTER_WINDOW_DAYS,
+    apply_alert_recommendation,
     cases_share_cluster,
     recommendation_matrix,
     resolve_case_recommendation,
@@ -137,4 +138,29 @@ class ClusterMembershipTests(SimpleTestCase):
         self.assertFalse(cases_share_cluster(anchor, temporally_far))
         self.assertEqual(CLUSTER_RADIUS_METERS, 300)
         self.assertEqual(CLUSTER_WINDOW_DAYS, 7)
+
+
+class ApprovedAlertRecommendationTests(SimpleTestCase):
+    def test_approved_text_fills_a_missing_protocol(self):
+        bundle = apply_alert_recommendation(
+            None,
+            'COVID-19',
+            'Isolate the household and list close contacts.',
+            status='probable',
+            case_count=2,
+        )
+        self.assertEqual(bundle['disease'], 'COVID-19')
+        self.assertEqual(bundle['category'], 'Category I')
+        self.assertEqual(bundle['case_count'], 2)
+        self.assertEqual(
+            bundle['actions'][0]['text_en'],
+            'Isolate the household and list close contacts.',
+        )
+
+    def test_blank_text_leaves_the_protocol_unchanged(self):
+        original = resolve_case_recommendation('COVID-19', 'probable')
+        self.assertIs(
+            apply_alert_recommendation(original, 'COVID-19', '   '),
+            original,
+        )
 

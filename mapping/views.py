@@ -22,6 +22,7 @@ from reports.case_scope import (
     parse_scope_time_range,
 )
 from reports.recommendation_service import (
+    apply_alert_recommendation,
     canonical_disease_name,
     resolve_case_recommendation,
 )
@@ -445,6 +446,7 @@ def api_cases(request):
         if is_admin_viewer
         else field_recommendation_matrix()
     )
+    approved_alert_text = _approved_alert_recommendations()
     for r in rows:
         ml_confidence = parse_ml_confidence(r.remarks or '')
         if not should_show_map_pin(r, ml_confidence):
@@ -490,6 +492,21 @@ def api_cases(request):
             and recommendation_bundle is None
             and bool(canonical_disease_name(action_disease))
         )
+        disease_key = canonical_disease_name(action_disease or ml_predicted) or (
+            action_disease or ml_predicted or ''
+        )
+        alert_text = approved_alert_text.get(
+            (barangay_name.casefold(), disease_key.casefold())
+        )
+        if alert_text:
+            recommendation_bundle = apply_alert_recommendation(
+                recommendation_bundle,
+                disease_key or action_disease or ml_predicted,
+                alert_text,
+                status='confirmed' if status_norm == 'Confirmed' else (classif_norm or 'probable'),
+                case_count=r.case_count,
+            )
+            recommendation_pending = False
         aptas_scores, aptas_risk_level, aptas_stored = _map_pin_aptas(r, assessment, risk_logs)
         purok = r.detailed_address or ''
 
@@ -558,6 +575,27 @@ def api_cases(request):
         })
 
     return JsonResponse({'ok': True, 'cases': cases})
+
+
+def _approved_alert_recommendations():
+    """Latest approved alert recommendation for each barangay and disease."""
+    from dashboard.models import AppNotification
+
+    index = {}
+    rows = (
+        AppNotification.objects.filter(review_status='approved')
+        .exclude(recommendation_text='')
+        .order_by('-reviewed_at', '-id')
+        .values_list('barangay_name', 'disease', 'recommendation_text')
+    )
+    for barangay, disease, text in rows:
+        barangay_key = (barangay or '').strip().casefold()
+        disease_key = canonical_disease_name(disease) or (disease or '').strip()
+        disease_key = disease_key.casefold()
+        cleaned = (text or '').strip()
+        if barangay_key and disease_key and cleaned:
+            index.setdefault((barangay_key, disease_key), cleaned)
+    return index
 
 
 def _scoped_report_qs(request):
