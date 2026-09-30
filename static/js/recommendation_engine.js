@@ -155,6 +155,9 @@
     options = options || {};
     var cards = recommendationCards(bundle);
     if (!cards.length) {
+      if (options.pendingApproval) {
+        return '<div class="rec-empty">Waiting for admin approval.</div>';
+      }
       return '<div class="rec-empty">No protocol is available for this disease identity.</div>';
     }
     var hasCategoryI = bundle.has_category_i ||

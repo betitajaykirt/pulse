@@ -630,9 +630,16 @@ def api_notifications(request):
         user_id=user_id,
         user_type=user_type
     ).values_list('notification_id', flat=True))
-    from reports.recommendation_repository import approved_recommendation_matrix
+    from reports.recommendation_repository import (
+        approved_recommendation_matrix,
+        field_recommendation_matrix,
+    )
 
-    recommendation_matrix = approved_recommendation_matrix()
+    recommendation_matrix = (
+        approved_recommendation_matrix()
+        if role in ('admin', 'super_admin')
+        else field_recommendation_matrix()
+    )
 
     def _notification_recommendations(notif, report=None):
         if (notif.recommendation_text or '').strip():

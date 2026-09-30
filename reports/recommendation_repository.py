@@ -13,10 +13,9 @@ def matrix_from_payload(payload: dict) -> dict[str, dict]:
     return {row['label']: row for row in payload['diseases']}
 
 
-def approved_recommendation_matrix() -> dict[str, dict]:
-    """Return only approved content, falling back to the shipped baseline."""
+def _latest_approved_payload():
     try:
-        payload = (
+        return (
             RecommendationRevision.objects
             .filter(status='approved')
             .order_by('-approved_at', '-id')
@@ -25,11 +24,37 @@ def approved_recommendation_matrix() -> dict[str, dict]:
         )
     except (OperationalError, ProgrammingError):
         # Keeps deploy-time checks and the first migration safe.
-        payload = None
+        return None
 
+
+def approved_recommendation_matrix() -> dict[str, dict]:
+    """Admin editing catalog: latest approval, or the shipped baseline."""
+    payload = _latest_approved_payload()
     if not payload:
         return recommendation_matrix()
     return matrix_from_payload(payload)
+
+
+def field_recommendation_matrix() -> dict[str, dict]:
+    """Recommendations released to BHWs and other non-admin roles."""
+    try:
+        released = {
+            disease
+            for disease in RecommendationRevision.objects.filter(
+                approved_at__isnull=False,
+            ).exclude(scope_disease='').values_list('scope_disease', flat=True)
+            if disease
+        }
+    except (OperationalError, ProgrammingError):
+        return {}
+    if not released:
+        return {}
+    source = approved_recommendation_matrix()
+    return {
+        label: row
+        for label, row in source.items()
+        if label in released
+    }
 
 
 def clear_approved_recommendation_cache() -> None:

@@ -21,8 +21,14 @@ from reports.case_scope import (
     event_date_window_q,
     parse_scope_time_range,
 )
-from reports.recommendation_service import resolve_case_recommendation
-from reports.recommendation_repository import approved_recommendation_matrix
+from reports.recommendation_service import (
+    canonical_disease_name,
+    resolve_case_recommendation,
+)
+from reports.recommendation_repository import (
+    approved_recommendation_matrix,
+    field_recommendation_matrix,
+)
 from reports.ml_display import (
     official_disease_label,
     parse_ml_confidence,
@@ -433,7 +439,12 @@ def api_cases(request):
     ])
 
     cases = []
-    recommendation_matrix = approved_recommendation_matrix()
+    is_admin_viewer = role in ('admin', 'super_admin')
+    recommendation_matrix = (
+        approved_recommendation_matrix()
+        if is_admin_viewer
+        else field_recommendation_matrix()
+    )
     for r in rows:
         ml_confidence = parse_ml_confidence(r.remarks or '')
         if not should_show_map_pin(r, ml_confidence):
@@ -473,6 +484,11 @@ def api_cases(request):
             action_disease,
             'confirmed' if status_norm.casefold() == 'confirmed' else classif_norm,
             matrix=recommendation_matrix,
+        )
+        recommendation_pending = (
+            not is_admin_viewer
+            and recommendation_bundle is None
+            and bool(canonical_disease_name(action_disease))
         )
         aptas_scores, aptas_risk_level, aptas_stored = _map_pin_aptas(r, assessment, risk_logs)
         purok = r.detailed_address or ''
@@ -522,8 +538,11 @@ def api_cases(request):
             'environmental_score': aptas_scores['environmental_score'],
             'aptas_stored':        aptas_stored,
             'recommendation_bundle': recommendation_bundle,
+            'recommendation_pending': recommendation_pending,
             'recommendations': (
-                ' '.join(
+                ''
+                if recommendation_pending
+                else ' '.join(
                     action['text_en']
                     for action in (recommendation_bundle or {}).get('actions', [])
                 )

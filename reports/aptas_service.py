@@ -358,8 +358,15 @@ def get_aptas_dashboard_context(*, barangay_name=None, limit=12, viewer_role=Non
     nurses_by_barangay = catchment_nurses_by_barangay(
         [card.get('barangay') for card in candidate_alerts]
     )
-    from reports.recommendation_repository import approved_recommendation_matrix
-    recommendation_matrix = approved_recommendation_matrix()
+    from reports.recommendation_repository import (
+        approved_recommendation_matrix,
+        field_recommendation_matrix,
+    )
+    recommendation_matrix = (
+        approved_recommendation_matrix()
+        if viewer_role in ('admin', 'super_admin')
+        else field_recommendation_matrix()
+    )
     candidate_alerts = [
         _enrich_card_context(
             card,

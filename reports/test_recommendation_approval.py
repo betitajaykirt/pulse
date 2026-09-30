@@ -8,6 +8,7 @@ from reports.recommendation_admin import recommendation_card
 from reports.recommendation_repository import (
     approved_recommendation_matrix,
     clear_approved_recommendation_cache,
+    field_recommendation_matrix,
     matrix_from_payload,
 )
 from reports.recommendation_service import (
@@ -53,6 +54,29 @@ class ApprovedRecommendationTests(SimpleTestCase):
         self.assertEqual(
             matrix,
             matrix_from_payload(baseline_recommendation_payload()),
+        )
+
+    @patch('reports.recommendation_repository.RecommendationRevision.objects')
+    def test_field_matrix_hides_baseline_until_admin_approval(self, objects):
+        objects.filter.return_value.exclude.return_value.values_list.return_value = []
+
+        self.assertEqual(field_recommendation_matrix(), {})
+
+    @patch('reports.recommendation_repository.approved_recommendation_matrix')
+    @patch('reports.recommendation_repository.RecommendationRevision.objects')
+    def test_field_matrix_includes_only_approved_diseases(self, objects, approved):
+        payload = self._edited_payload()
+        approved.return_value = matrix_from_payload(payload)
+        objects.filter.return_value.exclude.return_value.values_list.return_value = [
+            'Dengue Fever',
+        ]
+
+        matrix = field_recommendation_matrix()
+
+        self.assertEqual(set(matrix), {'Dengue Fever'})
+        self.assertEqual(
+            matrix['Dengue Fever']['actions']['probable'][0]['en'],
+            'Approved edited action.',
         )
 
 

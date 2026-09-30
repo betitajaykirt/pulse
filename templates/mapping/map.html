@@ -1712,7 +1712,11 @@
       html += '<div class="map-case-popup__rec-head"><strong>Public Health Recommendations</strong></div>';
       html += window.PulseRecommendationEngine.renderRecommendationCards(
         c.recommendation_bundle,
-        { showSummary: false, canManage: canManageRecommendations }
+        {
+          showSummary: false,
+          canManage: canManageRecommendations,
+          pendingApproval: !!c.recommendation_pending
+        }
       );
       html += '</div>';
 
@@ -1795,10 +1799,17 @@
 
       html += '</div>';
       var resolved = window.PulseRecommendationEngine.resolveClusterRecommendations(cases);
+      var clusterHasCards = resolved && resolved.disease_cards && resolved.disease_cards.length;
       html += '<div class="map-cluster-popup__recommendations">';
       html += window.PulseRecommendationEngine.renderRecommendationCards(
         resolved,
-        { showSummary: false, canManage: canManageRecommendations }
+        {
+          showSummary: false,
+          canManage: canManageRecommendations,
+          pendingApproval: !clusterHasCards && cases.some(function (item) {
+            return !!item.recommendation_pending;
+          })
+        }
       );
       html += '</div></div>';
       return html;
