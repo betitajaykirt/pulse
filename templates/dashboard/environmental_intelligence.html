@@ -60,14 +60,6 @@
     </div>
   </section>
 
-  <!-- Chart.js Middle Row -->
-  <section class="dash-section" style="margin-bottom: 2rem;">
-    <h3 class="dash-section__title">Environmental Trends & Outbreak Correlation (30 Days)</h3>
-    <div class="pulse-panel" style="padding: 1.5rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 8px;">
-      <canvas id="envCorrelationChart" height="100"></canvas>
-    </div>
-  </section>
-
   <!-- Vector Risk Table -->
   <section class="dash-section" style="margin-bottom: 2rem;">
     <h3 class="dash-section__title">Barangay Vector Risk Heatmap</h3>
@@ -110,8 +102,6 @@
   </section>
 </div>
 
-<!-- Include Chart.js (We load it from CDN for this view) -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 const WEATHER_BROWSER_URL = "{{ weather_browser_url|escapejs }}";
 
@@ -167,99 +157,6 @@ function recoverWeatherFromBrowser() {
 
 document.addEventListener("DOMContentLoaded", function() {
     recoverWeatherFromBrowser();
-    const ctx = document.getElementById('envCorrelationChart').getContext('2d');
-    
-    const labels = {{ chart_labels|safe }};
-    const tempData = {{ chart_temp|safe }};
-    const rainData = {{ chart_rain|safe }};
-    const casesData = {{ chart_cases|safe }};
-
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: 'Cases Reported',
-                    data: casesData,
-                    type: 'bar',
-                    backgroundColor: 'rgba(239, 68, 68, 0.7)', // Red
-                    borderColor: 'rgba(239, 68, 68, 1)',
-                    borderWidth: 1,
-                    yAxisID: 'y'
-                },
-                {
-                    label: 'Rainfall (mm)',
-                    data: rainData,
-                    type: 'bar',
-                    backgroundColor: 'rgba(59, 130, 246, 0.5)', // Blue
-                    borderColor: 'rgba(59, 130, 246, 1)',
-                    borderWidth: 1,
-                    yAxisID: 'y'
-                },
-                {
-                    label: 'Temperature (°C)',
-                    data: tempData,
-                    type: 'line',
-                    borderColor: 'rgba(245, 158, 11, 1)', // Orange
-                    backgroundColor: 'rgba(245, 158, 11, 0.2)',
-                    fill: false,
-                    tension: 0.3,
-                    yAxisID: 'y1'
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            interaction: {
-                mode: 'index',
-                intersect: false,
-            },
-            scales: {
-                y: {
-                    type: 'linear',
-                    display: true,
-                    position: 'left',
-                    ticks: { color: (window.PulseTheme && window.PulseTheme.chartColors().tick) || '#64748B' },
-                    title: {
-                        display: true,
-                        text: 'Cases / Rainfall (mm)',
-                        color: (window.PulseTheme && window.PulseTheme.chartColors().tick) || '#64748B'
-                    }
-                },
-                y1: {
-                    type: 'linear',
-                    display: true,
-                    position: 'right',
-                    ticks: { color: (window.PulseTheme && window.PulseTheme.chartColors().tick) || '#64748B' },
-                    title: {
-                        display: true,
-                        text: 'Temperature (°C)',
-                        color: (window.PulseTheme && window.PulseTheme.chartColors().tick) || '#64748B'
-                    },
-                    grid: {
-                        drawOnChartArea: false, // only want the grid lines for one axis to show up
-                    }
-                }
-            },
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            let label = context.dataset.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
-                            if (context.parsed.y !== null) {
-                                label += context.parsed.y;
-                            }
-                            return label;
-                        }
-                    }
-                }
-            }
-        }
-    });
 });
 </script>
 {% endblock %}

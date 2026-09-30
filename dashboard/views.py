@@ -24,9 +24,7 @@ from .analytics_service import (
 )
 from reports.weather_service import OPEN_METEO_URL, fetch_bago_city_weather
 from reports.aptas_service import get_aptas_dashboard_context, resolve_aptas_barangay_filter
-import json
 from django.db.models import Count, Avg, Sum
-from django.db.models.functions import TruncDate
 from datetime import timedelta
 from django.utils import timezone
 
@@ -1008,44 +1006,7 @@ def environmental_intelligence_view(request):
     weather = fetch_bago_city_weather()
     
     now = timezone.now()
-    thirty_days_ago = now - timedelta(days=30)
-    
-    # Chart data: Environmental Trends & APTAS Correlation
-    env_qs = EnvironmentalData.objects.filter(
-        recorded_at__gte=thirty_days_ago
-    ).annotate(
-        date=TruncDate('recorded_at')
-    ).values('date').annotate(
-        avg_temp=Avg('temperature'),
-        avg_rain=Sum('rainfall')
-    ).order_by('date')
-    
-    surveillance_qs = SurveillanceReport.objects.filter(
-        report_date__gte=thirty_days_ago
-    ).annotate(
-        date=TruncDate('report_date')
-    ).values('date').annotate(
-        cases=Count('id')
-    ).order_by('date')
-    
-    chart_labels = []
-    chart_temp = []
-    chart_rain = []
-    chart_cases = []
-    
-    env_map = {item['date']: item for item in env_qs if item['date']}
-    surveillance_map = {item['date']: item for item in surveillance_qs if item['date']}
-    
-    for i in range(30):
-        d = (thirty_days_ago + timedelta(days=i)).date()
-        chart_labels.append(d.strftime('%b %d'))
-        e = env_map.get(d, {'avg_temp': 0, 'avg_rain': 0})
-        s = surveillance_map.get(d, {'cases': 0})
-        
-        chart_temp.append(float(e.get('avg_temp') or 0))
-        chart_rain.append(float(e.get('avg_rain') or 0))
-        chart_cases.append(s.get('cases', 0))
-        
+
     # Barangay Vector Risk Table
     seven_days_ago = now - timedelta(days=7)
     
@@ -1131,10 +1092,6 @@ def environmental_intelligence_view(request):
     context = {
         'weather': weather,
         'weather_browser_url': OPEN_METEO_URL,
-        'chart_labels': json.dumps(chart_labels),
-        'chart_temp': json.dumps(chart_temp),
-        'chart_rain': json.dumps(chart_rain),
-        'chart_cases': json.dumps(chart_cases),
         'vector_risk_data': vector_risk_data,
     }
     
