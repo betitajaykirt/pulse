@@ -13,7 +13,7 @@ class AlertAcknowledgePolicyTests(SimpleTestCase):
             self.assertTrue(can_acknowledge_alerts(role), role)
 
     def test_field_roles_may_not_acknowledge(self):
-        for role in ('encoder', 'barangay_health_worker', 'catchment_nurse', None, ''):
+        for role in ('encoder', 'barangay_health_worker', 'midwife', None, ''):
             self.assertFalse(can_acknowledge_alerts(role), role)
 
     def _post(self, role):

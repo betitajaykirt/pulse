@@ -68,7 +68,7 @@ class User(models.Model):
         ('encoder', 'Encoder'),
         ('health_officer', 'Health Officer'),
         ('surveillance_officer', 'Surveillance Officer'),
-        ('catchment_nurse', 'Catchment Nurse (OIC)'),
+        ('midwife', 'Midwife'),
         ('barangay_health_worker', 'Barangay Health Worker'),
     ]
 

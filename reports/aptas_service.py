@@ -87,7 +87,7 @@ def _enrich_card_context(
     recommendation_matrix: dict | None = None,
 ) -> Dict[str, Any]:
     """Attach report-level context (officer, purok, coordinates, active cases) to a card."""
-    from myapp.barangay_scope import catchment_nurse_officer_fields
+    from myapp.barangay_scope import midwife_officer_fields
     from dashboard.models import AppNotification
 
     barangay_name = card.get('barangay', '')
@@ -108,9 +108,9 @@ def _enrich_card_context(
 
     if nurses_by_barangay is not None:
         nurse = nurses_by_barangay.get((barangay_name or '').strip().casefold())
-        officer_fields = catchment_nurse_officer_fields(nurse)
+        officer_fields = midwife_officer_fields(nurse)
     else:
-        officer_fields = catchment_nurse_officer_fields(barangay_name=barangay_name)
+        officer_fields = midwife_officer_fields(barangay_name=barangay_name)
     card['officer_name'] = officer_fields['officer_name']
     card['officer_contact'] = officer_fields['officer_contact']
 
@@ -354,8 +354,8 @@ def get_aptas_dashboard_context(*, barangay_name=None, limit=12, viewer_role=Non
         return (pidsr_rank, level_rank, -float(card.get('final_risk_score') or 0))
 
     candidate_alerts = sorted(pidsr_cards + ml_cards, key=_sort_key)
-    from myapp.barangay_scope import catchment_nurses_by_barangay
-    nurses_by_barangay = catchment_nurses_by_barangay(
+    from myapp.barangay_scope import midwives_by_barangay
+    nurses_by_barangay = midwives_by_barangay(
         [card.get('barangay') for card in candidate_alerts]
     )
     from reports.recommendation_repository import (

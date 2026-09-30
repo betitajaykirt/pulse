@@ -57,14 +57,14 @@ def create(request):
     contact  = request.POST.get('contact_number', '').strip()
     contact_normalized = normalize_contact_number(contact)
 
-    valid_roles = ['health_officer', 'barangay_health_worker', 'catchment_nurse']
+    valid_roles = ['health_officer', 'barangay_health_worker', 'midwife']
     errors = []
     if not first:  errors.append('First name required.')
     if not last:   errors.append('Last name required.')
     if not email:  errors.append('Email required.')
     if role not in valid_roles: errors.append('Invalid role.')
     if len(password) < 8: errors.append('Password must be at least 8 characters.')
-    if role in ('barangay_health_worker', 'catchment_nurse') and not barangay:
+    if role in ('barangay_health_worker', 'midwife') and not barangay:
         errors.append('Barangay is required for the selected role.')
     if bdate and not parse_user_date(bdate):
         errors.append('Enter date of birth as mm/dd/yyyy.')
@@ -127,7 +127,7 @@ def update_role(request, user_id):
         return redirect('users_index')
 
     new_role = request.POST.get('role', '').strip()
-    valid_roles = ['encoder', 'health_officer', 'surveillance_officer', 'barangay_health_worker', 'catchment_nurse']
+    valid_roles = ['encoder', 'health_officer', 'surveillance_officer', 'barangay_health_worker', 'midwife']
     if new_role not in valid_roles:
         messages.error(request, 'Invalid role.')
         return redirect('users_index')

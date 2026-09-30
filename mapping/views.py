@@ -11,8 +11,8 @@ from myapp.models import (
 )
 from myapp.barangay_scope import (
     is_city_wide_role, get_request_barangay, resolve_user_barangay,
-    is_barangay_scoped_role, catchment_nurses_by_barangay,
-    catchment_nurse_officer_fields,
+    is_barangay_scoped_role, midwives_by_barangay,
+    midwife_officer_fields,
 )
 from myapp.threshold_data import pidsr_category_display
 from reports.case_scope import (
@@ -434,7 +434,7 @@ def api_cases(request):
             return f'{score:.2f} — {level} Risk', score, level
         return f'{level} Risk', None, level
 
-    nurses_by_barangay = catchment_nurses_by_barangay([
+    nurses_by_barangay = midwives_by_barangay([
         r.barangay.barangay_name for r in rows if r.barangay
     ])
 
@@ -462,7 +462,7 @@ def api_cases(request):
         risk_line, risk_score, risk_level = _risk_display(assessment, r)
         barangay_name = r.barangay.barangay_name if r.barangay else ''
         nurse = nurses_by_barangay.get(barangay_name.casefold())
-        officer_fields = catchment_nurse_officer_fields(nurse)
+        officer_fields = midwife_officer_fields(nurse)
         status_norm = (r.status or '').strip()
         classif_norm = (r.case_classification or '').strip().lower()
         confirmed_by = _confirmed_by_name(r.validated_by)

@@ -1,4 +1,4 @@
-"""Seed 1 catchment nurse and 2 BHWs for each of Bago City's 24 barangays."""
+"""Seed 1 midwife and 2 BHWs for each of Bago City's 24 barangays."""
 from __future__ import annotations
 
 import csv
@@ -15,7 +15,7 @@ from myapp.models import Barangay, User
 
 
 # Realistic Negrense / Visayan names — fictional demo staff only.
-# 1 catchment nurse + 2 BHWs per official Bago City barangay.
+# 1 midwife + 2 BHWs per official Bago City barangay.
 DEMO_STAFF = {
     'Abuanan': {
         'nurse': ('Rowena', 'P', 'Magbanua'),
@@ -149,7 +149,7 @@ def build_contact(index: int) -> str:
 
 
 class Command(BaseCommand):
-    help = 'Create demo catchment nurse and BHW accounts for all 24 Bago City barangays.'
+    help = 'Create demo midwife and BHW accounts for all 24 Bago City barangays.'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -199,7 +199,7 @@ class Command(BaseCommand):
 
         for barangay, staff in DEMO_STAFF.items():
             people = [
-                ('catchment_nurse', 'CN', 'Catchment Nurse (OIC)', staff['nurse']),
+                ('midwife', 'CN', 'Midwife', staff['nurse']),
                 ('barangay_health_worker', 'B1', 'Barangay Health Worker', staff['bhw'][0]),
                 ('barangay_health_worker', 'B2', 'Barangay Health Worker', staff['bhw'][1]),
             ]

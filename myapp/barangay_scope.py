@@ -11,7 +11,7 @@ CITY_WIDE_ROLES = frozenset({
 
 # Localized roles are restricted to their assigned barangay
 BARANGAY_SCOPED_ROLES = frozenset({
-    'barangay_health_worker', 'encoder', 'catchment_nurse',
+    'barangay_health_worker', 'encoder', 'midwife',
 })
 
 
@@ -35,9 +35,9 @@ def user_display_name(user) -> str:
     return name or (getattr(user, 'email', None) or getattr(user, 'username', None) or '')
 
 
-def catchment_nurses_by_barangay(barangay_names=None) -> dict:
-    """Map casefolded barangay name to the assigned catchment nurse."""
-    qs = User.objects.filter(role='catchment_nurse', status='active')
+def midwives_by_barangay(barangay_names=None) -> dict:
+    """Map casefolded barangay name to the assigned midwife."""
+    qs = User.objects.filter(role='midwife', status='active')
     if barangay_names is not None:
         cleaned = [str(name).strip() for name in barangay_names if name]
         if not cleaned:
@@ -55,18 +55,18 @@ def catchment_nurses_by_barangay(barangay_names=None) -> dict:
     return mapping
 
 
-def resolve_catchment_nurse(barangay_name: str | None):
-    """Return the catchment nurse assigned to a barangay, or None."""
+def resolve_midwife(barangay_name: str | None):
+    """Return the midwife assigned to a barangay, or None."""
     name = (barangay_name or '').strip()
     if not name:
         return None
-    return catchment_nurses_by_barangay([name]).get(name.casefold())
+    return midwives_by_barangay([name]).get(name.casefold())
 
 
-def catchment_nurse_officer_fields(nurse=None, *, barangay_name=None) -> dict:
+def midwife_officer_fields(nurse=None, *, barangay_name=None) -> dict:
     """Officer-in-charge fields used by alert cards and related popups."""
     if nurse is None and barangay_name:
-        nurse = resolve_catchment_nurse(barangay_name)
+        nurse = resolve_midwife(barangay_name)
     return {
         'officer_name': user_display_name(nurse),
         'officer_contact': (nurse.contact_number or '').strip() if nurse else '',

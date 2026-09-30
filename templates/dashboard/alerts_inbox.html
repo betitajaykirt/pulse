@@ -381,7 +381,7 @@
     subtitleParts.push('Triggered by ' + escHtml(d.triggerSource || 'APTAS Risk Signal'));
     var subtitleHtml = '<p style="margin:0 0 6px;">' + subtitleParts.join(' • ') + '</p>';
     if (d.officerName) {
-      subtitleHtml += '<p style="margin:0;">Catchment Nurse: ' + escHtml(d.officerName);
+      subtitleHtml += '<p style="margin:0;">Midwife: ' + escHtml(d.officerName);
       if (d.officerContact) subtitleHtml += ' (' + escHtml(d.officerContact) + ')';
       subtitleHtml += '</p>';
     }
@@ -416,7 +416,7 @@
       ['Active Cases', d.activeCases || '0'],
       ['Purok / Address', d.purok || '—'],
       ['Trigger', d.triggerSource || 'APTAS Risk Signal'],
-      ['Catchment Nurse', d.officerName || '—'],
+      ['Midwife', d.officerName || '—'],
       ['Contact', d.officerContact || '—'],
     ];
     details.forEach(function(pair) {

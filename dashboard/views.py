@@ -14,8 +14,8 @@ from myapp.models import (
 from accounts.auth_utils import role_required
 from myapp.barangay_scope import (
     is_city_wide_role, resolve_user_barangay, BARANGAY_SCOPED_ROLES,
-    get_request_barangay, catchment_nurses_by_barangay,
-    catchment_nurse_officer_fields, can_acknowledge_alerts,
+    get_request_barangay, midwives_by_barangay,
+    midwife_officer_fields, can_acknowledge_alerts,
 )
 from .bhw_activity import barangay_filter_choices, build_bhw_activity_entries
 from .analytics_service import (
@@ -40,7 +40,7 @@ def dashboard(request):
         'surveillance_officer':   'dashboard/surveillance_officer.html',
         'barangay_health_worker': 'dashboard/barangay_health_worker.html',
     }
-    if role == 'catchment_nurse':
+    if role == 'midwife':
         return redirect('nurse_dashboard')
 
     template = template_map.get(role)
@@ -178,7 +178,7 @@ def system_logs_view(request):
     })
 
 
-@role_required('admin', 'super_admin', 'health_officer', 'catchment_nurse')
+@role_required('admin', 'super_admin', 'health_officer', 'midwife')
 def bhw_activity_logs_view(request):
     role = request.session.get('role')
     city_wide = is_city_wide_role(role)
@@ -402,30 +402,30 @@ def analytics_view(request):
 
 
 @login_required
-@role_required('catchment_nurse')
+@role_required('midwife')
 def nurse_analytics_view(request):
     user_id = request.session.get('user_id')
     user = User.objects.filter(id=user_id).first()
     barangay = resolve_user_barangay(user)
     
-    ctx = _get_stats('catchment_nurse', user_id)
+    ctx = _get_stats('midwife', user_id)
     ctx.update({
         'symptom_category_choices': get_dynamic_disease_choices(),
         'barangays': [barangay] if barangay else [],
         'is_barangay_scoped': True,
     })
     
-    barangay_filter = resolve_aptas_barangay_filter('catchment_nurse', user_id, ctx)
+    barangay_filter = resolve_aptas_barangay_filter('midwife', user_id, ctx)
     ctx.update(get_aptas_dashboard_context(
         barangay_name=barangay_filter,
-        viewer_role='catchment_nurse',
+        viewer_role='midwife',
     ))
     
     return render(request, 'dashboard/analytics.html', ctx)
 
 
 @require_GET
-@role_required('surveillance_officer', 'admin', 'super_admin', 'health_officer', 'catchment_nurse')
+@role_required('surveillance_officer', 'admin', 'super_admin', 'health_officer', 'midwife')
 def api_analytics_data(request):
     symptom_category = request.GET.get('symptom_category', '').strip()
     barangay_id = request.GET.get('barangay', '').strip()
@@ -706,9 +706,9 @@ def api_notifications(request):
 
         if nurses_by_barangay is not None:
             nurse = nurses_by_barangay.get((notif.barangay_name or '').strip().casefold())
-            officer_fields = catchment_nurse_officer_fields(nurse)
+            officer_fields = midwife_officer_fields(nurse)
         else:
-            officer_fields = catchment_nurse_officer_fields(
+            officer_fields = midwife_officer_fields(
                 barangay_name=notif.barangay_name,
             )
         officer_name = officer_fields['officer_name']
@@ -766,7 +766,7 @@ def api_notifications(request):
 
     data = []
     unread_count = 0
-    nurses_by_barangay = catchment_nurses_by_barangay(
+    nurses_by_barangay = midwives_by_barangay(
         [notif.barangay_name for notif in notifications_list]
     )
 
@@ -866,16 +866,16 @@ def api_alert_acknowledge(request, alert_id):
 
 
 @login_required
-@role_required('catchment_nurse')
+@role_required('midwife')
 def nurse_dashboard_view(request):
-    ctx = _get_stats('catchment_nurse', request.session.get('user_id'))
+    ctx = _get_stats('midwife', request.session.get('user_id'))
     ctx['weather'] = fetch_bago_city_weather()
     barangay_filter = resolve_aptas_barangay_filter(
-        'catchment_nurse', request.session.get('user_id'), ctx,
+        'midwife', request.session.get('user_id'), ctx,
     )
     ctx.update(get_aptas_dashboard_context(
         barangay_name=barangay_filter,
-        viewer_role='catchment_nurse',
+        viewer_role='midwife',
     ))
     if barangay_filter:
         ctx['aptas_barangay_scope'] = barangay_filter
@@ -906,7 +906,7 @@ def nurse_dashboard_view(request):
 
 
 @login_required
-@role_required('catchment_nurse')
+@role_required('midwife')
 def api_dispatch_task(request):
     if request.method != 'POST':
         return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
@@ -941,7 +941,7 @@ def api_dispatch_task(request):
     return JsonResponse({'ok': True, 'task_id': task.id})
 
 @login_required
-@role_required('catchment_nurse')
+@role_required('midwife')
 def manage_bhws_view(request):
     from django.utils import timezone
     from datetime import timedelta
@@ -989,7 +989,7 @@ def manage_bhws_view(request):
 
 
 @login_required
-@role_required('catchment_nurse')
+@role_required('midwife')
 def bhw_reports_view(request):
     # Redirect to case_records but append a query parameter so we can filter.
     # Actually, the case_records view doesn't currently filter by submitter role.
@@ -997,7 +997,7 @@ def bhw_reports_view(request):
     # to their barangay. We could pass a parameter, but for now case_records does the job.
     url = reverse('case_records')
     # If the user specifically wants BHW reports, we can just redirect to case_records
-    # because in the catchment nurse view, most reports are from BHWs.
+    # because in the midwife view, most reports are from BHWs.
     return redirect(url)
 
 @login_required

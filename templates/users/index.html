@@ -65,7 +65,7 @@
           <select name="role" id="create-role" class="input-soft" required>
             <option value="">Select Role</option>
             <option value="health_officer">Health Officer</option>
-            <option value="catchment_nurse">Catchment Nurse</option>
+            <option value="midwife">Midwife</option>
             <option value="barangay_health_worker">Barangay Health Worker</option>
           </select>
         </div>
@@ -209,7 +209,7 @@
                     <option value="encoder" {% if u.role == 'encoder' %}selected{% endif %}>Encoder</option>
                     <option value="health_officer" {% if u.role == 'health_officer' %}selected{% endif %}>Health Officer</option>
                     <option value="surveillance_officer" {% if u.role == 'surveillance_officer' %}selected{% endif %}>Surveillance Officer</option>
-                    <option value="catchment_nurse" {% if u.role == 'catchment_nurse' %}selected{% endif %}>Catchment Nurse</option>
+                    <option value="midwife" {% if u.role == 'midwife' %}selected{% endif %}>Midwife</option>
                     <option value="barangay_health_worker" {% if u.role == 'barangay_health_worker' %}selected{% endif %}>Barangay Health Worker</option>
                   </select>
                   <button type="submit" class="nc-btn nc-btn--primary nc-btn--sm">Save</button>
@@ -240,7 +240,7 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   var roleSelect = document.getElementById('create-role');
-  var barangayRoles = ['barangay_health_worker', 'catchment_nurse'];
+  var barangayRoles = ['barangay_health_worker', 'midwife'];
   roleSelect.addEventListener('change', function () {
     var bf = document.getElementById('barangay-field');
     var needsBarangay = barangayRoles.indexOf(this.value) !== -1;

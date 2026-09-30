@@ -138,7 +138,7 @@
                         <div><dt>Status</dt><dd>${escapeHtml(notif.case_status || 'Active')}</dd></div>
                         <div><dt>Disease</dt><dd>${escapeHtml(notif.disease || '—')}</dd></div>
                         <div><dt>Location</dt><dd>${escapeHtml(formatLocation(notif))}</dd></div>
-                        <div><dt>Catchment Nurse</dt><dd>${escapeHtml(formatOfficer(notif))}</dd></div>
+                        <div><dt>Midwife</dt><dd>${escapeHtml(formatOfficer(notif))}</dd></div>
                         <div><dt>Contact</dt><dd>${escapeHtml(formatContact(notif))}</dd></div>
                     </dl>
                     <div class="pulse-alert-card__recommendations">

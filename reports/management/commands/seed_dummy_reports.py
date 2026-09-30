@@ -132,7 +132,7 @@ def _jitter(lat: float, lng: float, rng: random.Random) -> tuple[float, float]:
 
 
 def _submitter_for(barangay_name: str):
-    for role in ('barangay_health_worker', 'catchment_nurse'):
+    for role in ('barangay_health_worker', 'midwife'):
         user = User.objects.filter(
             role=role,
             barangay_text__iexact=barangay_name,

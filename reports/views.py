@@ -73,7 +73,7 @@ def _incident_summary_disease_label(report_or_label) -> str:
 @login_required
 def submit_report(request):
     role = request.session.get('role')
-    if role not in ('health_officer', 'barangay_health_worker', 'encoder', 'catchment_nurse'):
+    if role not in ('health_officer', 'barangay_health_worker', 'encoder', 'midwife'):
         messages.error(request, 'Access denied.')
         return redirect('dashboard')
 
@@ -407,7 +407,7 @@ def my_reports(request):
 
 @role_required(
     'admin', 'super_admin', 'surveillance_officer', 'health_officer',
-    'barangay_health_worker', 'encoder', 'catchment_nurse'
+    'barangay_health_worker', 'encoder', 'midwife'
 )
 def case_records(request):
     search          = request.GET.get('search', '').strip()

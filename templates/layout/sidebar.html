@@ -53,7 +53,7 @@
     </a>
     {% endif %}
 
-    {% if session_role == 'catchment_nurse' %}
+    {% if session_role == 'midwife' %}
     <div class="nav-section-label">Management</div>
     <a href="{% url 'manage_bhws' %}" class="nav-item {% if 'manage-bhws' in request.path %}active{% endif %}">
       <span class="nav-icon"><i data-lucide="users" class="lucide-icon lucide-icon--sm"></i></span>
@@ -87,9 +87,9 @@
     </a>
     {% endif %}
 
-    {% if session_role == 'surveillance_officer' or session_role == 'admin' or session_role == 'super_admin' or session_role == 'catchment_nurse' or session_role == 'health_officer' %}
+    {% if session_role == 'surveillance_officer' or session_role == 'admin' or session_role == 'super_admin' or session_role == 'midwife' or session_role == 'health_officer' %}
     <div class="nav-section-label">Analysis</div>
-    {% if session_role == 'catchment_nurse' %}
+    {% if session_role == 'midwife' %}
     <a href="{% url 'nurse_analytics' %}" class="nav-item {% if 'analytics' in request.path %}active{% endif %}">
       <span class="nav-icon"><i data-lucide="line-chart" class="lucide-icon lucide-icon--sm"></i></span>
       <span>Analytics</span>
@@ -108,7 +108,7 @@
     {% endif %}
     {% endif %}
 
-    {% if session_role == 'encoder' or session_role == 'barangay_health_worker' or session_role == 'catchment_nurse' %}
+    {% if session_role == 'encoder' or session_role == 'barangay_health_worker' or session_role == 'midwife' %}
     <div class="nav-section-label">Data Entry</div>
     <a href="{% url 'submit_report' %}" class="nav-item {% if 'submit' in request.path %}active{% endif %}">
       <span class="nav-icon"><i data-lucide="file-plus" class="lucide-icon lucide-icon--sm"></i></span>
