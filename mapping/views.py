@@ -20,6 +20,7 @@ from reports.case_scope import (
     apply_open_case_scope,
     event_date_window_q,
     parse_scope_time_range,
+    window_includes_closed,
 )
 from reports.recommendation_service import (
     apply_alert_recommendation,
@@ -272,17 +273,20 @@ def api_barangay_data(request):
     time_range  = request.GET.get('time_range', '30')
     risk_filter = request.GET.get('risk', '')
     start, end = parse_scope_time_range(time_range)
+    include_closed = window_includes_closed(start, end)
     scoped_barangay = get_request_barangay(request)
     related_window_q = event_date_window_q(start, end, prefix='surveillancereport')
-    open_related_q = (
-        related_window_q
-        & ~Q(surveillancereport__status__in=INACTIVE_CASE_STATUSES)
-    )
+    if include_closed:
+        status_q = ~Q(surveillancereport__status='Discarded')
+    else:
+        status_q = ~Q(surveillancereport__status__in=INACTIVE_CASE_STATUSES)
+    open_related_q = related_window_q & status_q
 
     top_syndrome_qs = apply_open_case_scope(
         SurveillanceReport.objects.filter(barangay_id=OuterRef('id')),
         start=start,
         end=end,
+        include_closed=include_closed,
     ).values('syndrome_type').annotate(
         total_cases=Sum('case_count')
     ).order_by('-total_cases')
@@ -362,6 +366,7 @@ def api_cases(request):
         ),
         start=start,
         end=end,
+        include_closed=window_includes_closed(start, end),
     )
 
     if scoped_barangay:

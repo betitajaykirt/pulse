@@ -12,6 +12,7 @@ from reports.case_scope import (
     NAMED_TIME_RANGES,
     apply_open_case_scope,
     named_time_window,
+    window_includes_closed,
 )
 from reports.ml_display import (
     is_inconclusive_disease_label,
@@ -91,13 +92,27 @@ def _apply_disease_filter(qs, disease=''):
     return qs.filter(clause).distinct()
 
 
+def chart_status(status, classification=''):
+    """Map a stored case onto the Suspected / Probable / Confirmed curve."""
+    label = (status or '').strip()
+    if label in STATUS_ORDER:
+        return label
+    mapped = {
+        'suspected': 'Suspected',
+        'probable': 'Probable',
+        'confirmed': 'Confirmed',
+    }.get((classification or '').strip().lower())
+    return mapped or ''
+
+
 def _base_queryset(symptom_category='', barangay_id='', time_range='all_active'):
-    """All open surveillance reports in the selected window, read live from MySQL."""
+    """Surveillance reports in the selected window, read live from MySQL."""
     start, end = _time_window(time_range)
     qs = apply_open_case_scope(
         SurveillanceReport.objects.select_related('barangay'),
         start=start,
         end=end,
+        include_closed=window_includes_closed(start, end),
     )
     qs = _apply_disease_filter(qs, symptom_category)
     if barangay_id:
@@ -207,7 +222,7 @@ def build_epi_curve_data(qs, time_range='all_active'):
 
     rows = (
         dated_qs.annotate(period=trunc)
-        .values('period', 'status')
+        .values('period', 'status', 'case_classification')
         .annotate(count=Count('id'))
         .order_by('period')
     )
@@ -241,9 +256,9 @@ def build_epi_curve_data(qs, time_range='all_active'):
         key = _period_key(row['period'])
         if not key or key not in key_index:
             continue
-        status = row['status'] or 'Suspected'
+        status = chart_status(row['status'], row.get('case_classification'))
         if status not in status_data:
-            status = 'Suspected'
+            continue
         status_data[status][key_index[key]] += row['count']
 
     datasets = [
@@ -260,6 +275,11 @@ def build_epi_curve_data(qs, time_range='all_active'):
         period_title = expected_end.strftime('%B %Y')
     elif time_range == 'all_active':
         period_title = 'All open cases'
+    elif expected_start.year != expected_end.year:
+        period_title = (
+            f'{expected_start.strftime("%b %d, %Y")} – '
+            f'{expected_end.strftime("%b %d, %Y")}'
+        )
     else:
         period_title = f'{expected_start.strftime("%b %d")} – {expected_end.strftime("%b %d, %Y")}'
 

@@ -14,7 +14,9 @@ NAMED_TIME_RANGES = (
     'last_30_days',
     'last_3_months',
     'last_6_months',
+    'last_1_year',
     'current_year',
+    'last_3_years',
 )
 
 
@@ -38,9 +40,21 @@ def named_time_window(time_range: str, today=None) -> tuple[date | None, date]:
         return today - timedelta(days=90), today
     if key == 'last_6_months':
         return today - timedelta(days=183), today
+    if key == 'last_1_year':
+        return today - timedelta(days=365), today
     if key == 'current_year':
         return today.replace(month=1, day=1), today
+    if key == 'last_3_years':
+        return today - timedelta(days=365 * 3), today
     return None, today
+
+
+def window_includes_closed(start, end=None, today=None) -> bool:
+    """Longer filters keep closed history. The last 30 days stays current cases."""
+    if start is None:
+        return False
+    today = local_today(today)
+    return start <= today - timedelta(days=32)
 
 
 def rolling_days_window(days: int, today=None) -> tuple[date, date]:
@@ -103,9 +117,12 @@ def inactive_status_q(prefix: str = '') -> Q:
     return Q(**{f'{status}__in': INACTIVE_CASE_STATUSES})
 
 
-def apply_open_case_scope(qs, *, start=None, end=None):
-    """Open cases only (not Closed/Discarded), optionally limited by event date."""
-    qs = qs.exclude(status__in=INACTIVE_CASE_STATUSES)
+def apply_open_case_scope(qs, *, start=None, end=None, include_closed=False):
+    """Open cases, plus closed history when a longer date window asks for it."""
+    if include_closed:
+        qs = qs.exclude(status='Discarded')
+    else:
+        qs = qs.exclude(status__in=INACTIVE_CASE_STATUSES)
     window = event_date_window_q(start, end)
     if window:
         qs = qs.filter(window)

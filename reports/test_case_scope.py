@@ -3,12 +3,14 @@ from datetime import date
 from django.db.models import Q
 from django.test import SimpleTestCase
 
+from dashboard.analytics_service import chart_status
 from reports.case_scope import (
     INACTIVE_CASE_STATUSES,
     event_date_window_q,
     named_time_window,
     parse_scope_time_range,
     rolling_days_window,
+    window_includes_closed,
 )
 
 
@@ -32,6 +34,24 @@ class CaseScopeWindowTests(SimpleTestCase):
         start, end = parse_scope_time_range('all_active')
         self.assertIsNone(start)
         self.assertIsNone(end)
+
+    def test_last_three_years_is_a_bounded_window(self):
+        today = date(2026, 10, 1)
+        start, end = named_time_window('last_3_years', today=today)
+        self.assertEqual(start, date(2023, 10, 2))
+        self.assertEqual(end, today)
+        self.assertTrue(window_includes_closed(start, end, today=today))
+
+    def test_closed_history_keeps_its_classification_on_the_curve(self):
+        self.assertEqual(chart_status('Closed', 'confirmed'), 'Confirmed')
+        self.assertEqual(chart_status('Closed', 'probable'), 'Probable')
+        self.assertEqual(chart_status('Suspected', ''), 'Suspected')
+        self.assertEqual(chart_status('Closed', ''), '')
+
+    def test_last_30_days_stays_on_open_cases(self):
+        today = date(2026, 10, 1)
+        start, end = named_time_window('last_30_days', today=today)
+        self.assertFalse(window_includes_closed(start, end, today=today))
 
     def test_map_days_use_onset_window(self):
         start, end = parse_scope_time_range('7', today=date(2026, 9, 10))
