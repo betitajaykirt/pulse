@@ -19,6 +19,7 @@ from reports.ml_display import (
     is_alertable_disease_label,
     official_disease_label,
     report_has_alertable_disease,
+    report_is_category_i_high_confidence,
 )
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,7 @@ ALERT_TRIGGER_LABELS = {
     'aptas_anomaly': 'High Anomaly Score',
     'spatial_cluster': 'Spatial Cluster Spike',
     'pidsr_threshold': 'PIDSR Threshold Breach',
+    'category_i_signal': 'Category I High-Confidence Case',
     'new_confirmed_case': 'New Confirmed Case',
 }
 
@@ -124,6 +126,14 @@ def trigger_aptas_for_report(report_id, *, is_anomaly=False):
 
     if is_active_alert:
         _create_alert(assessment, report.barangay, report, is_anomaly=is_anomaly, alert_level=risk_level)
+    elif report_is_category_i_high_confidence(report):
+        _create_alert(
+            assessment,
+            report.barangay,
+            report,
+            alert_level='high',
+            trigger_code='category_i_signal',
+        )
 
     return assessment
 
@@ -206,7 +216,7 @@ def _get_purok_for_report(report):
         return report.patient.address
     return ""
 
-def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level=None):
+def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level=None, trigger_code=None):
     """Create or refresh an alert pending administrator review."""
     if not report_has_alertable_disease(report):
         logger.info(
@@ -219,11 +229,12 @@ def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level
 
     disease = official_disease_label(report)
     purok = _get_purok_for_report(report)
-    trigger_code = (
-        'aptas_anomaly'
-        if float(assessment.anomaly_score or 0) >= 0.50 or is_anomaly
-        else 'spatial_cluster'
-    )
+    if not trigger_code:
+        trigger_code = (
+            'aptas_anomaly'
+            if float(assessment.anomaly_score or 0) >= 0.50 or is_anomaly
+            else 'spatial_cluster'
+        )
     trigger_source = alert_trigger_label(trigger_code)
     recommendation_text = _default_alert_recommendation(report)
 

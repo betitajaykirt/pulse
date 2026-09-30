@@ -512,6 +512,21 @@ def _is_trackable_syndrome(syndrome_name: str) -> bool:
     return is_alertable_disease_label(syndrome_name)
 
 
+def _open_category_i_high_confidence(barangay_name: str, syndrome_name: str) -> bool:
+    """True when an open Category I case in this barangay is at 50% or higher."""
+    from myapp.threshold_data import resolve_pidsr_category
+    from reports.ml_display import report_is_category_i_high_confidence
+
+    if resolve_pidsr_category(syndrome_name) != 'Category 1':
+        return False
+    if not _is_trackable_syndrome(syndrome_name):
+        return False
+    return any(
+        report_is_category_i_high_confidence(report)
+        for report in _active_reports_qs(barangay_name, syndrome_name)
+    )
+
+
 def _syndrome_match_q(syndrome_name: str) -> Q:
     syndrome = (syndrome_name or '').strip()
     if not _is_trackable_syndrome(syndrome):
@@ -663,8 +678,12 @@ def compute_temporal_score(
     mu_28 = statistics.mean(weekly_counts) if weekly_counts else 0.0
     sigma_28 = statistics.pstdev(weekly_counts) if len(weekly_counts) > 1 else 0.0
 
+    # A flat baseline has no scale. Treat one case per week as the minimum
+    # deviation so a single case cannot become a maximum temporal surge.
     if sigma_28 == 0:
-        return 1.0 if x_7 > 0 else 0.0
+        if x_7 <= mu_28:
+            return 0.0
+        sigma_28 = 1.0
 
     t_score = (x_7 - mu_28) / (3 * sigma_28)
     return max(0.0, min(1.0, t_score))
@@ -913,6 +932,8 @@ def compute_and_log_barangay_risk(
         from reports.ml_display import report_has_alertable_disease
         if not report_has_alertable_disease(report):
             is_active = False
+    if not is_active and _open_category_i_high_confidence(barangay, syndrome):
+        is_active = True
 
     if deactivate_previous:
         BarangayRiskLog.objects.filter(
@@ -994,7 +1015,10 @@ def compute_aptas_breakdown(
         'final_risk_score': final_score,
         'risk_level': classify_risk_level(final_score),
         'is_active_alert': (
-            should_activate_aptas_alert(final_score, anomaly)
+            (
+                should_activate_aptas_alert(final_score, anomaly)
+                or _open_category_i_high_confidence(barangay, syndrome)
+            )
             and _is_trackable_syndrome(syndrome)
         ),
     }

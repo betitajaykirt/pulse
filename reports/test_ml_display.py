@@ -6,6 +6,7 @@ from reports.ml_display import (
     official_disease_label,
     predicted_disease_display,
     report_has_alertable_disease,
+    report_is_category_i_high_confidence,
     stored_disease_identity_from_ml,
 )
 
@@ -29,6 +30,42 @@ class OfficialDiseaseIdentityTests(SimpleTestCase):
         self.assertEqual(official_disease_label(report), 'Dengue Fever')
         self.assertEqual(predicted_disease_display(report)['primary'], 'Dengue Fever')
         self.assertFalse(report_has_alertable_disease(report))
+
+    def test_category_i_high_confidence_is_alertable(self):
+        report = _report(
+            status='Probable',
+            syndrome_type='COVID-19',
+            suspected_disease='COVID-19',
+            remarks='ML Classification: COVID-19 | ML Top Prediction: COVID-19 | ML Confidence: 92.1%',
+        )
+        self.assertTrue(report_is_category_i_high_confidence(report))
+
+    def test_category_i_at_fifty_percent_is_alertable(self):
+        report = _report(
+            status='Probable',
+            syndrome_type='COVID-19',
+            suspected_disease='COVID-19',
+            remarks='ML Classification: COVID-19 | ML Top Prediction: COVID-19 | ML Confidence: 50.0%',
+        )
+        self.assertTrue(report_is_category_i_high_confidence(report))
+
+    def test_category_i_below_fifty_percent_stays_off(self):
+        report = _report(
+            status='Suspected',
+            syndrome_type='COVID-19',
+            suspected_disease='COVID-19',
+            remarks='ML Classification: COVID-19 | ML Top Prediction: COVID-19 | ML Confidence: 49.9%',
+        )
+        self.assertFalse(report_is_category_i_high_confidence(report))
+
+    def test_category_ii_high_confidence_uses_risk_gate(self):
+        report = _report(
+            status='Probable',
+            syndrome_type='Dengue Fever',
+            suspected_disease='Dengue Fever',
+            remarks='ML Classification: Dengue Fever | ML Top Prediction: Dengue Fever | ML Confidence: 82.9%',
+        )
+        self.assertFalse(report_is_category_i_high_confidence(report))
 
     def test_high_confidence_stored_label_is_official(self):
         report = _report(

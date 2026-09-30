@@ -84,6 +84,20 @@ def report_has_alertable_disease(report) -> bool:
     return is_alertable_disease_label(official_disease_label(report))
 
 
+_CATEGORY_I_ALERT_CONFIDENCE = 0.50
+
+
+def report_is_category_i_high_confidence(report) -> bool:
+    """Category I at 50% or higher is immediately notifiable."""
+    if not report_has_alertable_disease(report):
+        return False
+    from myapp.threshold_data import resolve_pidsr_category
+    if resolve_pidsr_category(official_disease_label(report)) != 'Category 1':
+        return False
+    confidence = parse_ml_confidence(getattr(report, 'remarks', None) or '')
+    return confidence is not None and confidence >= _CATEGORY_I_ALERT_CONFIDENCE
+
+
 def parse_ml_top_prediction(remarks: str) -> str:
     if not remarks:
         return ''
