@@ -36,17 +36,25 @@ def approved_recommendation_matrix() -> dict[str, dict]:
 
 
 def field_recommendation_matrix() -> dict[str, dict]:
-    """Recommendations released to BHWs and other non-admin roles."""
+    """Recommendations whose latest revision is still approved."""
     try:
-        released = {
-            disease
-            for disease in RecommendationRevision.objects.filter(
-                approved_at__isnull=False,
-            ).exclude(scope_disease='').values_list('scope_disease', flat=True)
-            if disease
-        }
+        rows = (
+            RecommendationRevision.objects
+            .exclude(scope_disease='')
+            .order_by('-id')
+            .values_list('scope_disease', 'status')
+        )
     except (OperationalError, ProgrammingError):
         return {}
+
+    latest_status = {}
+    for disease, status in rows:
+        latest_status.setdefault(disease, status)
+    released = {
+        disease
+        for disease, status in latest_status.items()
+        if status == 'approved'
+    }
     if not released:
         return {}
     source = approved_recommendation_matrix()

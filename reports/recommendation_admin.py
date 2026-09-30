@@ -213,9 +213,10 @@ def approve_recommendation_revision(request, revision_id):
             current_row.update(deepcopy(edited_row))
             validate_recommendation_matrix(merged_payload)
             revision.payload = merged_payload
-        RecommendationRevision.objects.filter(status='approved').update(
-            status='superseded'
-        )
+        RecommendationRevision.objects.filter(
+            status='approved',
+            scope_disease=revision.scope_disease,
+        ).update(status='superseded')
         revision.status = 'approved'
         revision.approved_by_id = request.session['user_id']
         revision.approved_by_role = request.session.get('role', 'admin')
