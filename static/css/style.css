@@ -2492,6 +2492,10 @@ html[data-theme="dark"] .map-layer-btn:hover {
   max-height: none !important;
   overflow-y: auto !important; /* Internal scrolling only */
 }
+.custom-fixed-popup a.leaflet-popup-close-button {
+  top: 6px !important;
+  right: 18px !important;
+}
 .leaflet-popup-pane {
   z-index: 800 !important;
 }
