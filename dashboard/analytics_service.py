@@ -28,9 +28,9 @@ SEX_ORDER = ['Male', 'Female']
 INACTIVE_STATUSES = INACTIVE_CASE_STATUSES
 
 STATUS_COLORS = {
-    'Suspected': '#f59e0b',
-    'Probable': '#f97316',
-    'Confirmed': '#ef4444',
+    'Suspected': '#F59E0B',
+    'Probable': '#EF4444',
+    'Confirmed': '#8B5CF6',
 }
 
 SEX_COLORS = {
@@ -180,7 +180,7 @@ def _pad_period_keys(period_keys, interval, start_date=None, end_date=None):
 
 
 def build_epi_curve_data(qs, time_range='all_active'):
-    today = timezone.now().date()
+    today = timezone.localdate()
     dated_qs = _with_event_date(qs)
     window_start, window_end = _time_window(time_range, today)
 
