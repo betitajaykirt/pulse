@@ -64,7 +64,9 @@
           <label for="create-role">Role *</label>
           <select name="role" id="create-role" class="input-soft" required>
             <option value="">Select Role</option>
-            <option value="health_officer">Health Officer</option>
+            {% if session_role == 'super_admin' %}
+            <option value="admin">Admin</option>
+            {% endif %}
             <option value="midwife">Midwife</option>
             <option value="barangay_health_worker">Barangay Health Worker</option>
           </select>

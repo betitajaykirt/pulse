@@ -14,7 +14,7 @@ from accounts.identity_utils import (
     normalize_email,
 )
 from myapp.date_utils import parse_user_date
-from myapp.models import User, Barangay
+from myapp.models import Admin, User, Barangay
 
 
 @role_required('admin', 'super_admin')
@@ -57,12 +57,18 @@ def create(request):
     contact  = request.POST.get('contact_number', '').strip()
     contact_normalized = normalize_contact_number(contact)
 
-    valid_roles = ['health_officer', 'barangay_health_worker', 'midwife']
+    actor_role = request.session.get('role')
+    valid_roles = ['barangay_health_worker', 'midwife']
+    if actor_role == 'super_admin':
+        valid_roles.append('admin')
     errors = []
     if not first:  errors.append('First name required.')
     if not last:   errors.append('Last name required.')
     if not email:  errors.append('Email required.')
-    if role not in valid_roles: errors.append('Invalid role.')
+    if role == 'admin' and actor_role != 'super_admin':
+        errors.append('Only a super admin can create admin accounts.')
+    elif role not in valid_roles:
+        errors.append('Invalid role.')
     if len(password) < 8: errors.append('Password must be at least 8 characters.')
     if role in ('barangay_health_worker', 'midwife') and not barangay:
         errors.append('Barangay is required for the selected role.')
@@ -84,6 +90,23 @@ def create(request):
     username = f"{first.lower()}.{last.lower()}.{secrets.token_hex(4)}"
     now = timezone.now()
     parsed_birthdate = parse_user_date(bdate) if bdate else None
+    if role == 'admin':
+        Admin.objects.create(
+            username=username,
+            first_name=first,
+            last_name=last,
+            middle_name=middle or None,
+            suffix=suffix or None,
+            email=email,
+            contact_number=contact_normalized or None,
+            password_hash=hash_password(password),
+            status='active',
+            created_at=now,
+            updated_at=now,
+        )
+        messages.success(request, f'Admin account for {first} {last} created.')
+        return redirect('users_index')
+
     User.objects.create(
         username=username,
         first_name=first,
