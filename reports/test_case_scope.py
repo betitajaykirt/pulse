@@ -3,7 +3,8 @@ from datetime import date
 from django.db.models import Q
 from django.test import SimpleTestCase
 
-from dashboard.analytics_service import chart_status
+from dashboard.analytics_service import DISEASE_CHART_COLORS, chart_status, disease_chart_color
+from reports.pidsr_schema import DISEASE_LABELS
 from reports.case_scope import (
     INACTIVE_CASE_STATUSES,
     event_date_window_q,
@@ -41,6 +42,12 @@ class CaseScopeWindowTests(SimpleTestCase):
         self.assertEqual(start, date(2023, 10, 2))
         self.assertEqual(end, today)
         self.assertTrue(window_includes_closed(start, end, today=today))
+
+    def test_every_disease_has_its_own_chart_color(self):
+        colors = [disease_chart_color(label) for label in DISEASE_LABELS]
+        self.assertEqual(len(colors), 27)
+        self.assertEqual(len(colors), len(set(colors)))
+        self.assertEqual(set(DISEASE_CHART_COLORS), set(DISEASE_LABELS))
 
     def test_closed_history_keeps_its_classification_on_the_curve(self):
         self.assertEqual(chart_status('Closed', 'confirmed'), 'Confirmed')

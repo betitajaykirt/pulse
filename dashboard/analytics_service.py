@@ -39,6 +39,38 @@ SEX_COLORS = {
     'Female': '#ec4899',
 }
 
+# One stable color per monitored disease. The doughnut used to repeat a
+# 10-color list, so unrelated diseases looked the same.
+DISEASE_CHART_COLORS = {
+    'Acute Bloody Diarrhea': '#93AA00',
+    'Acute Encephalitis Syndrome': '#593315',
+    'Acute Flaccid Paralysis': '#C10020',
+    'Acute Hemorrhagic Fever Syndrome': '#F13A13',
+    'Acute Viral Hepatitis': '#232C16',
+    'Adverse Event Following Immunization': '#00538A',
+    'Anthrax': '#007D34',
+    'Bacterial Meningitis': '#1B6CA8',
+    'Cholera': '#E15D8A',
+    'COVID-19': '#FF6800',
+    'Dengue Fever': '#0E7C86',
+    'Diphtheria': '#6B4C9A',
+    'Hand, Foot, and Mouth Disease': '#803E75',
+    'Human Avian Influenza': '#F2C200',
+    'Influenza-Like Illness': '#C45C26',
+    'Leptospirosis': '#2F6B3A',
+    'Malaria': '#D4A017',
+    'Measles': '#53377A',
+    'Meningococcal Disease': '#FF7A5C',
+    'Middle East Respiratory Syndrome': '#817066',
+    'Neonatal Tetanus': '#A6BDD7',
+    'Non-Neonatal Tetanus': '#8C1D40',
+    'Paralytic Shellfish Poisoning': '#F6768E',
+    'Pertussis': '#3D5A80',
+    'Rabies': '#B32851',
+    'Severe Acute Respiratory Syndrome': '#7F180D',
+    'Typhoid and Paratyphoid Fever': '#B8860B',
+}
+
 
 def _age_bracket(age):
     try:
@@ -377,25 +409,27 @@ def _count_by_analytics_disease(qs):
     return aggregated
 
 
+def disease_chart_color(label: str) -> str:
+    """Return the chart color reserved for this disease."""
+    return DISEASE_CHART_COLORS.get(label, '#64748B')
+
+
 def build_disease_distribution_data(qs):
     aggregated = _count_by_analytics_disease(qs)
     sorted_items = sorted(aggregated.items(), key=lambda x: x[1], reverse=True)
-    base_colors = [
-        '#0F4C81', '#00A6A6', '#E11D48', '#f59e0b', '#8b5cf6',
-        '#10b981', '#f43f5e', '#6366f1', '#14b8a6', '#eab308',
-    ]
     labels, data, background_colors = [], [], []
-    for i, (disease, count) in enumerate(sorted_items):
+    for disease, count in sorted_items:
         labels.append(disease)
         data.append(count)
-        background_colors.append(base_colors[i % len(base_colors)])
+        background_colors.append(disease_chart_color(disease))
 
     return {
         'labels': labels,
         'datasets': [{
             'data': data,
             'backgroundColor': background_colors,
-            'borderWidth': 0,
+            'borderColor': '#ffffff',
+            'borderWidth': 2,
         }],
     }
 
