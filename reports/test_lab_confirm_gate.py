@@ -17,7 +17,7 @@ from reports.views import (
 class CloseCasePolicyTests(SimpleTestCase):
     def test_encoder_cannot_close_probable(self):
         msg = close_case_rejection(
-            'encoder', 'Probable', 'Lost to Follow-up',
+            'encoder', 'Probable', 'Recovered',
         )
         self.assertIsNotNone(msg)
         self.assertIn('cannot close probable or suspected', msg.lower())
@@ -41,10 +41,12 @@ class CloseCasePolicyTests(SimpleTestCase):
         self.assertIsNotNone(msg)
         self.assertIn('Case Confirmation', msg)
 
-    def test_cho_can_close_probable_lost_to_follow_up(self):
-        self.assertIsNone(close_case_rejection(
+    def test_lost_to_follow_up_is_not_a_close_outcome(self):
+        msg = close_case_rejection(
             'health_officer', 'Probable', 'Lost to Follow-up',
-        ))
+        )
+        self.assertIsNotNone(msg)
+        self.assertIn('valid resolution outcome', msg.lower())
 
     def test_probable_can_use_standard_recovered_outcome(self):
         self.assertIsNone(close_case_rejection(

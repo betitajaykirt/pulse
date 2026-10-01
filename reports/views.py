@@ -1189,7 +1189,6 @@ ALLOWED_CLOSE_OUTCOMES = frozenset({
     'Recovered',
     'Recovered (Confirmed Case)',
     'Deceased',
-    'Lost to Follow-up',
 })
 CHO_CLOSE_ROLES = frozenset({
     'admin',
