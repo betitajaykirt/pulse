@@ -145,27 +145,6 @@ def check_identity(request):
 
 
 @role_required('admin', 'super_admin')
-def update_role(request, user_id):
-    if request.method != 'POST':
-        return redirect('users_index')
-
-    new_role = request.POST.get('role', '').strip()
-    valid_roles = ['encoder', 'health_officer', 'surveillance_officer', 'barangay_health_worker', 'midwife']
-    if new_role not in valid_roles:
-        messages.error(request, 'Invalid role.')
-        return redirect('users_index')
-
-    user = User.objects.filter(id=user_id).first()
-    if not user:
-        messages.error(request, 'User not found.')
-        return redirect('users_index')
-
-    User.objects.filter(id=user_id).update(role=new_role)
-    messages.success(request, f'Role updated to {new_role}.')
-    return redirect('users_index')
-
-
-@role_required('admin', 'super_admin')
 def deactivate(request, user_id):
     if request.method != 'POST':
         return redirect('users_index')

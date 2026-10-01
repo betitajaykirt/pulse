@@ -180,10 +180,6 @@
             <td data-label="Created"><span class="um-date">{{ u.created_at|md_datetime }}</span></td>
             <td data-label="Actions">
               <div class="um-actions">
-                <button type="button" class="nc-btn nc-btn--outline nc-btn--sm btn-edit-toggle" data-id="{{ u.id }}">
-                  <i data-lucide="pencil" class="lucide-icon lucide-icon--xs"></i>
-                  Edit Role
-                </button>
                 {% if u.status == 'active' %}
                   <form method="POST" action="{% url 'users_deactivate' u.id %}" class="um-inline-form"
                         onsubmit="return confirm('Deactivate this account?');">
@@ -203,19 +199,6 @@
                     </button>
                   </form>
                 {% endif %}
-              </div>
-              <div id="edit-form-{{ u.id }}" class="um-edit-panel" style="display:none;">
-                <form method="POST" action="{% url 'users_update' u.id %}" class="um-edit-form">
-                  {% csrf_token %}
-                  <select name="role" class="input-soft" required>
-                    <option value="encoder" {% if u.role == 'encoder' %}selected{% endif %}>Encoder</option>
-                    <option value="health_officer" {% if u.role == 'health_officer' %}selected{% endif %}>Health Officer</option>
-                    <option value="surveillance_officer" {% if u.role == 'surveillance_officer' %}selected{% endif %}>Surveillance Officer</option>
-                    <option value="midwife" {% if u.role == 'midwife' %}selected{% endif %}>Midwife</option>
-                    <option value="barangay_health_worker" {% if u.role == 'barangay_health_worker' %}selected{% endif %}>Barangay Health Worker</option>
-                  </select>
-                  <button type="submit" class="nc-btn nc-btn--primary nc-btn--sm">Save</button>
-                </form>
               </div>
             </td>
           </tr>
@@ -248,13 +231,6 @@ document.addEventListener('DOMContentLoaded', function () {
     var needsBarangay = barangayRoles.indexOf(this.value) !== -1;
     bf.style.display = needsBarangay ? 'block' : 'none';
     bf.querySelector('select').required = needsBarangay;
-  });
-
-  document.querySelectorAll('.btn-edit-toggle').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var f = document.getElementById('edit-form-' + btn.dataset.id);
-      f.style.display = f.style.display === 'none' ? 'block' : 'none';
-    });
   });
 
   var createPwToggle = document.getElementById('create-pw-toggle');
