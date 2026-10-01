@@ -6,9 +6,9 @@
 
   <header class="pulse-page-header">
     <div class="pulse-page-header__text">
-      <span class="pulse-eyebrow">Validation</span>
+      <span class="pulse-eyebrow">Surveillance</span>
       <h2>Case Records</h2>
-      <p>Validate, update, and search all submitted surveillance reports</p>
+      <p>Search and review submitted surveillance reports</p>
     </div>
   </header>
 
@@ -23,11 +23,11 @@
         <button type="submit" class="nc-btn nc-btn--primary nc-btn--sm">Search</button>
       </div>
 
-      <details class="filter-drawer" {% if case_status or validation or barangay or symptom_category or disease_category %}open{% endif %} style="margin-top:1rem;">
+      <details class="filter-drawer" {% if case_status or barangay or symptom_category or disease_category %}open{% endif %} style="margin-top:1rem;">
         <summary>
           <i data-lucide="chevron-right" class="lucide-icon lucide-icon--xs filter-drawer__chevron"></i>
           Advanced Filters
-          {% if case_status or validation or barangay or symptom_category or disease_category %}
+          {% if case_status or barangay or symptom_category or disease_category %}
             <span class="pill-badge badge-info" style="margin-left:.35rem;">Applied</span>
           {% endif %}
         </summary>
@@ -44,15 +44,6 @@
                 <option value="Confirmed" {% if case_status == 'Confirmed' %}selected{% endif %}>Confirmed</option>
                 <option value="Closed" {% if case_status == 'Closed' %}selected{% endif %}>Closed</option>
                 <option value="Discarded" {% if case_status == 'Discarded' %}selected{% endif %}>Discarded</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Validation</label>
-              <select name="validation" class="input-soft input-soft--plain">
-                <option value="">All Validation</option>
-                <option value="pending" {% if validation == 'pending' %}selected{% endif %}>Pending</option>
-                <option value="validated" {% if validation == 'validated' %}selected{% endif %}>Validated</option>
-                <option value="rejected" {% if validation == 'rejected' %}selected{% endif %}>Rejected</option>
               </select>
             </div>
             {% if city_wide %}
@@ -86,7 +77,7 @@
           <div class="filter-drawer__actions">
             <button type="submit" class="nc-btn nc-btn--primary nc-btn--sm">Apply Filters</button>
             <a href="{% url 'case_records' %}" class="nc-btn nc-btn--outline nc-btn--sm">Clear</a>
-            {% if case_status or validation or barangay or symptom_category or disease_category %}
+            {% if case_status or barangay or symptom_category or disease_category %}
             <span class="filter-applied-note">Filters applied</span>
             {% endif %}
           </div>
@@ -103,12 +94,12 @@
     <div class="pulse-table-wrap table-wrapper">
       <table class="pulse-table">
         <thead>
-          <tr><th>#</th><th>Patient</th><th>Barangay</th><th>Predicted Disease</th><th>Onset</th><th>Reporter</th><th>Status</th><th>Validation</th><th>Actions</th></tr>
+          <tr><th>#</th><th>Patient</th><th>Barangay</th><th>Predicted Disease</th><th>Onset</th><th>Reporter</th><th>Status</th><th>Actions</th></tr>
         </thead>
         <tbody>
         {% if not records %}
           <tr>
-            <td colspan="9">
+            <td colspan="8">
               <div class="pulse-empty">
                 <i data-lucide="folder-open" class="lucide-icon"></i>
                 <p>No records found.</p>
@@ -140,9 +131,6 @@
               </span>
               {% if r.confirmed_at %}<div class="um-muted" style="margin-top:.25rem;">{{ r.confirmed_at|md_date }}</div>{% endif %}
             </td>
-            <td data-label="Validation">
-              <span class="pill-badge {% if r.validation_status == 'validated' %}badge-active{% elif r.validation_status == 'rejected' %}badge-inactive{% else %}badge-muted{% endif %}">{{ r.validation_status|title }}</span>
-            </td>
             <td data-label="Actions">
               <div class="pulse-actions">
                 <button type="button" class="nc-btn nc-btn--outline nc-btn--sm"
@@ -164,18 +152,6 @@
                     '{{ r.resolution_outcome|default:""|escapejs }}',
                     '{{ r.closed_at|md_datetime|default:"" }}'
                   )">View</button>
-                {% if r.validation_status == 'pending' and can_validate %}
-                <form method="POST" action="{% url 'validate_report' r.id %}" class="um-inline-form">
-                  {% csrf_token %}
-                  <input type="hidden" name="action" value="validate">
-                  <button type="submit" class="nc-btn nc-btn--success nc-btn--sm">Validate</button>
-                </form>
-                <form method="POST" action="{% url 'validate_report' r.id %}" class="um-inline-form" onsubmit="return confirm('Reject this report?');">
-                  {% csrf_token %}
-                  <input type="hidden" name="action" value="reject">
-                  <button type="submit" class="nc-btn nc-btn--danger nc-btn--sm">Reject</button>
-                </form>
-                {% endif %}
               </div>
             </td>
           </tr>
@@ -330,8 +306,6 @@ function viewRecord(id, barangay, disease, classif, cases, onset, caseStatus, va
 
   const classifColor = classif === 'confirmed' ? '#DC2626' : classif === 'probable' ? '#F59E0B' : '#0F4C81';
   const caseStatusColor = caseStatus === 'Confirmed' ? '#DC2626' : caseStatus === 'Suspected' ? '#F59E0B' : caseStatus === 'Discarded' ? '#64748B' : '#C2410C';
-  const validationColor  = validationStatus === 'validated' ? '#16A34A' : validationStatus === 'rejected' ? '#DC2626' : '#94a3b8';
-
   let html = '';
 
   html += '<div class="section-divider">Report Info</div>';
@@ -345,7 +319,6 @@ function viewRecord(id, barangay, disease, classif, cases, onset, caseStatus, va
   html += row('Submitted On', date);
   html += row('Case Status', `<span style="color:${caseStatusColor};font-weight:700;">${caseStatus}</span>`);
   if (confirmedAt) html += row('Confirmed On', confirmedAt);
-  html += row('Validation', `<span style="color:${validationColor};font-weight:700;">${cap(validationStatus)}</span>`);
 
   if (lat && lng) {
     html += '<div class="section-divider">Location</div>';

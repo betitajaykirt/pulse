@@ -411,7 +411,6 @@ def my_reports(request):
 )
 def case_records(request):
     search          = request.GET.get('search', '').strip()
-    validation      = request.GET.get('validation', '').strip()
     case_status     = request.GET.get('case_status', '').strip()
     barangay        = request.GET.get('barangay', '').strip()
     symptom_category = request.GET.get('symptom_category', '').strip()
@@ -433,8 +432,6 @@ def case_records(request):
               Q(barangay__barangay_name__icontains=search) |
               Q(patient_name__icontains=search) |
               Q(remarks__icontains=search))
-    if validation:
-        q &= Q(validation_status=validation)
     if case_status:
         q &= Q(status=case_status)
     if scoped_barangay:
@@ -486,7 +483,6 @@ def case_records(request):
         'symptom_category_choices': SYMPTOM_CATEGORY_CHOICES,
         'disease_category_choices': DISEASE_CATEGORY_CHOICES,
         'search': search,
-        'validation': validation,
         'case_status': case_status,
         'barangay': barangay,
         'symptom_category': symptom_category,
