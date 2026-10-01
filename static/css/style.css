@@ -2171,10 +2171,48 @@ html[data-theme="dark"] .aptas-alert-card--pidsr .aptas-alert-card__logged {
   background: rgba(15, 76, 129, 0.06); color: var(--primary);
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
-.pulse-table-wrap,
-.um-table-wrap {
+.pulse-table-wrap {
   overflow-x: auto; -webkit-overflow-scrolling: touch;
   padding: 0 1.75rem 1.5rem;
+}
+.um-table-wrap {
+  overflow-x: hidden;
+  padding: 0 1.25rem 1.5rem;
+}
+.um-table {
+  table-layout: fixed;
+}
+.um-col-id { width: 44px; }
+.um-col-name { width: 16%; }
+.um-col-email { width: 22%; }
+.um-col-role { width: 15%; }
+.um-col-barangay { width: 12%; }
+.um-col-status { width: 78px; }
+.um-col-created { width: 96px; }
+.um-col-actions { width: 118px; }
+.um-table thead th,
+.um-table tbody td {
+  padding: .75rem .4rem;
+}
+.um-table .um-user-name,
+.um-table .um-date,
+.um-table .um-barangay {
+  white-space: normal;
+}
+.um-table .um-email {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.um-table .um-pill--role {
+  white-space: normal;
+  line-height: 1.25;
+  text-align: center;
+}
+.um-table .um-actions .nc-btn {
+  white-space: nowrap;
+  padding: .4rem .55rem;
 }
 .pulse-table tbody td,
 .um-table tbody td {

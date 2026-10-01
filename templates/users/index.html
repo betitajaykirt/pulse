@@ -122,8 +122,18 @@
       <span class="um-count-badge">{{ users|length }} record{{ users|length|pluralize }}</span>
     </div>
 
-    <div class="um-table-wrap table-wrapper">
+    <div class="um-table-wrap">
       <table class="um-table">
+        <colgroup>
+          <col class="um-col-id">
+          <col class="um-col-name">
+          <col class="um-col-email">
+          <col class="um-col-role">
+          <col class="um-col-barangay">
+          <col class="um-col-status">
+          <col class="um-col-created">
+          <col class="um-col-actions">
+        </colgroup>
         <thead>
           <tr>
             <th>#</th>
@@ -162,7 +172,14 @@
             </td>
             <td data-label="Email"><span class="um-email">{{ u.email }}</span></td>
             <td data-label="Role">
-              <span class="um-pill um-pill--role">{{ u.role|title }}</span>
+              <span class="um-pill um-pill--role">
+                {% if u.role == 'barangay_health_worker' %}Barangay Health Worker
+                {% elif u.role == 'midwife' %}Midwife
+                {% elif u.role == 'encoder' %}Encoder
+                {% elif u.role == 'health_officer' %}Health Officer
+                {% elif u.role == 'surveillance_officer' %}Surveillance Officer
+                {% else %}{{ u.role|title }}{% endif %}
+              </span>
             </td>
             <td data-label="Barangay">
               {% if u.barangay_text %}
