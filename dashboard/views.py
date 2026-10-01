@@ -100,7 +100,11 @@ def _local_barangay_stats(user):
     top_diseases = build_top_disease_breakdown(base_qs, limit=2)
     total_confirmed = base_qs.filter(status='Confirmed').count()
     pending_reports = base_qs.filter(validation_status='pending').exclude(status='Confirmed').count()
-    
+    from reports.ml_display import official_disease_label
+    recent_reports = list(base_qs.order_by('-report_date')[:5])
+    for report in recent_reports:
+        report.display_disease = official_disease_label(report)
+
     # Retrieve active alerts related to this barangay
     notifications = NotificationLog.objects.select_related('alert').filter(
         recipient_role=user.role,
@@ -117,7 +121,7 @@ def _local_barangay_stats(user):
         'suspected_count': base_qs.filter(status='Suspected').count(),
         'confirmed_count': total_confirmed,
         'active_alerts': len(aptas_alerts),
-        'recent_reports': base_qs.order_by('-report_date')[:5],
+        'recent_reports': recent_reports,
         
         # Admin-style synced KPIs
         'active_cases_total': active_cases_total,
