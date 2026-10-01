@@ -118,7 +118,7 @@ for i, name in enumerate(["View Dashboard Alerts", "View Risk Status", "Receive 
     label(name, x1 + 12, px - 12, y)
 
 # Midwife -> process. Highest rail uses the rightmost stub.
-for i, name in enumerate(["Personal Information", "Case Report Data"]):
+for i, name in enumerate(["Task Assignment to BHW", "Case Follow-up"]):
     x0 = mid[0] + (188, 70)[i]
     y, xd = top_y[i], right_drop[i]
     stroke([(x0, mid[1]), (x0, y), (xd, y), (xd, py - 14)])
@@ -126,7 +126,7 @@ for i, name in enumerate(["Personal Information", "Case Report Data"]):
     label(name, xd + 14, x0 - 14, y)
 
 # process -> Midwife. Highest line lands nearest the process.
-for i, name in enumerate(["View Data", "View Alerts / Notifications", "Manage Information"]):
+for i, name in enumerate(["Approved Alerts", "Risk Status and Map", "Barangay Case Records"]):
     x1 = mid[0] + (48, 118, 188)[i]
     y = side_hi[i]
     stroke([(pr, y), (x1, y), (x1, mid[1] + mid[3] + 14)])
@@ -150,7 +150,7 @@ for i, name in enumerate(["User Management", "Case Record Updates", "Data Module
     label(name, min(x0, xd) + 12, max(x0, xd) - 12, y)
 
 # process -> Dual AI Engine. Highest line reaches farthest right.
-for i, name in enumerate(["Historical Incident Data", "Anomaly Results", "Geo-Spatial Map"]):
+for i, name in enumerate(["Symptom Features", "Outbreak History", "Climate Inputs"]):
     x1 = eng[0] + (275, 230, 185)[i]
     y = side_lo[i]
     stroke([(pr, y), (x1, y), (x1, eng[1] - 14)])
@@ -158,7 +158,7 @@ for i, name in enumerate(["Historical Incident Data", "Anomaly Results", "Geo-Sp
     label(name, pr + 12, x1 - 12, y)
 
 # Dual AI Engine -> process. Stubs stay to the right of those downward arrows.
-for i, name in enumerate(["Alert Acknowledgement", "Investigation Update", "Response Logs"]):
+for i, name in enumerate(["Disease Label", "Confidence Score", "Anomaly Score"]):
     # Up-stubs stay left of the downward arrows. The top rail is the longest.
     x0 = eng[0] + (140, 85, 30)[i]
     y, xd = bot_y[i], bot_right[i]
