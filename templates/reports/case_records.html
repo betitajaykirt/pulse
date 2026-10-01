@@ -311,7 +311,6 @@ function viewRecord(id, barangay, disease, classif, cases, onset, caseStatus, va
   html += '<div class="section-divider">Report Info</div>';
   html += row('Disease', disease);
   html += row('Classification', `<span style="color:${classifColor};font-weight:700;">${cap(classif)}</span>`);
-  html += row('Number of Cases', `<strong>${cases}</strong>`);
   html += row('Barangay', barangay);
   if (address) html += row('Purok / Address', address);
   html += row('Date of Onset', onset || '—');

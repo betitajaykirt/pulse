@@ -137,12 +137,12 @@
     <div class="pulse-table-wrap table-wrapper">
       <table class="pulse-table">
         <thead>
-          <tr><th>Barangay</th><th>Disease</th><th>Cases</th><th>Classification</th><th>Onset</th><th>Risk</th><th>Reporter</th><th>Date</th><th>Actions</th></tr>
+          <tr><th>Barangay</th><th>Disease</th><th>Classification</th><th>Onset</th><th>Risk</th><th>Reporter</th><th>Date</th><th>Actions</th></tr>
         </thead>
         <tbody>
         {% if not reports %}
           <tr>
-            <td colspan="9">
+            <td colspan="8">
               <div class="pulse-empty">
                 <i data-lucide="inbox" class="lucide-icon"></i>
                 <p>No validated reports match the selected filters.</p>
@@ -155,7 +155,6 @@
               data-id="{{ r.id }}"
               data-barangay="{{ r.barangay_name|default:'—' }}"
               data-disease="{{ r.display_disease }}"
-              data-cases="{{ r.case_count }}"
               data-classification="{{ r.status }}"
               data-onset="{{ r.date_of_onset|md_date }}"
               data-risk="{{ r.incident_risk_level }}"
@@ -167,7 +166,6 @@
               {{ r.display_disease }}
               {% pidsr_category_badge r.display_disease %}
             </td>
-            <td data-label="Cases"><strong>{{ r.case_count }}</strong></td>
             <td data-label="Classification">
               <span class="pill-badge {% if r.status == 'Confirmed' %}badge-danger{% elif r.status == 'Probable' %}badge-probable{% elif r.status == 'Suspected' %}badge-suspected{% else %}badge-info{% endif %}">{{ r.status }}</span>
             </td>

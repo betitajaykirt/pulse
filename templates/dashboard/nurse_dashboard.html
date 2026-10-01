@@ -177,7 +177,6 @@
           <thead>
             <tr>
               <th>Disease</th>
-              <th>Cases</th>
               <th>Submitted By</th>
               <th>Status</th>
               <th>Date</th>
@@ -187,7 +186,6 @@
             {% for r in recent_reports %}
             <tr class="pulse-table__row">
               <td data-label="Disease">{{ r.display_disease|default:r.syndrome_type }}</td>
-              <td data-label="Cases">{{ r.case_count }}</td>
               <td data-label="Submitted By">
                 {% if r.submitted_by %}
                   BHW: {{ r.submitted_by.first_name }} {{ r.submitted_by.last_name }}

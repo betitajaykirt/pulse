@@ -84,13 +84,12 @@
       <div class="pulse-table-wrap table-wrapper">
         <table class="pulse-table">
           <thead>
-            <tr><th>Disease</th><th>Cases</th><th>Status</th><th>Date</th></tr>
+            <tr><th>Disease</th><th>Status</th><th>Date</th></tr>
           </thead>
           <tbody>
             {% for r in recent_reports %}
             <tr class="pulse-table__row">
               <td data-label="Disease">{{ r.display_disease|default:r.syndrome_type }}</td>
-              <td data-label="Cases">{{ r.case_count }}</td>
               <td data-label="Status">
                 <span class="pill-badge badge-{% if r.status == 'Suspected' %}suspected{% elif r.status == 'Confirmed' %}confirmed{% else %}muted{% endif %}">{{ r.status }}</span>
               </td>

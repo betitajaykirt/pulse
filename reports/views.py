@@ -1454,12 +1454,11 @@ def incident_reports(request):
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="incident_reports.csv"'
         writer = csv.writer(response)
-        writer.writerow(['Barangay', 'Disease', 'Cases', 'Classification', 'Onset Date', 'Risk Level', 'Reporter', 'Report Date'])
+        writer.writerow(['Barangay', 'Disease', 'Classification', 'Onset Date', 'Risk Level', 'Reporter', 'Report Date'])
         for r in reports:
             writer.writerow([
                 r.barangay_name or '—',
                 r.display_disease,
-                r.case_count,
                 r.status,
                 format_display_date(r.date_of_onset),
                 r.incident_risk_level,
