@@ -94,9 +94,6 @@
         const toast = document.createElement('div');
         toast.className = `toast toast-${severityClass} pulse-alert-card`;
 
-        const contactTel = (notif.officer_contact || '').replace(/\D/g, '');
-        // For task notifications, if no contact number, fallback to 'Contact Officer via System' link
-        const contactHref = contactTel ? `tel:${contactTel}` : (notif.officer_email ? `mailto:${notif.officer_email}` : '#');
         const mapUrl = notif.map_url || `/map/?barangay=${encodeURIComponent(notif.barangay_name || '')}`;
         const pendingReview = notif.review_status === 'pending';
         const queuedNote = modalQueue.length > 0
@@ -150,8 +147,7 @@
                         <button type="button" class="btn btn-secondary toast-dismiss-btn">Acknowledge</button>
                         ${pendingReview
                             ? '<a href="/dashboard/alerts/" class="btn btn-primary pulse-alert-card__review-btn">Review Alert</a>'
-                            : `${contactTel || notif.officer_email ? `<a href="${escapeHtml(contactHref)}" class="btn btn-outline pulse-alert-card__contact-btn">Contact Nurse</a>` : ''}
-                               <a href="${escapeHtml(mapUrl)}" class="btn btn-primary pulse-alert-card__map-btn">View on Map</a>`}
+                            : `<a href="${escapeHtml(mapUrl)}" class="btn btn-primary pulse-alert-card__map-btn">View on Map</a>`}
                     </div>
                 </div>
             `;
