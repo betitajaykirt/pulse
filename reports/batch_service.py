@@ -327,6 +327,9 @@ def _persist_batch_submission(
 
         first_name = (case.get('first_name') or '').strip()
         last_name = (case.get('last_name') or '').strip()
+        middle_initial = (case.get('middle_name') or case.get('middle_initial') or '').strip().rstrip('.')
+        if middle_initial and (len(middle_initial) != 1 or not middle_initial.isalpha()):
+            raise ValueError(f'Patient #{idx}: middle initial must be one letter.')
         legacy_name = (case.get('patient_name') or '').strip()
         if first_name or last_name:
             if not first_name:

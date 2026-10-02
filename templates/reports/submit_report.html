@@ -312,8 +312,9 @@ function demographicsSectionHtml(p) {
             class="field-middle-name input-soft input-soft--plain"
             data-pid="${p.id}"
             value="${escapeTextarea(p.middle_name)}"
-            maxlength="10"
-            placeholder="e.g. M."
+            maxlength="1"
+            pattern="[A-Za-z]?"
+            placeholder="e.g. M"
             autocomplete="additional-name">
         </div>
         <div class="form-group">
@@ -542,7 +543,17 @@ function bindPatientEvents() {
   }
   bindNameField('.field-first-name', 'first_name');
   bindNameField('.field-last-name', 'last_name');
-  bindNameField('.field-middle-name', 'middle_name');
+  document.querySelectorAll('.field-middle-name').forEach(inp => {
+    inp.oninput = inp.onchange = () => {
+      const letter = ((inp.value || '').match(/[A-Za-z]/) || [''])[0];
+      if (inp.value !== letter) inp.value = letter;
+      const p = patients.find(x => x.id === inp.dataset.pid);
+      if (!p) return;
+      p.middle_name = letter;
+      p.patient_name = formatPatientFullName(p);
+      updatePatientHeader(p);
+    };
+  });
   bindNameField('.field-suffix', 'suffix');
   document.querySelectorAll('.field-civil-status').forEach(sel => {
     sel.onchange = () => { const p = patients.find(x => x.id === sel.dataset.pid); if (p) p.civil_status = sel.value; };
@@ -935,6 +946,8 @@ function validatePatients() {
     const n = i + 1;
     if (!(p.first_name || '').trim()) return `Patient #${n}: first name is required.`;
     if (!(p.last_name || '').trim()) return `Patient #${n}: last name is required.`;
+    const middle = (p.middle_name || '').trim();
+    if (middle && !/^[A-Za-z]$/.test(middle)) return `Patient #${n}: middle initial must be one letter.`;
     if (!p.date_of_birth) return `Patient #${n}: date of birth is required.`;
     if (!p.date_of_onset) return `Patient #${n}: date of onset is required.`;
     const dobDate = parsePatientDate(p.date_of_birth);
