@@ -126,7 +126,6 @@
               <th>Contact Number</th>
               <th>Assigned Area</th>
               <th>Status</th>
-              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -138,15 +137,10 @@
               <td data-label="Status">
                 <span class="pill-badge badge-active">Active</span>
               </td>
-              <td data-label="Actions">
-                <button type="button" class="btn btn-sm btn-primary" onclick="openDispatchModal('{{ bhw.id }}', '{{ bhw.first_name }} {{ bhw.last_name }}', '')">
-                  Assign Task
-                </button>
-              </td>
             </tr>
             {% empty %}
             <tr>
-              <td colspan="5" style="text-align: center; padding: 1rem;">No active BHWs found in {{ barangay_name }}.</td>
+              <td colspan="4" style="text-align: center; padding: 1rem;">No active BHWs found in {{ barangay_name }}.</td>
             </tr>
             {% endfor %}
           </tbody>
