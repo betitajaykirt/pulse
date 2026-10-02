@@ -61,19 +61,6 @@
         Local Spatial Clusters
       </div>
     </article>
-    <article class="dash-metric-card">
-      <div class="dash-metric-card__head">
-        <div class="dash-metric-card__icon dash-metric-card__icon--accent">
-          <i data-lucide="clock" class="lucide-icon lucide-icon--sm"></i>
-        </div>
-        <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
-      </div>
-      <div class="dash-metric-card__value">{{ pending_reports|default:0 }}</div>
-      <div class="dash-metric-card__label">Pending Lab Confirmations</div>
-      <div class="dash-metric-card__footer text-muted" style="font-size: 0.85rem; margin-top: 5px;">
-        Awaiting Verification
-      </div>
-    </article>
   </div>
 
   <section class="dash-section">
@@ -94,7 +81,7 @@
           <span class="dash-widget-menu" aria-hidden="true"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></span>
         </div>
         <h4>My Reports</h4>
-        <p>View and track your submitted reports{% if pending_reports %} — <strong>{{ pending_reports }} pending</strong>{% endif %}</p>
+        <p>View and track your submitted reports</p>
         <span class="dash-widget-card__link">Open <i data-lucide="arrow-right" class="lucide-icon lucide-icon--xs"></i></span>
       </a>
       <a href="{% url 'bhw_activity_logs' %}" class="dash-widget-card">

@@ -55,16 +55,6 @@
       <div class="dash-metric-card__value">{{ aptas_alerts|length }}</div>
       <div class="dash-metric-card__label">High-Risk Hotspots</div>
     </article>
-    <article class="dash-metric-card">
-      <div class="dash-metric-card__head">
-        <div class="dash-metric-card__icon dash-metric-card__icon--accent">
-          <i data-lucide="clock" class="lucide-icon lucide-icon--sm"></i>
-        </div>
-        <button type="button" class="dash-widget-menu" aria-label="More options"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></button>
-      </div>
-      <div class="dash-metric-card__value">{{ pending_reports }}</div>
-      <div class="dash-metric-card__label">Pending Lab Confirmations</div>
-    </article>
   </div>
 
 
@@ -77,7 +67,7 @@
           <span class="dash-widget-menu" aria-hidden="true"><i data-lucide="more-horizontal" class="lucide-icon lucide-icon--xs"></i></span>
         </div>
         <h4>Case Monitoring</h4>
-        <p>Real-time syndromic surveillance{% if pending_reports %} — <strong>{{ pending_reports }} pending</strong>{% endif %}</p>
+        <p>Real-time syndromic surveillance</p>
         <span class="dash-widget-card__link">Open <i data-lucide="arrow-right" class="lucide-icon lucide-icon--xs"></i></span>
       </a>
       <a href="{% url 'map_view' %}" class="dash-widget-card">
