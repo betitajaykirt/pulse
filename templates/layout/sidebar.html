@@ -80,7 +80,7 @@
       <span>Alerts</span>
     </a>
 
-    {% if session_role != 'barangay_health_worker' %}
+    {% if session_role != 'barangay_health_worker' and session_role != 'midwife' %}
     <a href="{% url 'environmental_intelligence' %}" class="nav-item {% if 'environmental' in request.path %}active{% endif %}">
       <span class="nav-icon"><i data-lucide="cloud-rain" class="lucide-icon lucide-icon--sm"></i></span>
       <span>Environmental Intelligence</span>
