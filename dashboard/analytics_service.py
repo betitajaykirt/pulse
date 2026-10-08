@@ -205,6 +205,9 @@ def _pad_period_keys(period_keys, interval, start_date=None, end_date=None):
     if interval == 'day':
         step = timedelta(days=1)
     elif interval == 'week':
+        # TruncWeek buckets on Monday. Start the axis on that same Monday
+        # or the bars never land on a label.
+        start = start - timedelta(days=start.weekday())
         step = timedelta(weeks=1)
     else:
         filled = []
