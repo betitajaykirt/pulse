@@ -400,6 +400,29 @@ class Symptom(models.Model):
         return self.name
 
 
+class AddedDisease(models.Model):
+    """Office-added disease. Staff can confirm it. The forest does not predict it until a later training run."""
+
+    CATEGORY_CHOICES = [
+        ('Category 1', 'Category I'),
+        ('Category 2', 'Category II'),
+    ]
+
+    name = models.CharField(max_length=150, unique=True)
+    category = models.CharField(max_length=12, choices=CATEGORY_CHOICES)
+    symptom_codes = models.JSONField(default=list, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'added_diseases'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
 # ── Disease mitigation protocols (map popup / CHO response playbook) ──
 
 class MitigationProtocol(models.Model):
@@ -769,61 +792,6 @@ class SystemLog(models.Model):
         return f"Log #{self.pk} — {self.activity_type}"
 
 
-# ── Registration Requests (table: registration_requests) ──────────
-
-class RegistrationRequest(models.Model):
-    first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100)
-    middle_name = models.CharField(max_length=100, null=True, blank=True)
-    suffix = models.CharField(max_length=20, null=True, blank=True)
-    birthdate = models.DateField(null=True, blank=True)
-    id_type = models.CharField(max_length=50, null=True, blank=True)
-    id_number = models.CharField(max_length=100, null=True, blank=True)
-    email = models.EmailField(max_length=255)
-    contact_number = models.CharField(max_length=20, null=True, blank=True)
-    password_hash = models.CharField(max_length=255)
-    region_text = models.CharField(max_length=100, null=True, blank=True)
-    province_text = models.CharField(max_length=100, null=True, blank=True)
-    city_text = models.CharField(max_length=100, null=True, blank=True)
-    barangay_text = models.CharField(max_length=100, null=True, blank=True)
-    approval_status = models.CharField(max_length=10, default='pending')
-    rejection_reason = models.TextField(null=True, blank=True)
-    document_path = models.CharField(max_length=500, null=True, blank=True)
-    submitted_at = models.DateTimeField()
-    reviewed_at = models.DateTimeField(null=True, blank=True)
-    reviewed_by = models.ForeignKey(
-        Admin, on_delete=models.DO_NOTHING,
-        null=True, blank=True, db_column='reviewed_by',
-    )
-
-    class Meta:
-        db_table = 'registration_requests'
-        managed = False
-
-    def __str__(self):
-        return f"{self.first_name} {self.last_name} — {self.approval_status}"
-
-
-# ── OCR Results (table: ocr_results) ──────────────────────────────
-
-class OcrResult(models.Model):
-    registration = models.OneToOneField(
-        RegistrationRequest, on_delete=models.DO_NOTHING, db_column='registration_id',
-    )
-    extracted_text = models.TextField(null=True, blank=True)
-    extracted_name = models.CharField(max_length=255, null=True, blank=True)
-    match_score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
-    ocr_status = models.CharField(max_length=12)
-    processed_at = models.DateTimeField()
-
-    class Meta:
-        db_table = 'ocr_results'
-        managed = False
-
-    def __str__(self):
-        return f"OCR #{self.pk} — {self.ocr_status}"
-
-
 # ── Login Attempts (table: login_attempts) ────────────────────────
 
 class LoginAttempt(models.Model):
@@ -930,72 +898,7 @@ class FieldTask(models.Model):
         return f"Task #{self.pk} - {self.title}"
 
 
-# ── Legacy / prototype tables (pulse.sql — unused by active PULSE app) ──
-
-class LegacyAdmin(models.Model):
-    """Legacy singular ``admin`` table from early schema."""
-
-    id = models.AutoField(primary_key=True, db_column='admin_id')
-    name = models.CharField(max_length=255)
-    email = models.EmailField(max_length=254, unique=True)
-    password = models.CharField(max_length=255)
-    role = models.CharField(max_length=50)
-    status = models.CharField(max_length=50)
-
-    class Meta:
-        db_table = 'admin'
-        managed = False
-
-
-class LegacySuperAdmin(models.Model):
-    """Legacy singular ``super_admin`` table from early schema."""
-
-    id = models.AutoField(primary_key=True, db_column='super_admin_id')
-    name = models.CharField(max_length=255)
-    email = models.EmailField(max_length=254, unique=True)
-    password = models.CharField(max_length=255)
-    role = models.CharField(max_length=50)
-    status = models.CharField(max_length=50)
-
-    class Meta:
-        db_table = 'super_admin'
-        managed = False
-
-
-class Bhw(models.Model):
-    """Legacy BHW table (superseded by ``users`` with role barangay_health_worker)."""
-
-    id = models.AutoField(primary_key=True, db_column='bhw_id')
-    name = models.CharField(max_length=255)
-    password = models.CharField(max_length=255)
-    email = models.EmailField(max_length=254, unique=True)
-    contact_info = models.CharField(max_length=100)
-    barangay = models.ForeignKey(
-        Barangay, on_delete=models.DO_NOTHING, db_column='barangay_id',
-    )
-
-    class Meta:
-        db_table = 'bhw'
-        managed = False
-
-
-class EnvironmentData(models.Model):
-    """Legacy ``environment_data`` table (superseded by ``environmental_data``)."""
-
-    id = models.AutoField(primary_key=True, db_column='environment_id')
-    temperature = models.DecimalField(max_digits=5, decimal_places=2)
-    humidity = models.DecimalField(max_digits=5, decimal_places=2)
-    weather_condition = models.CharField(max_length=100)
-    recorded_date = models.DateTimeField()
-    barangay = models.ForeignKey(
-        Barangay, on_delete=models.DO_NOTHING, db_column='barangay_id',
-    )
-
-    class Meta:
-        db_table = 'environment_data'
-        managed = False
-
-
+# Alerts still store analysis_id, which must point at risk_analysis.
 class MlAiPrediction(models.Model):
     id = models.AutoField(primary_key=True, db_column='prediction_id')
     disease_type = models.CharField(max_length=100)
@@ -1021,80 +924,6 @@ class RiskAnalysis(models.Model):
 
     class Meta:
         db_table = 'risk_analysis'
-        managed = False
-
-
-class HealthReport(models.Model):
-    id = models.AutoField(primary_key=True, db_column='report_id')
-    symptoms = models.TextField()
-    severity_level = models.CharField(max_length=50)
-    report_date = models.DateTimeField()
-    admin = models.ForeignKey(
-        LegacyAdmin, on_delete=models.DO_NOTHING,
-        null=True, blank=True, db_column='admin_id',
-    )
-    barangay = models.ForeignKey(
-        Barangay, on_delete=models.DO_NOTHING, db_column='barangay_id',
-    )
-    bhw = models.ForeignKey(
-        Bhw, on_delete=models.DO_NOTHING, db_column='bhw_id',
-    )
-
-    class Meta:
-        db_table = 'health_report'
-        managed = False
-
-
-class IncidentReport(models.Model):
-    id = models.AutoField(primary_key=True, db_column='incident_id')
-    disease_type = models.CharField(max_length=100)
-    case_count = models.IntegerField()
-    incident_date = models.DateField()
-    response_action = models.TextField()
-    health_report = models.ForeignKey(
-        HealthReport, on_delete=models.DO_NOTHING, db_column='report_id',
-    )
-    patient = models.ForeignKey(
-        Patient, on_delete=models.DO_NOTHING, db_column='patient_id',
-    )
-
-    class Meta:
-        db_table = 'incident_report'
-        managed = False
-
-
-class HistoricalRecord(models.Model):
-    id = models.AutoField(primary_key=True, db_column='record_id')
-    disease_type = models.CharField(max_length=100)
-    case_status = models.CharField(max_length=50)
-    treatment_status = models.CharField(max_length=100)
-    date_recorded = models.DateField()
-    notes = models.TextField(null=True, blank=True)
-    incident = models.ForeignKey(
-        IncidentReport, on_delete=models.DO_NOTHING, db_column='incident_id',
-    )
-    patient = models.ForeignKey(
-        Patient, on_delete=models.DO_NOTHING, db_column='patient_id',
-    )
-
-    class Meta:
-        db_table = 'historical_records'
-        managed = False
-
-
-class LegacyNotification(models.Model):
-    """Legacy ``notification`` table (distinct from ``notification_logs``)."""
-
-    id = models.AutoField(primary_key=True, db_column='notification_id')
-    recipient_role = models.CharField(max_length=100)
-    notification_message = models.TextField()
-    sent_date = models.DateTimeField()
-    alert = models.ForeignKey(
-        Alert, on_delete=models.DO_NOTHING, db_column='alert_id',
-    )
-
-    class Meta:
-        db_table = 'notification'
         managed = False
 
 

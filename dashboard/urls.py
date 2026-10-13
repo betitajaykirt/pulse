@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import disease_views, views
 
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
@@ -11,6 +11,7 @@ urlpatterns = [
     path('api/alerts/aptas/', views.api_alerts_aptas, name='api_alerts_aptas'),
     path('api/alerts/<int:alert_id>/acknowledge/', views.api_alert_acknowledge, name='api_alert_acknowledge'),
     path('outbreak-thresholds/', views.outbreak_thresholds_view, name='outbreak_thresholds'),
+    path('diseases/', disease_views.added_diseases_view, name='added_diseases'),
     path('api/notifications/', views.api_notifications, name='api_notifications'),
     path('api/notifications/<int:notif_id>/read/', views.api_notification_read, name='api_notification_read'),
     path('alerts/<int:notif_id>/review/', views.review_alert_notification, name='review_alert_notification'),

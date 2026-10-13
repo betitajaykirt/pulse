@@ -1,0 +1,153 @@
+{% extends "dashboard/base_dashboard.html" %}
+{% load pidsr_tags %}
+
+{% block page_title %}Added Diseases{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Added Diseases</h1>
+    <p class="page-subtitle">Add the disease, tick the symptoms it shares with the current list, and type any symptom that list does not have. Staff can confirm cases under this name. The prediction model still uses the current training file until that file is rebuilt.</p>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:1.25rem;">
+  <div class="card-body">
+    <h2 style="font-size:1.05rem; margin:0 0 1rem;">{% if editing %}Edit {{ editing.name }}{% else %}Add a disease{% endif %}</h2>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="save">
+      {% if editing %}<input type="hidden" name="disease_id" value="{{ editing.id }}">{% endif %}
+      <div class="filter-drawer__grid">
+        <div class="form-group">
+          <label for="disease-name">Disease name</label>
+          <input id="disease-name" name="name" class="input-soft" maxlength="150" required
+                 value="{{ editing.name|default:'' }}" placeholder="e.g. Nipah Virus">
+        </div>
+        <div class="form-group">
+          <label for="disease-category">PIDSR category</label>
+          <select id="disease-category" name="category" class="input-soft" required>
+            <option value="">Select category…</option>
+            <option value="Category 1" {% if editing.category == 'Category 1' %}selected{% endif %}>Category I</option>
+            <option value="Category 2" {% if editing.category == 'Category 2' %}selected{% endif %}>Category II</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Symptoms for this disease</label>
+        <p class="text-muted" style="font-size:.82rem; margin:.2rem 0 .6rem;">Tick symptoms this disease shares with cases you already record. If it has a symptom that is not listed, type that symptom in the same box.</p>
+        <div style="border:1px solid rgba(0,0,0,.08); border-radius:8px; padding:.75rem 1rem;">
+          <div style="max-height:280px; overflow:auto;">
+            {% for group in symptom_groups %}
+            <fieldset style="border:0; margin:0 0 .8rem; padding:0;">
+              <legend style="font-size:.78rem; font-weight:650; margin-bottom:.35rem;">{{ group.title }}</legend>
+              <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:.25rem .75rem;">
+                {% for item in group.items %}
+                <label style="display:flex; gap:.4rem; align-items:flex-start; font-size:.84rem;">
+                  <input type="checkbox" name="symptom_codes" value="{{ item.code }}" {% if item.checked %}checked{% endif %}>
+                  <span>{{ item.name }}</span>
+                </label>
+                {% endfor %}
+              </div>
+            </fieldset>
+            {% endfor %}
+          </div>
+          <div style="border-top:1px solid rgba(0,0,0,.08); margin-top:.75rem; padding-top:.75rem;">
+            <p style="font-size:.78rem; font-weight:650; margin:0 0 .4rem;">Symptom this disease has that is not listed above</p>
+            <div id="new-symptom-rows">
+              {% for draft in new_symptom_drafts %}
+              <div class="new-symptom-row" style="display:grid; grid-template-columns:1fr 220px; gap:.5rem; margin-bottom:.4rem;">
+                <input name="new_symptom_names" class="input-soft" maxlength="150" value="{{ draft.name }}" placeholder="e.g. Swollen lymph nodes">
+                <select name="new_symptom_groups" class="input-soft">
+                  {% for value, label in symptom_group_choices %}
+                  <option value="{{ value }}" {% if draft.group == value %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              {% empty %}
+              <div class="new-symptom-row" style="display:grid; grid-template-columns:1fr 220px; gap:.5rem; margin-bottom:.4rem;">
+                <input name="new_symptom_names" class="input-soft" maxlength="150" placeholder="e.g. Swollen lymph nodes">
+                <select name="new_symptom_groups" class="input-soft">
+                  {% for value, label in symptom_group_choices %}
+                  <option value="{{ value }}">{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              {% endfor %}
+            </div>
+            <button type="button" class="btn btn-outline btn-sm" onclick="addNewSymptomRow()">Add another symptom</button>
+          </div>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary">{% if editing.id %}Save changes{% else %}Add disease{% endif %}</button>
+      {% if editing.id %}
+      <a href="{% url 'added_diseases' %}" class="btn btn-outline">Cancel</a>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Disease</th>
+            <th>Category</th>
+            <th>Symptoms</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in diseases %}
+          <tr>
+            <td class="font-medium">{{ item.row.name }}</td>
+            <td>{% pidsr_category_badge item.row.name %}</td>
+            <td style="max-width:28rem;">{{ item.symptom_labels|join:", " }}</td>
+            <td>
+              {% if item.row.is_active %}
+              <span class="badge badge-success">Active</span>
+              {% else %}
+              <span class="badge badge-secondary">Hidden</span>
+              {% endif %}
+            </td>
+            <td>
+              <a class="btn btn-sm btn-outline" href="{% url 'added_diseases' %}?edit={{ item.row.id }}">Edit</a>
+              <form method="post" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="disease_id" value="{{ item.row.id }}">
+                {% if item.row.is_active %}
+                <input type="hidden" name="action" value="deactivate">
+                <button type="submit" class="btn btn-sm btn-outline">Hide</button>
+                {% else %}
+                <input type="hidden" name="action" value="activate">
+                <button type="submit" class="btn btn-sm btn-outline">Show</button>
+                {% endif %}
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="text-center py-4 text-muted">No diseases have been added yet. The original 27 diseases stay in the trained list.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<script>
+  const symptomGroupOptions = `{% for value, label in symptom_group_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}`;
+
+  function addNewSymptomRow() {
+    const row = document.createElement('div');
+    row.className = 'new-symptom-row';
+    row.style.cssText = 'display:grid; grid-template-columns:1fr 220px; gap:.5rem; margin-bottom:.4rem;';
+    row.innerHTML = '<input name="new_symptom_names" class="input-soft" maxlength="150" placeholder="e.g. Swollen lymph nodes">'
+      + '<select name="new_symptom_groups" class="input-soft">' + symptomGroupOptions + '</select>';
+    document.getElementById('new-symptom-rows').appendChild(row);
+  }
+</script>
+{% endblock %}

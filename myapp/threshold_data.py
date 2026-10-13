@@ -49,7 +49,14 @@ def resolve_pidsr_category(disease_label: str) -> str:
     if text in DISEASE_PIDSR_CATEGORY:
         return DISEASE_PIDSR_CATEGORY[text]
     from reports.pidsr_schema import normalize_disease_label
-    return DISEASE_PIDSR_CATEGORY.get(normalize_disease_label(text), 'Category 2')
+    normalized = normalize_disease_label(text)
+    if normalized in DISEASE_PIDSR_CATEGORY:
+        return DISEASE_PIDSR_CATEGORY[normalized]
+    from reports.disease_catalog import catalog_category_level
+    catalog = catalog_category_level(text) or catalog_category_level(normalized)
+    if catalog:
+        return catalog
+    return 'Category 2'
 
 
 def pidsr_category_display(disease_label: str) -> str:
@@ -65,6 +72,11 @@ def pidsr_category_display(disease_label: str) -> str:
     raw = DISEASE_PIDSR_CATEGORY.get(text) or DISEASE_PIDSR_CATEGORY.get(
         normalize_disease_label(text), ''
     )
+    if not raw:
+        from reports.disease_catalog import catalog_category_level
+        raw = catalog_category_level(text) or catalog_category_level(
+            normalize_disease_label(text)
+        )
     if raw == 'Category 1':
         return 'Category I'
     if raw == 'Category 2':

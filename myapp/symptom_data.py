@@ -39,7 +39,11 @@ def seed_all_symptoms(verbose=True):
         )
 
     from reports.pidsr_schema import PIDSR_SYMPTOM_CODES
-    removed, _ = Symptom.objects.exclude(code__in=PIDSR_SYMPTOM_CODES).delete()
+    removed, _ = (
+        Symptom.objects.exclude(code__in=PIDSR_SYMPTOM_CODES)
+        .exclude(code__startswith='added_')
+        .delete()
+    )
     if verbose and removed:
         print(f'Removed {removed} legacy symptom catalog row(s).')
     return created, updated

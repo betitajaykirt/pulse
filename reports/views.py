@@ -32,7 +32,8 @@ from reports.ml_display import (
     official_disease_label,
     predicted_disease_display,
 )
-from reports.pidsr_schema import DISEASE_LABELS, normalize_disease_label
+from reports.disease_catalog import is_confirmable_disease, selectable_disease_labels
+from reports.pidsr_schema import normalize_disease_label
 from .risk_service import evaluate_report_risk
 from .batch_service import save_batch_submission
 from .patient_registry import DuplicatePatientCaseError, link_or_create_patient
@@ -839,7 +840,7 @@ def admin_confirmation_panel(request):
         'pending_cases': pending_cases,
         'search': search,
         'queue_count': len(pending_cases),
-        'syndrome_types': list(DISEASE_LABELS),
+        'syndrome_types': list(selectable_disease_labels()),
     })
 
 
@@ -1121,6 +1122,9 @@ def confirm_case(request, report_id):
     lab_control_number = request.POST.get('lab_control_number', '').strip()
     test_type = request.POST.get('test_type', '').strip()
     confirmed_disease = request.POST.get('confirmed_disease', '').strip()
+    if confirmed_disease and not is_confirmable_disease(confirmed_disease):
+        messages.error(request, 'Choose a disease from the list. Added diseases appear there after an admin saves them.')
+        return redirect(_confirm_redirect_target(request))
     lab_specimen_number = request.POST.get('lab_specimen_number', '').strip()
     lab_issue_date = request.POST.get('lab_issue_date', '').strip()
     lab_findings = request.POST.get('lab_findings', '').strip()
@@ -1490,7 +1494,7 @@ def incident_reports(request):
         'by_barangay': sorted(by_barangay.items(), key=lambda x: -x[1]),
         'by_classif':  by_classif,
         'barangays':   barangays,
-        'syndrome_types': list(DISEASE_LABELS),
+        'syndrome_types': list(selectable_disease_labels()),
         'date_from': date_from, 'date_to': date_to,
         'syndrome': syndrome, 'barangay': barangay,
     })

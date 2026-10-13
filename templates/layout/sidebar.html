@@ -51,6 +51,13 @@
       <span class="nav-icon"><i data-lucide="sliders" class="lucide-icon lucide-icon--sm"></i></span>
       <span>Outbreak Thresholds</span>
     </a>
+    {% if session_role == 'admin' or session_role == 'super_admin' %}
+    <a href="{% url 'added_diseases' %}"
+      class="nav-item {% if request.resolver_match.url_name == 'added_diseases' %}active{% endif %}">
+      <span class="nav-icon"><i data-lucide="plus-circle" class="lucide-icon lucide-icon--sm"></i></span>
+      <span>Added Diseases</span>
+    </a>
+    {% endif %}
     {% endif %}
 
     {% if session_role == 'midwife' %}

@@ -466,9 +466,13 @@ def build_top_disease_breakdown(qs, limit=2):
 
 
 def get_analytics_disease_choices():
+    from reports.disease_catalog import active_added_disease_labels
+
     qs = SurveillanceReport.objects.exclude(status__in=INACTIVE_STATUSES)
-    labels = sorted(_count_by_analytics_disease(qs).keys())
-    return [('', 'All Diseases')] + [(label, label) for label in labels]
+    labels = set(_count_by_analytics_disease(qs).keys())
+    labels.update(active_added_disease_labels())
+    ordered = sorted(label for label in labels if label)
+    return [('', 'All Diseases')] + [(label, label) for label in ordered]
 
 
 def build_summary_stats(qs, symptom_category_filter=''):

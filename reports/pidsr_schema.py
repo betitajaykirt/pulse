@@ -488,6 +488,7 @@ def normalize_symptom_codes(codes: Sequence[str]) -> list[str]:
     """Map legacy symptom codes to unified PIDSR fields and dedupe."""
     normalized: list[str] = []
     seen: set[str] = set()
+    office_codes = _office_added_symptom_codes()
     for raw in codes or []:
         code = str(raw).strip()
         if not code:
@@ -495,10 +496,22 @@ def normalize_symptom_codes(codes: Sequence[str]) -> list[str]:
         code = LEGACY_SYMPTOM_CODE_MAP.get(code, code)
         if code in seen:
             continue
-        if code in PIDSR_SYMPTOM_CODES:
+        if code in PIDSR_SYMPTOM_CODES or code in office_codes:
             normalized.append(code)
             seen.add(code)
     return normalized
+
+
+def _office_added_symptom_codes() -> frozenset[str]:
+    """Symptom codes an admin added. They can be stored on a case before the next training run."""
+    try:
+        from myapp.models import Symptom
+
+        return frozenset(
+            Symptom.objects.filter(code__startswith='added_').values_list('code', flat=True)
+        )
+    except Exception:
+        return frozenset()
 
 
 def normalize_disease_label(label: str) -> str:
