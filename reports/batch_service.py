@@ -54,6 +54,14 @@ def build_remarks(purok_street, symptoms, age=None, sex=None, disease_label=None
 
         parts.append(f'Sex: {sex}')
 
+    if detailed_address:
+
+        parts.append(f'Address: {detailed_address}')
+
+    elif purok_street:
+
+        parts.append(f'Address: {purok_street}')
+
     if disease_label:
 
         parts.append(f'ML Classification: {disease_label}')

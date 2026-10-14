@@ -1,6 +1,4 @@
-"""Encrypt patient identity values that are still stored in the clear."""
-from datetime import date, datetime
-
+"""Encrypt patient names that are still stored in the clear."""
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
 
@@ -8,31 +6,23 @@ from myapp.field_encryption import is_encrypted, scrub_identity_from_remarks
 
 
 class Command(BaseCommand):
-    help = 'Encrypt patient names, birthdates, addresses, and school fields already in the database.'
+    help = 'Encrypt patient names on patients, surveillance reports, and patient cases.'
 
     def handle(self, *args, **options):
-        self._require_text_column('patients', 'birthdate')
+        self._require_text_column('patient_cases', 'patient_name')
         from myapp.models import Patient, PatientCase, SurveillanceReport
 
-        patients = self._rewrite(Patient, 'patients', 'patient_id', [
-            'full_name', 'address', 'birthdate',
-        ])
+        patients = self._rewrite(Patient, 'patients', 'patient_id', ['full_name'])
         reports = self._rewrite(
             SurveillanceReport,
             'surveillance_reports',
             'id',
-            [
-                'patient_name', 'detailed_address', 'school_name',
-                'grade_year_section', 'date_of_birth',
-            ],
+            ['patient_name'],
             scrub_remarks=True,
         )
-        cases = self._rewrite(PatientCase, 'patient_cases', 'id', [
-            'patient_name', 'detailed_address', 'school_name',
-            'grade_year_section', 'purok_street', 'date_of_birth',
-        ])
+        cases = self._rewrite(PatientCase, 'patient_cases', 'id', ['patient_name'])
         self.stdout.write(self.style.SUCCESS(
-            f'Encrypted {patients} patient rows, {reports} reports, and {cases} case rows.'
+            f'Encrypted names on {patients} patients, {reports} reports, and {cases} case rows.'
         ))
 
     def _require_text_column(self, table, column):
@@ -50,7 +40,7 @@ class Command(BaseCommand):
             row = cursor.fetchone()
         if not row or row[0].lower() not in {'text', 'tinytext', 'mediumtext', 'longtext'}:
             raise CommandError(
-                'Identity columns are still date or short text columns. '
+                'The patient name column is still too short for encrypted text. '
                 'Deploy the app so migration 0022 runs, then run this command.'
             )
 
@@ -67,12 +57,12 @@ class Command(BaseCommand):
         for raw in raw_rows:
             pk = raw[0]
             values = dict(zip(columns, raw))
-            needs_identity = any(_is_plaintext(values.get(field)) for field in fields)
+            needs_name = any(_is_plaintext(values.get(field)) for field in fields)
             needs_remarks = False
             if scrub_remarks:
                 scrubbed = scrub_identity_from_remarks(values.get('remarks'))
                 needs_remarks = scrubbed != (values.get('remarks') or '')
-            if not needs_identity and not needs_remarks:
+            if not needs_name and not needs_remarks:
                 continue
             row = model.objects.get(pk=pk)
             if needs_remarks:
@@ -88,6 +78,4 @@ class Command(BaseCommand):
 def _is_plaintext(value) -> bool:
     if value in (None, ''):
         return False
-    if isinstance(value, (date, datetime)):
-        return True
     return not is_encrypted(str(value))

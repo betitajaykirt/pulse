@@ -25,5 +25,5 @@ class FieldEncryptionTests(SimpleTestCase):
         text = 'Patient: Maria Cruz | Age: 8 | Address: Purok 1 | ML Top Prediction: Dengue Fever'
         self.assertEqual(
             scrub_identity_from_remarks(text),
-            'Age: 8 | ML Top Prediction: Dengue Fever',
+            'Age: 8 | Address: Purok 1 | ML Top Prediction: Dengue Fever',
         )

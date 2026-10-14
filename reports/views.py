@@ -259,6 +259,7 @@ def _process_report_submission(request, barangays, locked_barangay=None):
     summary_parts = []
     if patient_age:  summary_parts.append(f"Age: {patient_age}")
     if patient_sex:  summary_parts.append(f"Sex: {patient_sex}")
+    if patient_addr: summary_parts.append(f"Address: {patient_addr}")
     if symptoms_present: summary_parts.append(f"Symptoms: {', '.join(symptoms_present)}")
     if outcome:      summary_parts.append(f"Outcome: {outcome}")
     if remarks:      summary_parts.append(f"Notes: {remarks}")

@@ -1,4 +1,4 @@
-"""Deterministic encryption for patient identity columns.
+"""Deterministic encryption for patient name columns.
 
 The same name always produces the same ciphertext, so the app can still match
 an exact birthdate. A person reading the table sees the ciphertext. The app
@@ -46,7 +46,7 @@ def decrypt_text(value):
 
 
 def scrub_identity_from_remarks(remarks: str | None) -> str:
-    """Remove name and address lines that were copied into remarks."""
+    """Remove patient-name lines that were copied into remarks."""
     if not remarks:
         return remarks or ''
     kept = []
@@ -54,8 +54,7 @@ def scrub_identity_from_remarks(remarks: str | None) -> str:
         text = part.strip()
         if not text:
             continue
-        lowered = text.casefold()
-        if lowered.startswith('patient:') or lowered.startswith('address:'):
+        if text.casefold().startswith('patient:'):
             continue
         kept.append(text)
     return ' | '.join(kept)
