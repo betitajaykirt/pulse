@@ -46,10 +46,6 @@ def build_remarks(purok_street, symptoms, age=None, sex=None, disease_label=None
 
     parts = []
 
-    if patient_name and patient_name != 'Unknown Resident':
-
-        parts.append(f'Patient: {patient_name}')
-
     if age is not None:
 
         parts.append(f'Age: {age}')
@@ -57,14 +53,6 @@ def build_remarks(purok_street, symptoms, age=None, sex=None, disease_label=None
     if sex:
 
         parts.append(f'Sex: {sex}')
-
-    if detailed_address:
-
-        parts.append(f'Address: {detailed_address}')
-
-    elif purok_street:
-
-        parts.append(f'Address: {purok_street}')
 
     if disease_label:
 

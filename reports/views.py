@@ -32,6 +32,7 @@ from reports.ml_display import (
     predicted_disease_display,
 )
 from reports.disease_catalog import is_confirmable_disease, selectable_disease_labels
+from reports.identity_search import report_ids_for_identity_search
 from reports.pidsr_schema import normalize_disease_label
 from .risk_service import evaluate_report_risk
 from .batch_service import save_batch_submission
@@ -256,10 +257,8 @@ def _process_report_submission(request, barangays, locked_barangay=None):
     outcome      = request.POST.get('patient_outcome', '').strip()
 
     summary_parts = []
-    if patient_name: summary_parts.append(f"Patient: {patient_name}")
     if patient_age:  summary_parts.append(f"Age: {patient_age}")
     if patient_sex:  summary_parts.append(f"Sex: {patient_sex}")
-    if patient_addr: summary_parts.append(f"Address: {patient_addr}")
     if symptoms_present: summary_parts.append(f"Symptoms: {', '.join(symptoms_present)}")
     if outcome:      summary_parts.append(f"Outcome: {outcome}")
     if remarks:      summary_parts.append(f"Notes: {remarks}")
@@ -427,11 +426,20 @@ def case_records(request):
 
     q = Q()
     if search:
-        q &= (Q(syndrome_type__icontains=search) |
-              Q(suspected_disease__icontains=search) |
-              Q(barangay__barangay_name__icontains=search) |
-              Q(patient_name__icontains=search) |
-              Q(remarks__icontains=search))
+        identity_scope = SurveillanceReport.objects.all()
+        if scoped_barangay:
+            identity_scope = identity_scope.filter(barangay_id=scoped_barangay.id)
+        elif barangay and city_wide:
+            identity_scope = identity_scope.filter(barangay_id=barangay)
+        if case_status:
+            identity_scope = identity_scope.filter(status=case_status)
+        q &= (
+            Q(syndrome_type__icontains=search) |
+            Q(suspected_disease__icontains=search) |
+            Q(barangay__barangay_name__icontains=search) |
+            Q(remarks__icontains=search) |
+            Q(id__in=report_ids_for_identity_search(search, identity_scope))
+        )
     if case_status:
         q &= Q(status=case_status)
     if scoped_barangay:
@@ -805,10 +813,12 @@ def admin_confirmation_panel(request):
     if search:
         search_q = (
             Q(barangay__barangay_name__icontains=search) |
-            Q(patient__full_name__icontains=search) |
-            Q(patient_name__icontains=search) |
             Q(syndrome_type__icontains=search) |
-            Q(suspected_disease__icontains=search)
+            Q(suspected_disease__icontains=search) |
+            Q(id__in=report_ids_for_identity_search(
+                search,
+                SurveillanceReport.objects.filter(q),
+            ))
         )
         if search.isdigit():
             search_q |= Q(id=int(search)) | Q(patient_id=int(search))

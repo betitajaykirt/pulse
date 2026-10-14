@@ -36,8 +36,11 @@ def names_match(left: str | None, right: str | None) -> bool:
 
 
 def find_matching_patients(full_name: str, birthdate: date, barangay_id: int) -> list:
-    qs = Patient.objects.filter(birthdate=birthdate, barangay_id=barangay_id)
-    return [row for row in qs if names_match(row.full_name, full_name)]
+    qs = Patient.objects.filter(barangay_id=barangay_id)
+    return [
+        row for row in qs
+        if row.birthdate == birthdate and names_match(row.full_name, full_name)
+    ]
 
 
 def find_open_duplicate_cases(full_name: str, birthdate: date, barangay_id: int) -> list:
@@ -47,15 +50,15 @@ def find_open_duplicate_cases(full_name: str, birthdate: date, barangay_id: int)
     found = {}
 
     by_fields = (
-        SurveillanceReport.objects.filter(
-            barangay_id=barangay_id,
-            date_of_birth=birthdate,
-        )
+        SurveillanceReport.objects.filter(barangay_id=barangay_id)
         .exclude(status__in=CLOSED_CASE_STATUSES)
-        .only('id', 'status', 'patient_id', 'patient_name', 'date_of_onset', 'syndrome_type')
+        .only(
+            'id', 'status', 'patient_id', 'patient_name',
+            'date_of_birth', 'date_of_onset', 'syndrome_type',
+        )
     )
     for report in by_fields:
-        if names_match(report.patient_name, full_name):
+        if report.date_of_birth == birthdate and names_match(report.patient_name, full_name):
             found[report.id] = report
 
     if patient_ids:
