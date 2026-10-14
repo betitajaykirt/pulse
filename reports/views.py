@@ -6,7 +6,6 @@ Covers:
   - Health Incident Reporting (admin incident report generation)
 """
 import json
-import csv
 import logging
 from django.shortcuts import render, redirect
 from django.http import JsonResponse, HttpResponse
@@ -1455,12 +1454,10 @@ def incident_reports(request):
         )
 
     if request.GET.get('export') == 'excel':
-        response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = 'attachment; filename="incident_reports.csv"'
-        writer = csv.writer(response)
-        writer.writerow(['Barangay', 'Disease', 'Classification', 'Onset Date', 'Risk Level', 'Reporter', 'Report Date'])
-        for r in reports:
-            writer.writerow([
+        from reports.incident_export import build_incident_workbook
+
+        payload = build_incident_workbook([
+            [
                 r.barangay_name or '—',
                 r.display_disease,
                 r.status,
@@ -1468,7 +1465,14 @@ def incident_reports(request):
                 r.incident_risk_level,
                 r.reporter or '—',
                 format_display_datetime(r.report_date),
-            ])
+            ]
+            for r in reports
+        ])
+        response = HttpResponse(
+            payload,
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        response['Content-Disposition'] = 'attachment; filename="cdss_report_spreadsheet.xlsx"'
         return response
 
     # Summary stats
