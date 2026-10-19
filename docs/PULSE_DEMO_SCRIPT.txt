@@ -1,0 +1,184 @@
+PULSE DEMONSTRATION SCRIPT
+Bago City Health Office — core features
+Suggested length: 12 to 15 minutes
+Site: https://pulse-5yox.onrender.com
+
+Prepare two browsers, or one normal window and one private window.
+Window A: a Barangay Health Worker account for Poblacion.
+Window B: an Admin account.
+Use a new patient name and birthdate for every case so the duplicate check does not block the demo.
+
+
+OPENING (about 1 minute)
+
+SAY:
+PULSE is the surveillance system of the Bago City Health Office. A barangay health worker records a case. The system predicts the disease and scores how unusual the situation is. An admin reviews any alert before field staff see it. The map, the analytics, and the incident report all use those same records.
+
+DO:
+Show the sign-in page. Point out that accounts are created by administrators. Staff do not register themselves.
+
+
+1. BARANGAY HEALTH WORKER — RECORD A CASE (about 4 minutes)
+
+DO:
+In Window A, sign in as the Poblacion barangay health worker.
+Open Submit Report.
+
+SAY:
+The worker does not type the disease. They enter who the patient is, where they live, and which symptoms are present. The Random Forest reads that pattern and names the most likely disease.
+
+DO:
+Enter a new patient. Suggested details:
+Name: Liza M. Herrera
+Sex: Female
+Age: 28
+Birthdate: June 12, 1998
+Barangay: Poblacion
+Address: Purok 3
+Onset date: today
+
+Tick these symptoms and exposures:
+Fever
+Loss of smell or taste
+Dry cough
+Sore throat
+Runny nose
+Trouble breathing
+Headache
+Body malaise
+Recent travel
+Known community cases
+
+Submit the report.
+
+SAY:
+COVID-19 is Category I. The model shows the predicted disease and a confidence score. Because this pattern is Category I and the confidence is at least 50 percent, PULSE creates an alert. That alert is not sent to the field yet. It waits for an admin.
+
+DO:
+Open My Reports and show the new row. The disease column shows COVID-19, not the raw symptom list.
+Open the Geospatial Map. Show the new case in Poblacion.
+Point out the color: Suspected is amber, Probable is red, Confirmed is purple. A confidence of 50 percent or more is Probable. Below 50 percent is still shown, as Suspected.
+
+SAY:
+A low score is still displayed. It is not hidden as inconclusive. It simply does not raise an automatic alert unless it is a Category I disease at 50 percent or more.
+
+
+2. WHAT THE FIELD DOES NOT SEE YET (about 1 minute)
+
+DO:
+Stay on the barangay health worker window. Open Alerts.
+
+SAY:
+The worker can see that a case was recorded. They do not get the outbreak recommendation until an admin approves it. The midwife is the same. Approval is the gate.
+
+
+3. ADMIN — REVIEW AND RELEASE THE ALERT (about 3 minutes)
+
+DO:
+In Window B, sign in as Admin.
+Open Alerts. Open the pending COVID-19 alert.
+
+SAY:
+The admin sees the predicted disease, the barangay, and the recommended action. They can approve it or reject it. Field staff only receive it after approval.
+
+DO:
+Approve the alert.
+Switch back to Window A and refresh Alerts, or wait for the notification.
+
+SAY:
+Now the barangay health worker can see the approved alert and the recommendation. Acknowledge only records that the office has seen it. It does not close the case.
+
+
+4. CATEGORY II DOES NOT AUTO-ALERT THE SAME WAY (about 2 minutes)
+
+DO:
+In Window A, submit a second new patient.
+Name: Marco T. Salinas
+Sex: Male
+Age: 24
+Birthdate: March 3, 2002
+Barangay: Poblacion
+
+Tick:
+Fever
+Headache
+Reticular or retro-orbital pain
+Myalgia
+Rash
+Nausea
+Petechiae
+Gum bleeding
+Tourniquet test positive
+Joint swelling
+Stagnant water
+
+Submit.
+
+SAY:
+This pattern is Dengue Fever, which is Category II. The case still appears on the map as Probable when the confidence is 50 percent or more. A Category II disease does not raise an alert from confidence alone. The outbreak score also has to clear the APTAS line: the final risk is at least 60 and the anomaly score is at least 0.50. One dengue case in a quiet barangay stays on the map without becoming a city alert.
+
+
+5. CASE MONITORING AND CONFIRMATION (about 2 minutes)
+
+DO:
+In Window B, open Case Monitoring. Search for Liza Herrera.
+
+SAY:
+The name search still works in the app. The database stores that name encrypted. The screen decrypts it for a signed-in user.
+
+DO:
+Open Case Confirmation. Select the COVID-19 case.
+If a laboratory file is part of the demo, upload it and show the scanned fields.
+Choose COVID-19 as the confirmed disease and confirm the case.
+
+SAY:
+Confirmation is the health office decision. It is separate from the model's prediction. After confirmation the case is marked Confirmed, and the map uses the purple confirmed color. The close outcomes are Recovered, Recovered as a confirmed case, or Deceased.
+
+
+6. ANALYTICS AND THE INCIDENT REPORT (about 2 minutes)
+
+DO:
+Open Analytics. Leave the filter on All open cases and show the epidemic curve, then the disease chart.
+
+SAY:
+The curve counts Suspected, Probable, and Confirmed cases from the database. Each disease has its own color. Changing the time range changes the buckets: recent ranges are daily or weekly, longer ranges are monthly.
+
+DO:
+Open Incident Reports. Click Export Excel. Open the file.
+
+SAY:
+The download is the CDSS report spreadsheet. The title is on the first row, and the columns are wide enough for the full disease, the reporter, and the date.
+
+
+7. OPTIONAL CLOSING FEATURES (if time remains)
+
+Added disease
+DO:
+As Admin, open Added Diseases.
+SAY:
+If a disease is not in the trained list, an admin can add it and tick the symptoms it shares, or type a symptom that is not on the checklist yet. Staff can confirm cases under that name immediately. The Random Forest will not predict it until the training file is rebuilt with enough confirmed cases of that disease.
+
+Roles
+SAY:
+A midwife sees only her barangay. She can view approved alerts and case records. She cannot acknowledge a city alert, and she does not see Environmental Intelligence. Only an admin or a super admin can add a disease or create an admin account. A role cannot be changed after the account is created.
+
+
+CLOSE (about 30 seconds)
+
+SAY:
+PULSE records the case, predicts the disease, places it on the map, and holds the alert until the admin approves it. Confirmation, analytics, and the spreadsheet all read the same records. The model learns from a prepared training file, not from every new report, so a wrong guess is not taught back into the forest.
+
+
+BACKUP LINES IF ASKED
+
+How does the Random Forest work?
+It is 300 trees. Each tree votes for a disease using age, sex, symptoms, exposures, and climate. The share of votes is the confidence. The top disease is always shown.
+
+How does the Isolation Forest work?
+It looks at case count, rainfall, temperature, and humidity against the outbreak history. An unusual combination gets a high anomaly score. That score is the A in APTAS. Category II alerts need both a high final risk and an anomaly score of at least 0.50.
+
+Why is a new disease not predicted on the first day?
+The forest can only name diseases that were in its training file. A newly added disease can be recorded and confirmed. Prediction starts after a later training run that includes enough confirmed examples.
+
+What is protected?
+Passwords are bcrypt hashes. Patient names are encrypted in the database and decrypted by the app, so the screens still show the real name. Birthdate, address, disease, and symptoms stay readable because the charts and the model use them.

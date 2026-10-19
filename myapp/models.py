@@ -5,7 +5,7 @@ Legacy tables (barangays, alerts) and PulseCapstone tables coexist in pulse_db.
 from decimal import Decimal, InvalidOperation
 from django.db import models
 
-from myapp.fields import EncryptedTextField
+from myapp.fields import EncryptedTextField, ReadableCharField, ReadableTextField
 
 
 # ── Super Admins (table: super_admins) ───────────────────────────
@@ -172,7 +172,7 @@ class Patient(models.Model):
     id = models.AutoField(primary_key=True, db_column='patient_id')
     full_name = EncryptedTextField()
     sex = models.CharField(max_length=10)
-    address = models.TextField()
+    address = ReadableTextField()
     birthdate = models.DateField()
     barangay = models.ForeignKey(
         Barangay, on_delete=models.DO_NOTHING, db_column='barangay_id',
@@ -220,10 +220,10 @@ class SurveillanceReport(models.Model):
     patient_name = EncryptedTextField(default='Unknown Resident')
     civil_status = models.CharField(max_length=50, null=True, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
-    detailed_address = models.TextField(null=True, blank=True)
+    detailed_address = ReadableTextField(null=True, blank=True)
     is_student = models.BooleanField(default=False)
-    grade_year_section = models.CharField(max_length=100, null=True, blank=True)
-    school_name = models.CharField(max_length=255, null=True, blank=True)
+    grade_year_section = ReadableCharField(max_length=100, null=True, blank=True)
+    school_name = ReadableCharField(max_length=255, null=True, blank=True)
     date_of_onset = models.DateField(null=True, blank=True)
     report_date = models.DateTimeField()
     case_classification = models.CharField(max_length=10, default='suspected')
@@ -586,13 +586,13 @@ class PatientCase(models.Model):
     patient_name = EncryptedTextField(default='Unknown Resident')
     civil_status = models.CharField(max_length=50, null=True, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
-    detailed_address = models.TextField(null=True, blank=True)
+    detailed_address = ReadableTextField(null=True, blank=True)
     is_student = models.BooleanField(default=False)
-    grade_year_section = models.CharField(max_length=100, null=True, blank=True)
-    school_name = models.CharField(max_length=255, null=True, blank=True)
+    grade_year_section = ReadableCharField(max_length=100, null=True, blank=True)
+    school_name = ReadableCharField(max_length=255, null=True, blank=True)
     age = models.PositiveSmallIntegerField()
     sex = models.CharField(max_length=10, choices=SEX_CHOICES)
-    purok_street = models.TextField()
+    purok_street = ReadableTextField()
     latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
     longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
     date_of_onset = models.DateField(null=True, blank=True)

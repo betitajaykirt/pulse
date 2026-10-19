@@ -49,3 +49,23 @@ class EncryptedDateField(models.DateField):
         if not prepared:
             value = self.get_prep_value(value)
         return value
+
+
+class _ReadDecryptMixin:
+    """Show readable text even if the stored value is ciphertext.
+
+    Writes stay as typed. Rows that were encrypted earlier are decrypted on read.
+    """
+
+    def from_db_value(self, value, expression, connection):
+        if value is None:
+            return value
+        return decrypt_text(value)
+
+
+class ReadableTextField(_ReadDecryptMixin, models.TextField):
+    pass
+
+
+class ReadableCharField(_ReadDecryptMixin, models.CharField):
+    pass
