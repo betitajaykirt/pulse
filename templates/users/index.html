@@ -175,9 +175,6 @@
               <span class="um-pill um-pill--role">
                 {% if u.role == 'barangay_health_worker' %}Barangay Health Worker
                 {% elif u.role == 'midwife' %}Midwife
-                {% elif u.role == 'encoder' %}Encoder
-                {% elif u.role == 'health_officer' %}Health Officer
-                {% elif u.role == 'surveillance_officer' %}Surveillance Officer
                 {% else %}{{ u.role|title }}{% endif %}
               </span>
             </td>

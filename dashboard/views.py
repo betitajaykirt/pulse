@@ -35,9 +35,6 @@ def dashboard(request):
     template_map = {
         'super_admin':            'dashboard/super_admin.html',
         'admin':                  'dashboard/admin.html',
-        'encoder':                'dashboard/encoder.html',
-        'health_officer':         'dashboard/admin.html',
-        'surveillance_officer':   'dashboard/surveillance_officer.html',
         'barangay_health_worker': 'dashboard/barangay_health_worker.html',
     }
     if role == 'midwife':
@@ -51,11 +48,7 @@ def dashboard(request):
     ctx['weather'] = fetch_bago_city_weather()
     if template == 'dashboard/admin.html':
         ctx['can_manage_users'] = role in ('admin', 'super_admin')
-        ctx['dashboard_subtitle'] = (
-            'Health Officer — Bago City Health Office'
-            if role == 'health_officer'
-            else 'Administrator — Bago City Health Office'
-        )
+        ctx['dashboard_subtitle'] = 'Administrator — Bago City Health Office'
     barangay_filter = resolve_aptas_barangay_filter(
         role, request.session.get('user_id'), ctx,
     )
@@ -135,7 +128,7 @@ def _local_barangay_stats(user):
 
 def _get_stats(role, user_id=None):
     ctx = {}
-    if role in ('admin', 'super_admin', 'health_officer'):
+    if role in ('admin', 'super_admin'):
         active_qs = SurveillanceReport.objects.exclude(status__in=('Closed', 'Discarded'))
         ctx['active_cases_total'] = active_qs.count()
         top_diseases = build_top_disease_breakdown(active_qs, limit=2)
@@ -152,15 +145,6 @@ def _get_stats(role, user_id=None):
     if role == 'super_admin':
         ctx['total_admins'] = Admin.objects.count()
         ctx['total_reports'] = SurveillanceReport.objects.exclude(status='Closed').count()
-    if role == 'surveillance_officer':
-        active_qs = SurveillanceReport.objects.exclude(status__in=('Closed', 'Discarded'))
-        ctx['active_alerts'] = Alert.objects.filter(status='active').count()
-        ctx['pending_reports'] = active_qs.filter(validation_status='pending').exclude(status='Confirmed').count()
-        ctx['suspected_count'] = active_qs.filter(status='Suspected').count()
-        ctx['confirmed_count'] = SurveillanceReport.objects.filter(status='Confirmed').count()
-        ctx['total_confirmed'] = ctx['confirmed_count']
-        ctx['active_cases_total'] = active_qs.count()
-        ctx['top_disease_breakdown'] = build_top_disease_breakdown(active_qs, limit=2)
     if role in BARANGAY_SCOPED_ROLES and user_id:
         user = User.objects.filter(id=user_id).first()
         if user:
@@ -168,7 +152,7 @@ def _get_stats(role, user_id=None):
     return ctx
 
 
-@role_required('admin', 'super_admin', 'health_officer')
+@role_required('admin', 'super_admin')
 def system_logs_view(request):
     system_logs = list(SystemLog.objects.order_by('-created_at')[:100])
     audit_logs = list(AuditLog.objects.order_by('-created_at')[:100])
@@ -182,7 +166,7 @@ def system_logs_view(request):
     })
 
 
-@role_required('admin', 'super_admin', 'health_officer', 'midwife')
+@role_required('admin', 'super_admin', 'midwife')
 def bhw_activity_logs_view(request):
     role = request.session.get('role')
     city_wide = is_city_wide_role(role)
@@ -384,7 +368,7 @@ def get_dynamic_disease_choices():
     return get_analytics_disease_choices()
 
 
-@role_required('surveillance_officer', 'admin', 'super_admin', 'health_officer')
+@role_required('admin', 'super_admin')
 def analytics_view(request):
     barangays = get_barangay_options()
     
@@ -429,7 +413,7 @@ def nurse_analytics_view(request):
 
 
 @require_GET
-@role_required('surveillance_officer', 'admin', 'super_admin', 'health_officer', 'midwife')
+@role_required('admin', 'super_admin', 'midwife')
 def api_analytics_data(request):
     symptom_category = request.GET.get('symptom_category', '').strip()
     barangay_id = request.GET.get('barangay', '').strip()
@@ -543,7 +527,7 @@ def api_alerts_aptas(request):
     })
 
 
-@role_required('admin', 'super_admin', 'health_officer')
+@role_required('admin', 'super_admin')
 def outbreak_thresholds_view(request):
     from myapp.models import OutbreakThreshold
     
@@ -1016,7 +1000,7 @@ def bhw_reports_view(request):
     return redirect(url)
 
 @login_required
-@role_required('admin', 'super_admin', 'health_officer', 'surveillance_officer')
+@role_required('admin', 'super_admin')
 def environmental_intelligence_view(request):
     weather = fetch_bago_city_weather()
     

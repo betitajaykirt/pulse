@@ -216,6 +216,17 @@ def _get_purok_for_report(report):
         return report.patient.address
     return ""
 
+def _resolve_trigger_code(assessment, report, *, is_anomaly, active_cases):
+    """Pick the reason shown on an alert. A single case is never a spatial cluster."""
+    if float(assessment.anomaly_score or 0) >= 0.50 or is_anomaly:
+        return 'aptas_anomaly'
+    if report_is_category_i_high_confidence(report):
+        return 'category_i_signal'
+    if active_cases > 1:
+        return 'spatial_cluster'
+    return 'aptas_risk_signal'
+
+
 def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level=None, trigger_code=None):
     """Create or refresh an alert pending administrator review."""
     if not report_has_alertable_disease(report):
@@ -229,13 +240,6 @@ def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level
 
     disease = official_disease_label(report)
     purok = _get_purok_for_report(report)
-    if not trigger_code:
-        trigger_code = (
-            'aptas_anomaly'
-            if float(assessment.anomaly_score or 0) >= 0.50 or is_anomaly
-            else 'spatial_cluster'
-        )
-    trigger_source = alert_trigger_label(trigger_code)
     recommendation_text = _default_alert_recommendation(report)
 
     from dashboard.models import AppNotification
@@ -251,6 +255,12 @@ def _create_alert(assessment, barangay, report, *, is_anomaly=False, alert_level
         | Q(remarks__icontains=f'ML Top Prediction: {disease}')
     ).count()
     
+    if not trigger_code:
+        trigger_code = _resolve_trigger_code(
+            assessment, report, is_anomaly=is_anomaly, active_cases=active_cases,
+        )
+    trigger_source = alert_trigger_label(trigger_code)
+
     existing_notif = AppNotification.objects.filter(
         disease=disease,
         barangay_name=barangay.barangay_name,

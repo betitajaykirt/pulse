@@ -6,12 +6,11 @@ from myapp.models import Barangay, User
 
 # City-wide roles see all 24 barangays
 CITY_WIDE_ROLES = frozenset({
-    'admin', 'super_admin', 'health_officer', 'surveillance_officer',
-})
+    'admin', 'super_admin', })
 
 # Localized roles are restricted to their assigned barangay
 BARANGAY_SCOPED_ROLES = frozenset({
-    'barangay_health_worker', 'encoder', 'midwife',
+    'barangay_health_worker', 'midwife',
 })
 
 

@@ -69,12 +69,12 @@ def _incident_summary_disease_label(report_or_label) -> str:
     return label
 
 
-# ── Submit Case Report (Health Officer / BHW / Encoder) ──────────
+# ── Submit Case Report (BHW / Midwife) ──────────
 
 @login_required
 def submit_report(request):
     role = request.session.get('role')
-    if role not in ('health_officer', 'barangay_health_worker', 'encoder', 'midwife'):
+    if role not in ('barangay_health_worker', 'midwife'):
         messages.error(request, 'Access denied.')
         return redirect('dashboard')
 
@@ -406,8 +406,7 @@ def my_reports(request):
 # ── Case Records — validate/update/search ─────────────────────────
 
 @role_required(
-    'admin', 'super_admin', 'surveillance_officer', 'health_officer',
-    'barangay_health_worker', 'encoder', 'midwife'
+    'admin', 'super_admin', 'barangay_health_worker', 'midwife'
 )
 def case_records(request):
     search          = request.GET.get('search', '').strip()
@@ -802,7 +801,7 @@ def _perform_case_lab_negative(
     return {'status': 'DISCARDED', 'outcome': 'negative'}
 
 
-@role_required('admin', 'super_admin', 'health_officer')
+@role_required('admin', 'super_admin')
 def admin_confirmation_panel(request):
     """Dedicated queue for admin lab confirmation of ML-classified probable cases."""
     search = request.GET.get('search', '').strip()
@@ -995,11 +994,8 @@ def _evaluate_confirmed_close_lab(request, report):
 @role_required(
     'admin',
     'super_admin',
-    'health_officer',
-    'surveillance_officer',
     'barangay_health_worker',
-    'encoder',
-)
+    )
 def ocr_parse_lab_document(request):
     try:
         from .ocr_service import (
@@ -1030,7 +1026,7 @@ def ocr_parse_lab_document(request):
             )
         if (
             purpose == 'confirmation'
-            and request.session.get('role') not in {'admin', 'super_admin', 'health_officer'}
+            and request.session.get('role') not in {'admin', 'super_admin'}
         ):
             return JsonResponse(
                 {'success': False, 'error': 'You are not authorized to confirm cases.'},
@@ -1112,7 +1108,7 @@ def ocr_parse_lab_document(request):
 
 
 @require_POST
-@role_required('admin', 'super_admin', 'health_officer')
+@role_required('admin', 'super_admin')
 def confirm_case(request, report_id):
     report = SurveillanceReport.objects.filter(id=report_id)
     report = barangay_queryset_filter(request, report).first()
@@ -1191,8 +1187,7 @@ def _confirm_redirect_target(request):
 
 FIELD_ROLES_CONFIRMED_CLOSE_ONLY = frozenset({
     'barangay_health_worker',
-    'encoder',
-})
+    })
 UNCONFIRMED_CLOSE_STATUSES = frozenset({'Probable', 'Suspected'})
 LAB_NEGATIVE_CLOSE_OUTCOME = 'Discarded (Not a Case / False Alarm)'
 ALLOWED_CLOSE_OUTCOMES = frozenset({
@@ -1203,9 +1198,7 @@ ALLOWED_CLOSE_OUTCOMES = frozenset({
 CHO_CLOSE_ROLES = frozenset({
     'admin',
     'super_admin',
-    'health_officer',
-    'surveillance_officer',
-})
+    })
 
 
 def close_case_rejection(role, status, outcome=''):
@@ -1219,7 +1212,7 @@ def close_case_rejection(role, status, outcome=''):
 
     if role in FIELD_ROLES_CONFIRMED_CLOSE_ONLY and status in UNCONFIRMED_CLOSE_STATUSES:
         return (
-            'Barangay encoders and health workers cannot close probable or suspected cases. '
+            'Barangay health workers cannot close probable or suspected cases. '
             'Laboratory-negative discard is done by CHO on the Case Confirmation panel.'
         )
 
@@ -1245,7 +1238,7 @@ def close_case_rejection(role, status, outcome=''):
 
 
 @require_POST
-@role_required('admin', 'super_admin', 'surveillance_officer')
+@role_required('admin', 'super_admin')
 def validate_report(request, report_id):
     """Legacy manual validation — superseded by live ML auto-validation on submit."""
     messages.info(
@@ -1257,7 +1250,7 @@ def validate_report(request, report_id):
 
 
 @require_POST
-@role_required('admin', 'super_admin', 'health_officer', 'surveillance_officer', 'barangay_health_worker', 'encoder')
+@role_required('admin', 'super_admin', 'barangay_health_worker')
 def close_case(request, report_id):
     """Close an active case. Unconfirmed discard is CHO lab-confirmation only."""
     report = SurveillanceReport.objects.filter(id=report_id)
@@ -1392,7 +1385,7 @@ def _incident_report_date_bound(value):
     return timezone.make_aware(local_midnight, timezone.get_current_timezone())
 
 
-@role_required('admin', 'super_admin', 'surveillance_officer', 'health_officer')
+@role_required('admin', 'super_admin')
 def incident_reports(request):
     """Generate structured health incident reports from validated data."""
     date_from = request.GET.get('date_from', '')

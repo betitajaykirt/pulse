@@ -52,7 +52,7 @@ class Command(BaseCommand):
                 
                 summary = f'APTAS RISK: {log.syndrome} at {alert_level.title()} level in {log.barangay}'
                 
-                for role in ('admin', 'health_officer', 'surveillance_officer'):
+                for role in ('admin'):
                     NotificationLog.objects.create(
                         alert_id=alert.id,
                         recipient_role=role,

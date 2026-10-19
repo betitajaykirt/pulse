@@ -89,6 +89,31 @@
         return 'No contact on file';
     }
 
+    // Alerts closed with X. Cleared by the login page, so they return after the next login.
+    const DISMISSED_KEY = 'pulseDismissedAlerts';
+
+    function dismissedIds() {
+        try {
+            return JSON.parse(sessionStorage.getItem(DISMISSED_KEY) || '[]');
+        } catch (err) {
+            return [];
+        }
+    }
+
+    function wasDismissed(id) {
+        return dismissedIds().includes(id);
+    }
+
+    function rememberDismissed(id) {
+        try {
+            const ids = dismissedIds();
+            if (!ids.includes(id)) ids.push(id);
+            sessionStorage.setItem(DISMISSED_KEY, JSON.stringify(ids));
+        } catch (err) {
+            /* storage unavailable: the pop-up simply returns on the next page load */
+        }
+    }
+
     function createToastUI(notif) {
         const severityClass = getSeverityClass(notif.severity_level);
         const toast = document.createElement('div');
@@ -105,6 +130,14 @@
                 removeToast(toast);
                 setTimeout(showNextModal, 300);
             });
+        };
+
+        // X only hides the pop-up for this login session. The alert stays unread,
+        // so it pops up again after the next login until it is acknowledged.
+        const dismissForSession = () => {
+            rememberDismissed(notif.id);
+            removeToast(toast);
+            setTimeout(showNextModal, 300);
         };
 
         const locationText = notif.purok ? `${escapeHtml(notif.barangay_name)} — ${escapeHtml(notif.purok)}` : escapeHtml(notif.barangay_name);
@@ -154,7 +187,7 @@
         toastContainer.appendChild(toast);
         setTimeout(() => toast.classList.add('show'), 10);
 
-        toast.querySelector('.toast-close').addEventListener('click', acknowledge);
+        toast.querySelector('.toast-close').addEventListener('click', dismissForSession);
         toast.querySelector('.toast-dismiss-btn').addEventListener('click', acknowledge);
         const destinationButton = toast.querySelector(
             pendingReview ? '.pulse-alert-card__review-btn' : '.pulse-alert-card__map-btn'
@@ -283,7 +316,7 @@
                     data.notifications.forEach(notif => {
                         listContainer.appendChild(renderDropdownItem(notif));
 
-                        if (!notifiedIds.has(notif.id) && !notif.is_read) {
+                        if (!notifiedIds.has(notif.id) && !notif.is_read && !wasDismissed(notif.id)) {
                             queueToast(notif);
                         }
                         notifiedIds.add(notif.id);

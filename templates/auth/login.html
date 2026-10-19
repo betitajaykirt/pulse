@@ -257,6 +257,8 @@
 {% block extra_js %}
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 <script>
+  // A new login brings back alerts that were closed with X but never acknowledged.
+  try { sessionStorage.removeItem('pulseDismissedAlerts'); } catch (e) {}
 document.addEventListener('DOMContentLoaded', function () {
   if (window.lucide) lucide.createIcons();
 

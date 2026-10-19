@@ -4,8 +4,7 @@ from django.utils import timezone
 from myapp.models import Admin, AuditLog, SuperAdmin, SystemLog, User
 
 ROLE_SLUGS = {
-    'super_admin', 'admin', 'health_officer', 'surveillance_officer',
-    'barangay_health_worker', 'encoder', 'user',
+    'super_admin', 'admin', 'barangay_health_worker', 'user',
 }
 
 

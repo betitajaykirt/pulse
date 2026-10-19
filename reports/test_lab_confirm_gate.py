@@ -15,9 +15,9 @@ from reports.views import (
 )
 
 class CloseCasePolicyTests(SimpleTestCase):
-    def test_encoder_cannot_close_probable(self):
+    def test_bhw_cannot_close_probable(self):
         msg = close_case_rejection(
-            'encoder', 'Probable', 'Recovered',
+            'barangay_health_worker', 'Probable', 'Recovered',
         )
         self.assertIsNotNone(msg)
         self.assertIn('cannot close probable or suspected', msg.lower())
@@ -28,14 +28,14 @@ class CloseCasePolicyTests(SimpleTestCase):
         )
         self.assertIsNotNone(msg)
 
-    def test_encoder_can_close_confirmed_recovered(self):
+    def test_bhw_can_close_confirmed_recovered(self):
         self.assertIsNone(close_case_rejection(
-            'encoder', 'Confirmed', 'Recovered (Confirmed Case)',
+            'barangay_health_worker', 'Confirmed', 'Recovered (Confirmed Case)',
         ))
 
     def test_discard_not_a_case_blocked_for_cho(self):
         msg = close_case_rejection(
-            'health_officer', 'Probable',
+            'admin', 'Probable',
             'Discarded (Not a Case / False Alarm)',
         )
         self.assertIsNotNone(msg)
@@ -43,14 +43,14 @@ class CloseCasePolicyTests(SimpleTestCase):
 
     def test_lost_to_follow_up_is_not_a_close_outcome(self):
         msg = close_case_rejection(
-            'health_officer', 'Probable', 'Lost to Follow-up',
+            'admin', 'Probable', 'Lost to Follow-up',
         )
         self.assertIsNotNone(msg)
         self.assertIn('valid resolution outcome', msg.lower())
 
     def test_probable_can_use_standard_recovered_outcome(self):
         self.assertIsNone(close_case_rejection(
-            'health_officer', 'Probable', 'Recovered',
+            'admin', 'Probable', 'Recovered',
         ))
 
     def test_confirmed_cannot_use_standard_recovered_outcome(self):

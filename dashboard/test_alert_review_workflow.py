@@ -77,7 +77,7 @@ class AlertReviewWorkflowTests(SimpleTestCase):
         self.assertEqual(notification.review_status, 'approved')
         self.assertEqual(notification.recommendation_text, 'Inspect the affected area.')
         self.assertEqual(alert.status, 'active')
-        self.assertEqual(notification_logs.update_or_create.call_count, 3)
+        self.assertEqual(notification_logs.update_or_create.call_count, 2)
         notification_reads.filter.return_value.delete.assert_called_once()
         audit.assert_called_once()
 

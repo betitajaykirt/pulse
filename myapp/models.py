@@ -67,9 +67,6 @@ class Admin(models.Model):
 
 class User(models.Model):
     ROLE_CHOICES = [
-        ('encoder', 'Encoder'),
-        ('health_officer', 'Health Officer'),
-        ('surveillance_officer', 'Surveillance Officer'),
         ('midwife', 'Midwife'),
         ('barangay_health_worker', 'Barangay Health Worker'),
     ]
