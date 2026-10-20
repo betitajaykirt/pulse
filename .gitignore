@@ -12,3 +12,4 @@ pulse_data_only.sql
 *.pem
 credentials.json
 serviceAccount.json
+/test/
