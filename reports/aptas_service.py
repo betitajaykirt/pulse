@@ -85,6 +85,7 @@ def _enrich_card_context(
     *,
     nurses_by_barangay: dict | None = None,
     recommendation_matrix: dict | None = None,
+    viewer_role: str | None = None,
 ) -> Dict[str, Any]:
     """Attach report-level context (officer, purok, coordinates, active cases) to a card."""
     from myapp.barangay_scope import midwife_officer_fields
@@ -123,14 +124,15 @@ def _enrich_card_context(
         card['latitude'] = None
         card['longitude'] = None
 
-    dispatch = (
-        AppNotification.objects.filter(
-            barangay_name__iexact=barangay_name,
-            disease__iexact=syndrome_name,
-        )
-        .order_by('-created_at')
-        .first()
+    dispatch_qs = AppNotification.objects.filter(
+        barangay_name__iexact=barangay_name,
+        disease__iexact=syndrome_name,
     )
+    if viewer_role not in ('admin', 'super_admin'):
+        # Field staff only see released alerts. A newer alert still waiting for
+        # admin review must not hide the one that was already approved.
+        dispatch_qs = dispatch_qs.filter(review_status='approved')
+    dispatch = dispatch_qs.order_by('-created_at').first()
     card['dispatch_id'] = dispatch.id if dispatch else None
     card['review_status'] = dispatch.review_status if dispatch else 'unreviewed'
     card['trigger_source'] = (
@@ -322,6 +324,35 @@ def deactivate_inconclusive_alerts() -> None:
         logger.debug('Inconclusive AppNotification cleanup skipped', exc_info=True)
 
 
+def _released_alert_cards(*, barangay_name=None, skip_keys=frozenset(), limit=20) -> list[Dict[str, Any]]:
+    """Cards for alerts that are still live (pop-up and bell) but whose latest risk
+    reading dropped below the alert gate, so the panel agrees with the notifications."""
+    from dashboard.models import AppNotification
+    from dashboard.notification_service import relevant_app_notifications
+
+    notifs = AppNotification.objects.filter(review_status__in=('pending', 'approved'))
+    if barangay_name:
+        notifs = notifs.filter(barangay_name__iexact=barangay_name)
+    cards = []
+    seen = set(skip_keys)
+    for notif in relevant_app_notifications(notifs, limit=limit):
+        key = ((notif.barangay_name or '').casefold(), (notif.disease or '').casefold())
+        if key in seen:
+            continue
+        log = (
+            BarangayRiskLog.objects.filter(
+                barangay__iexact=notif.barangay_name,
+                syndrome__iexact=notif.disease,
+            )
+            .order_by('-created_at')
+            .first()
+        )
+        if log and _is_trackable_syndrome(log.syndrome):
+            seen.add(key)
+            cards.append(_aptas_ml_log_to_card(log))
+    return cards
+
+
 def get_aptas_dashboard_context(*, barangay_name=None, limit=12, viewer_role=None):
     """Build template context for APTAS alert cards (ML signals + PIDSR thresholds)."""
     deactivate_inconclusive_alerts()
@@ -345,6 +376,15 @@ def get_aptas_dashboard_context(*, barangay_name=None, limit=12, viewer_role=Non
         if _is_trackable_syndrome(log.syndrome)
         and (log.barangay.casefold(), log.syndrome.casefold()) not in pidsr_keys
     ]
+
+    ml_cards.extend(
+        _released_alert_cards(
+            barangay_name=barangay_name,
+            skip_keys=pidsr_keys | {
+                (c['barangay'].casefold(), c['syndrome'].casefold()) for c in ml_cards
+            },
+        )
+    )
 
     def _sort_key(card: Dict[str, Any]):
         level_rank = {'Critical': 0, 'High': 1, 'Moderate': 2, 'Low': 3}.get(card['risk_level'], 4)
@@ -370,6 +410,7 @@ def get_aptas_dashboard_context(*, barangay_name=None, limit=12, viewer_role=Non
             card,
             nurses_by_barangay=nurses_by_barangay,
             recommendation_matrix=recommendation_matrix,
+            viewer_role=viewer_role,
         )
         for card in candidate_alerts
     ]

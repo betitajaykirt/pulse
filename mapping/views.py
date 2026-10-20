@@ -503,7 +503,9 @@ def api_cases(request):
         alert_text = approved_alert_text.get(
             (barangay_name.casefold(), disease_key.casefold())
         )
-        if alert_text:
+        # The alert's text has its own approval. It only fills in when the patient's
+        # disease has no released recommendation; it never replaces one.
+        if alert_text and not recommendation_bundle:
             recommendation_bundle = apply_alert_recommendation(
                 recommendation_bundle,
                 disease_key or action_disease or ml_predicted,
