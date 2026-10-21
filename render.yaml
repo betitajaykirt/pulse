@@ -9,3 +9,17 @@ services:
         value: 3.11.9
       - key: DEBUG
         value: "False"
+  # Optional nightly retrain (a paid Render cron job, so it is switched off).
+  # To use it instead of running the command by hand, remove the leading '# '.
+  # 18:00 UTC is 02:00 in Manila. Give the job the same environment variables as the web service.
+  # - type: cron
+  #   name: pulse-ai-retrain
+  #   runtime: python
+  #   schedule: "0 18 * * *"
+  #   buildCommand: pip install -r requirements.txt
+  #   startCommand: python manage.py retrain_classifier
+  #   envVars:
+  #     - key: PYTHON_VERSION
+  #       value: 3.11.9
+  #     - key: DEBUG
+  #       value: "False"

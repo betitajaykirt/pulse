@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from functools import lru_cache
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
@@ -27,6 +27,7 @@ from ml_engine import (
     train_and_classify_result,
 )
 from myapp.models import EnvironmentalData
+from reports.classifier_store import active_model_id, load_active_model
 from reports.pidsr_schema import normalize_symptom_codes
 from reports.weather_service import FALLBACK_WEATHER
 
@@ -40,12 +41,84 @@ _outbreak_model = None
 _outbreak_model_lock = threading.Lock()
 
 
-def _load_training_frame() -> pd.DataFrame:
+def _live_training_rows() -> Optional[pd.DataFrame]:
+    """Lab-confirmed cases from the database, shaped like the training CSV.
+
+    Only cases an officer confirmed with a laboratory record are used, so the forest learns from verified
+    diseases rather than from its own predictions.
+    """
+    import json
+
+    from django.db.models import Q
+
+    from myapp.models import SurveillanceReport
+    from reports.disease_catalog import selectable_disease_labels
+    from reports.ml_display import official_disease_label
+
+    known = {label.casefold() for label in selectable_disease_labels()}
+    confirmed = (
+        Q(status='Confirmed') | Q(case_classification__iexact='confirmed')
+        | Q(validated_by__isnull=False)
+    )
+    # A laboratory record is required. Cases marked confirmed without one are
+    # left out, so only lab-verified diseases become training labels.
+    has_lab_record = (
+        Q(lab_specimen_number__gt='') | Q(lab_findings__gt='') | Q(lab_interpretation__gt='')
+    )
+    rows = []
+    reports = (
+        SurveillanceReport.objects.filter(confirmed).filter(has_lab_record)
+        .select_related('barangay')
+    )
+    for report in reports.prefetch_related('patient_case'):
+        case = report.patient_case.first()
+        label = (official_disease_label(report) or '').strip()
+        if not case or label.casefold() not in known:
+            continue
+        try:
+            symptoms = json.loads(case.symptoms_json or '[]')
+        except (TypeError, ValueError):
+            continue
+        if not symptoms or case.age is None:
+            continue
+        row = patient_case_to_feature_row(age=case.age, sex=case.sex, symptom_codes=symptoms)
+        row['barangay'] = report.barangay.barangay_name if report.barangay else ''
+        row['submission_date'] = (report.report_date or timezone.now()).date().isoformat()
+        row[TARGET_COLUMN] = label
+        rows.append(row)
+    return pd.DataFrame(rows) if rows else None
+
+
+def load_csv_training_frame() -> pd.DataFrame:
+    """The permanent base: historical_training_data.csv (or the mock fallback)."""
     if HISTORICAL_CSV.is_file():
         return ensure_climate_columns(pd.read_csv(HISTORICAL_CSV))
     logger.warning('historical_training_data.csv not found — using minimal fallback training set.')
     from ml_pipeline import _build_mock_training_set  # noqa: SLF001
     return _build_mock_training_set()
+
+
+def load_live_training_frame(columns) -> Optional[pd.DataFrame]:
+    """Lab-confirmed live cases aligned to ``columns``, or None when there are none."""
+    live = _live_training_rows()
+    if live is None:
+        return None
+    return ensure_climate_columns(live).reindex(columns=columns, fill_value=0)
+
+
+def _load_training_frame() -> pd.DataFrame:
+    base = load_csv_training_frame()
+    if getattr(settings, 'ML_STACK_LIVE_DATA', False):
+        # Live cases are added in memory on top of the CSV. The CSV file is
+        # never changed, and any failure falls back to the CSV alone.
+        try:
+            live = load_live_training_frame(base.columns)
+            if live is not None:
+                logger.info('Stacking %d lab-confirmed live cases onto %d CSV rows.', len(live), len(base))
+                return pd.concat([base, live], ignore_index=True)
+        except Exception:
+            logger.exception('Could not stack live cases; training on the CSV only.')
+    return base
 
 
 def _get_outbreak_model(outbreak_train_df: pd.DataFrame):
@@ -63,10 +136,47 @@ def _get_outbreak_model(outbreak_train_df: pd.DataFrame):
     return _outbreak_model
 
 
-@lru_cache(maxsize=1)
+CLASSIFIER_REFRESH_SECONDS = 3600
+_classifier_lock = threading.Lock()
+_classifier_state = {'model': None, 'model_id': None, 'checked_at': 0.0}
+
+
 def _get_fitted_classifier():
-    """Fit once per web worker instead of rebuilding the forest per request."""
-    return fit_random_forest_classifier(_load_training_frame())
+    """Return the cached forest, preferring the newest nightly-trained model.
+
+    The saved model is looked up at most once an hour, so a model trained at
+    2:00 AM goes live without a restart. With no saved model (or if loading it
+    fails) the forest is fitted from the training data, exactly as before.
+    """
+    now = time.monotonic()
+    state = _classifier_state
+    if state['model'] is not None and now - state['checked_at'] < CLASSIFIER_REFRESH_SECONDS:
+        return state['model']
+    with _classifier_lock:
+        if state['model'] is not None and now - state['checked_at'] < CLASSIFIER_REFRESH_SECONDS:
+            return state['model']
+        try:
+            newest = active_model_id()
+            if newest is not None and newest != state['model_id']:
+                loaded = load_active_model()
+                if loaded:
+                    state['model_id'] = loaded[0]
+                    state['model'] = (loaded[1], loaded[2])
+                    logger.info('Loaded nightly-trained classifier #%s.', loaded[0])
+        except Exception:
+            logger.exception('Could not load the saved classifier; keeping the current one.')
+        if state['model'] is None:
+            state['model'] = fit_random_forest_classifier(_load_training_frame())
+            state['model_id'] = None
+        state['checked_at'] = now
+        return state['model']
+
+
+def _reset_classifier_cache():
+    _classifier_state.update({'model': None, 'model_id': None, 'checked_at': 0.0})
+
+
+_get_fitted_classifier.cache_clear = _reset_classifier_cache
 
 
 def _get_outbreak_training_data() -> pd.DataFrame:
@@ -171,7 +281,7 @@ def analyze_patient_case(
     fitted_classifier=None,
     same_day_prior_cases: int = 0,
 ) -> Dict[str, Any]:
-    if train_df is None:
+    if train_df is None and fitted_classifier is None:
         train_df = _load_training_frame()
     if outbreak_train_df is None:
         outbreak_train_df = _get_outbreak_training_data()
@@ -294,14 +404,15 @@ def analyze_batch_cases(
     barangay_names: Optional[dict] = None,
 ) -> List[Dict[str, Any]]:
     barangay_names = barangay_names or {}
-    train_df = _load_training_frame()
     outbreak_train_df = _get_outbreak_training_data()
     climate = get_climate_features_for_timestamp()
     fitted_classifier = None
+    train_df = None
     try:
         fitted_classifier = _get_fitted_classifier()
     except Exception:
         logger.exception('Shared Random Forest fit failed; falling back to per-case training.')
+        train_df = _load_training_frame()
     results = []
     barangay_batch_counts: Dict[str, int] = {}
     for idx, case in enumerate(cases, start=1):

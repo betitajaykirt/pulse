@@ -226,3 +226,6 @@ LOCKOUT_WINDOW_SECONDS = int(os.getenv('LOCKOUT_WINDOW_SECONDS', 900))
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Add officer-confirmed live cases to the Random Forest training data (off by default).
+ML_STACK_LIVE_DATA = os.getenv('ML_STACK_LIVE_DATA', 'false').lower() in ('1', 'true', 'yes')
