@@ -48,6 +48,7 @@
         const s = (notif.severity_level || '').toLowerCase();
         if (s.includes('critical')) return 'CRITICAL OUTBREAK ALERT';
         if (s.includes('high')) return 'HIGH RISK ANOMALY DETECTED';
+        if (s.includes('low')) return 'LOW RISK SURVEILLANCE ALERT';
         return 'MODERATE SURVEILLANCE ALERT';
     }
 
